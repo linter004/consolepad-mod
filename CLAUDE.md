@@ -8,21 +8,25 @@
   Sonnet medio → Sonnet alto → Opus medio.
 - **Registro:** al terminar cada tarea, añade una entrada en `routing-log.md` con: tarea, nivel que la resolvió, intentos y coste estimado.
 - **Aprendizaje:** cuando `routing-log.md` tenga 5 o más entradas, resume los patrones como reglas fijas en la sección "Reglas aprendidas" de este archivo.
-- **Sin subagentes:** no uses subagentes ni equipos de agentes salvo petición explícita.
+- **Subagentes:** permitidos solo para (1) leer logs largos y diagnósticos con mucho texto, devolviendo un resumen corto, y (2) `.claude/agents/fixer-opus.md` (Opus medio), con permiso permanente del usuario únicamente para diagnosticar y arreglar algo que ya falló una vez. Nada más.
 
-## Autonomía en el prototipo de pantalla dividida (pasos que quedan)
+## Autonomía en la pantalla dividida (hasta que funcione de principio a fin)
 
-Estas reglas se suman a las de ahorro; no las sustituyen.
+Estas reglas se suman a las de ahorro; no las sustituyen. Objetivo: 2-4 jugadores locales, cada uno con su HUD, pausa, inventario y pantallas, cursor, mando y ajustes en su parte de la pantalla. Primero funcionar, después pulir (el aspecto es el de Minecraft normal). Hoja de ruta en `docs/splitscreen-roadmap.md`; plan base en `docs/splitscreen-plan.md`.
 
-- **En cada paso:** explica en 3 líneas qué vas a hacer y empieza sin esperar mi OK. Implementa, compila, usa el autotest y haz un commit por paso, con la tarea y el nivel en `routing-log.md`.
-- **Si la comprobación objetiva pasa**, pasa al siguiente paso del plan (`docs/splitscreen-plan.md`, sección 6) sin pedir permiso.
+- **En cada paso:** explica en 3 líneas qué vas a hacer y empieza sin esperar OK. Implementa, compila, usa el autotest y haz **un commit por paso**, con tarea, nivel y resultado en `routing-log.md`. Comprobaciones numéricas con el autotest siempre que se pueda, no solo capturas.
+- **Si la comprobación pasa**, sigue al paso siguiente sin pedir permiso.
+- **Si falla una vez:** delega el diagnóstico y el arreglo en `fixer-opus`. No cambies el modelo de la sesión principal.
 - **Para y espera solo si:**
-  - (a) una comprobación falla: propón subir de nivel; no cambies de modelo sin mi confirmación;
-  - (b) ves una fuga de contexto de P2 hacia P1;
-  - (c) necesitas que yo mire algo jugando: dame una lista corta de qué probar;
-  - (d) el uso semanal pasa del 40 % en `/usage`;
+  - (a) un paso falla incluso con el subagente;
+  - (b) hay una fuga de contexto de P2 hacia P1 que no consigues cerrar;
+  - (c) el uso semanal pasa del 50 % en `/usage`;
+  - (d) el usuario debe probar algo jugando que no se pueda medir: dar una lista corta de qué probar;
   - (e) hay que usar algo que gaste créditos de pago.
+- **Si algo es demasiado arriesgado o grande**, déjalo en el roadmap como pendiente con el motivo y sigue con lo siguiente.
+- **Contexto pequeño:** logs largos y diagnósticos con mucho texto, a un subagente que devuelva un resumen corto; no pegar logs completos ni capturas innecesarias. Tras cada paso, el estado resumido va a `routing-log.md` de modo que una sesión nueva pueda continuar solo con ese archivo y los commits.
 - **Fallos visuales:** se comprueban con medidas numéricas en el autotest (por ejemplo `SplitDiag` y `aspectTest`), no solo mirando capturas.
+- **Autotest:** mientras corre, la ventana no debe tocarse.
 
 ## Reglas aprendidas
 
