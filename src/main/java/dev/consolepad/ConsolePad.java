@@ -37,6 +37,7 @@ public class ConsolePad {
             AutoTest.tick();
         });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> ContextSwitcher.watchdog(SecondaryPlayers.context()));
+        NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Post e) -> AutoTest.frameEnd());
         NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) -> e.getDispatcher().register(
                 Commands.literal("consolepad").then(Commands.literal("join2").executes(ctx -> {
                     SecondaryPlayers.join(Minecraft.getInstance());

@@ -17,7 +17,8 @@
     "ChatGuardsMixin",
     "ToastGuardsMixin",
     "MinecraftInvoker",
-    "KeyMappingGuardMixin"
+    "KeyMappingGuardMixin",
+    "GameRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

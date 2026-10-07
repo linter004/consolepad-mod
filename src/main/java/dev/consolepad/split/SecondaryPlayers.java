@@ -72,7 +72,7 @@ public final class SecondaryPlayers {
 
         SocketAddress address = server.getConnection().startMemoryChannel();
         Connection c = Connection.connectToLocalServer(address);
-        context = new PlayerContext(new DormantLevelRenderer(mc));
+        context = new PlayerContext(new SplitLevelRenderer(mc));
         connection = c; // antes de iniciar el protocolo: ConnectionMixin envuelve el listener de juego
         c.initiateServerboundPlayConnection(address.toString(), 0, new SecondaryHandshakeListener(c, mc));
         c.send(new ServerboundHelloPacket(name, profile.getId()));
@@ -125,7 +125,8 @@ public final class SecondaryPlayers {
         if (ctx != null) {
             Minecraft.getInstance().execute(() -> {
                 try {
-                    ctx.renderer.close();
+                    if (ctx.renderer instanceof SplitLevelRenderer r) r.release();
+                    else ctx.renderer.close();
                 } catch (RuntimeException e) {
                     ConsolePad.LOGGER.warn("[split] no se pudo cerrar el renderer latente de P2: {}", e.toString());
                 }

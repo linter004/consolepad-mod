@@ -4,6 +4,7 @@ import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -49,7 +50,55 @@ public final class AutoTest {
     private static int p1SelectedBefore, p2SelectedBefore;
     private static int c0Attack, c0Continue, c0Use, c0Jump, c0Hotbar;
 
+    private static final int WARMUP_TICKS = 20 * 4;
+    private static final int MEASURE_TICKS = 20 * 8;
+    private static boolean phaseStarted;
+    private static long fpsSum;
+    private static int fpsSamples;
+    private static boolean screenshotPending;
+
     private AutoTest() {}
+
+    /** Al terminar cada frame (RenderFrameEvent.Post): aqui se hace la captura, con el frame ya dibujado. */
+    public static void frameEnd() {
+        if (!screenshotPending) return;
+        screenshotPending = false;
+        Minecraft mc = Minecraft.getInstance();
+        Screenshot.grab(mc.gameDirectory, "split-step4.png", mc.getMainRenderTarget(),
+                msg -> ConsolePad.LOGGER.info("[autotest] captura: {}", msg.getString()));
+    }
+
+    /** Fase 3 (sin division, 1 jugador) y fase 4 (dividido, 2 jugadores): mide FPS con distancia de renderizado 8. */
+    private static void fpsPhase(Minecraft mc, boolean split) {
+        if (!phaseStarted) {
+            phaseStarted = true;
+            mc.options.renderDistance().set(8);
+            mc.options.enableVsync().set(false);
+            mc.options.framerateLimit().set(260);
+            SplitView.enabled = split;
+            fpsSum = 0;
+            fpsSamples = 0;
+            ticks = 0;
+            ConsolePad.LOGGER.info("[autotest] fase {}: {} (distancia 8, sin vsync)", split ? "dividida" : "base",
+                    split ? "pantalla dividida, 2 jugadores" : "1 jugador, sin division");
+            return;
+        }
+        if (ticks > WARMUP_TICKS && ticks % 20 == 0) {
+            fpsSum += mc.getFps();
+            fpsSamples++;
+        }
+        if (split && ticks == WARMUP_TICKS + 40) screenshotPending = true;
+        if (ticks >= WARMUP_TICKS + MEASURE_TICKS) {
+            PlayerContext c = SecondaryPlayers.context();
+            String p2Stats = c != null && c.renderer instanceof SplitLevelRenderer r && r.isLive() ? r.getSectionStatistics() : "n/a";
+            ConsolePad.LOGGER.info("[autotest] RESULTADO FPS {}: media {} fps ({} muestras). Secciones P1: {} | P2: {}",
+                    split ? "DIVIDIDO (2 jugadores)" : "BASE (1 jugador)", fpsSamples == 0 ? 0 : fpsSum / fpsSamples, fpsSamples,
+                    mc.levelRenderer.getSectionStatistics(), p2Stats);
+            phaseStarted = false;
+            next();
+            if (split) ConsolePad.LOGGER.info("[autotest] terminado");
+        }
+    }
 
     public static void init(PadManager manager) {
         pads = manager;
@@ -80,7 +129,8 @@ public final class AutoTest {
                 }
             }
             case 2 -> teleportAway(mc);
-            case 3 -> matrix(mc);
+            case 3 -> fpsPhase(mc, false);
+            case 4 -> fpsPhase(mc, true);
             default -> { }
         }
     }
