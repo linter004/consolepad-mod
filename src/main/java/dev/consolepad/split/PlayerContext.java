@@ -5,6 +5,7 @@ import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.HitResult;
 
 /** Estado de cliente de un jugador local extra: lo que vanilla guarda en campos globales de Minecraft. */
 public final class PlayerContext {
@@ -12,6 +13,10 @@ public final class PlayerContext {
     public ClientLevel level;
     public MultiPlayerGameMode gameMode;
     public Entity cameraEntity;
+    public HitResult hitResult;
+    public Entity crosshairPickEntity;
+    public int missTime;
+    public int rightClickDelay;
     /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
     public final LevelRenderer renderer;
 

@@ -6,6 +6,7 @@ import dev.consolepad.client.PadDriver;
 import dev.consolepad.split.AutoTest;
 import dev.consolepad.split.ContextSwitcher;
 import dev.consolepad.split.SecondaryPlayers;
+import dev.consolepad.split.SecondaryTick;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.Commands;
 import net.neoforged.api.distmarker.Dist;
@@ -31,6 +32,7 @@ public class ConsolePad {
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> {
             SecondaryPlayers.tick();
+            SecondaryTick.tick(driver.pads().slot(1));
             AutoTest.tick();
         });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> ContextSwitcher.watchdog(SecondaryPlayers.context()));

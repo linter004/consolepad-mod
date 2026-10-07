@@ -1,12 +1,14 @@
 package dev.consolepad.split;
 
 import dev.consolepad.ConsolePad;
+import dev.consolepad.mixin.MinecraftInvoker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.HitResult;
 
 /**
  * Cambia temporalmente player/level/gameMode/cameraEntity de Minecraft al contexto de un jugador extra.
@@ -40,6 +42,11 @@ public final class ContextSwitcher {
         ClientLevel p1Level = mc.level;
         MultiPlayerGameMode p1GameMode = mc.gameMode;
         Entity p1Camera = mc.cameraEntity;
+        HitResult p1Hit = mc.hitResult;
+        Entity p1Cross = mc.crosshairPickEntity;
+        MinecraftInvoker inv = (MinecraftInvoker) mc;
+        int p1Miss = inv.consolepad$getMissTime();
+        int p1Delay = inv.consolepad$getRightClickDelay();
 
         active = true;
         current = ctx;
@@ -47,6 +54,10 @@ public final class ContextSwitcher {
         mc.level = ctx.level;
         mc.gameMode = ctx.gameMode;
         mc.cameraEntity = ctx.cameraEntity;
+        mc.hitResult = ctx.hitResult;
+        mc.crosshairPickEntity = ctx.crosshairPickEntity;
+        inv.consolepad$setMissTime(ctx.missTime);
+        inv.consolepad$setRightClickDelay(ctx.rightClickDelay);
         try {
             body.run();
         } finally {
@@ -55,6 +66,14 @@ public final class ContextSwitcher {
             ctx.level = mc.level;
             ctx.gameMode = mc.gameMode;
             ctx.cameraEntity = mc.cameraEntity;
+            ctx.hitResult = mc.hitResult;
+            ctx.crosshairPickEntity = mc.crosshairPickEntity;
+            ctx.missTime = inv.consolepad$getMissTime();
+            ctx.rightClickDelay = inv.consolepad$getRightClickDelay();
+            mc.hitResult = p1Hit;
+            mc.crosshairPickEntity = p1Cross;
+            inv.consolepad$setMissTime(p1Miss);
+            inv.consolepad$setRightClickDelay(p1Delay);
             mc.player = p1Player;
             mc.level = p1Level;
             mc.gameMode = p1GameMode;
@@ -62,12 +81,15 @@ public final class ContextSwitcher {
             active = false;
             current = null;
             runs++;
-            verify(mc, p1Player, p1Level, p1GameMode, p1Camera);
+            verify(mc, p1Player, p1Level, p1GameMode, p1Camera, p1Hit, p1Cross, p1Miss, p1Delay, inv);
         }
     }
 
-    private static void verify(Minecraft mc, LocalPlayer player, ClientLevel level, MultiPlayerGameMode gameMode, Entity camera) {
-        boolean ok = mc.player == player && mc.level == level && mc.gameMode == gameMode && mc.cameraEntity == camera;
+    private static void verify(Minecraft mc, LocalPlayer player, ClientLevel level, MultiPlayerGameMode gameMode, Entity camera,
+                               HitResult p1Hit, Entity p1Cross, int p1Miss, int p1Delay, MinecraftInvoker inv) {
+        boolean ok = mc.player == player && mc.level == level && mc.gameMode == gameMode && mc.cameraEntity == camera
+                && mc.hitResult == p1Hit && mc.crosshairPickEntity == p1Cross
+                && inv.consolepad$getMissTime() == p1Miss && inv.consolepad$getRightClickDelay() == p1Delay;
         if (!ok) {
             violations++;
             ConsolePad.LOGGER.error("[split] P1 SIN RESTAURAR tras un paquete de P2: player={} level={} gameMode={} camera={}",

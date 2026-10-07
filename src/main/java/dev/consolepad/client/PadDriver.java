@@ -49,6 +49,10 @@ public final class PadDriver {
     private final float[] dpadHeld = new float[4];
     private final float[] dpadNext = new float[4];
 
+    public PadManager pads() {
+        return pads;
+    }
+
     public PadDriver() {
         // Guarda los ajustes de todos los slots al cerrar el juego.
         Runtime.getRuntime().addShutdownHook(new Thread(pads::saveSettings, "ConsolePad-save"));
@@ -286,7 +290,7 @@ public final class PadDriver {
     }
 
     /** Misma curva que el raton en vanilla ((s*0.6+0.2)^3*8): el 50 % por defecto equivale a 1. */
-    private static float sensitivityFactor(Options o) {
+    public static float sensitivityFactor(Options o) {
         double base = o.sensitivity().get() * 0.6 + 0.2;
         return (float) (base * base * base * 8.0);
     }
