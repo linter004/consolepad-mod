@@ -8,6 +8,7 @@ import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
+import dev.consolepad.split.SecondaryPlayers;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -60,6 +61,14 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
+        // Fase 3, paso 1: Start+Back en el mando del slot 1 abre al jugador local extra.
+        PadManager.Device dev1 = pads.slot(1).device;
+        if (dev1 != null) {
+            PadState s1 = dev1.state;
+            if ((s1.pressed(PadState.START) && s1.isDown(PadState.BACK)) || (s1.pressed(PadState.BACK) && s1.isDown(PadState.START))) {
+                SecondaryPlayers.join(mc);
+            }
+        }
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
         if (dev == null || !mc.isWindowActive()) {
