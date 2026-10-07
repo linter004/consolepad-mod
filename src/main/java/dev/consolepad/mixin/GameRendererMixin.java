@@ -2,6 +2,7 @@ package dev.consolepad.mixin;
 
 import com.mojang.blaze3d.platform.Window;
 import dev.consolepad.split.ContextSwitcher;
+import dev.consolepad.split.SplitDiag;
 import dev.consolepad.split.SplitHud;
 import dev.consolepad.split.SplitRender;
 import dev.consolepad.split.SplitView;
@@ -11,10 +12,13 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
+import org.joml.Matrix4f;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Pantalla dividida: una pasada de mundo por jugador y proyeccion con el aspecto de cada region. */
 @Mixin(GameRenderer.class)
@@ -54,5 +58,11 @@ public abstract class GameRendererMixin {
     private int consolepad$projectionHeight(Window window) {
         int h = SplitView.height;
         return h > 0 ? h : window.getHeight();
+    }
+
+    /** Diagnostico: anota la matriz de proyeccion que devuelve cada llamada (solo con el autotest grabando). */
+    @Inject(method = "getProjectionMatrix", at = @At("RETURN"))
+    private void consolepad$diagProjection(double fov, CallbackInfoReturnable<Matrix4f> cir) {
+        SplitDiag.onProjection(cir.getReturnValue());
     }
 }

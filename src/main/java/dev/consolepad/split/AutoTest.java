@@ -89,6 +89,33 @@ public final class AutoTest {
         if (ticks >= 45) next();
     }
 
+    private static int aspectBad;
+
+    /**
+     * Comprobacion numerica del aspecto: durante unos frames graba, por pasada, el viewport GL real y la proyeccion y
+     * falla si el aspecto de la proyeccion o del viewport se desvia mas de un 1 % del de la region de la pasada.
+     */
+    private static void aspectTest(Minecraft mc, String label) {
+        if (ticks == 1) {
+            SplitView.enabled = true;
+            SplitDiag.clear();
+            SplitDiag.recording = true;
+            com.mojang.blaze3d.platform.Window w = mc.getWindow();
+            ConsolePad.LOGGER.info("[autotest] aspecto '{}': ventana {}x{}", label, w.getWidth(), w.getHeight());
+        }
+        if (ticks == 10) {
+            SplitDiag.recording = false;
+            int n = SplitDiag.samples().size();
+            int bad = SplitDiag.check(label, 0.01);
+            aspectBad += bad;
+            ConsolePad.LOGGER.info("[autotest] RESULTADO aspecto '{}': {} muestras, {} fuera de tolerancia (1 %) -> {}", label, n, bad,
+                    n > 0 && bad == 0 ? "OK" : "FALLO");
+            screenshotName = "split-aspect-" + label + ".png";
+            screenshotPending = true;
+        }
+        if (ticks >= 20) next();
+    }
+
     /** Pone la ventana a 1920x1080 (o lo mas cercano que admita la pantalla) y espera a que se aplique. */
     private static void resizeWindow(Minecraft mc) {
         com.mojang.blaze3d.platform.Window window = mc.getWindow();
@@ -167,9 +194,11 @@ public final class AutoTest {
             }
             case 2 -> teleportAway(mc);
             case 3 -> hotbarTest(mc);
-            case 4 -> resizeWindow(mc);
-            case 5 -> fpsPhase(mc, false);
-            case 6 -> fpsPhase(mc, true);
+            case 4 -> aspectTest(mc, "pequena");
+            case 5 -> resizeWindow(mc);
+            case 6 -> aspectTest(mc, "1920x1080");
+            case 7 -> fpsPhase(mc, false);
+            case 8 -> fpsPhase(mc, true);
             default -> { }
         }
     }

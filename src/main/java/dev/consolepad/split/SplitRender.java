@@ -69,16 +69,23 @@ public final class SplitRender {
                              int x, int y, int w, int h) {
         RenderSystem.enableScissor(x, y, w, h);
         RenderSystem.viewport(x, y, w, h);
+        SplitView.x = x;
+        SplitView.y = y;
         SplitView.width = w;
         SplitView.height = h;
+        SplitDiag.beginPass(ctx != null ? "P2" : "P1", w, h);
         ClientLevel level = ctx != null ? ctx.level : mc.level;
         // Los dispatchers de entidades y bloques son compartidos: apuntan al nivel del jugador que se dibuja.
         mc.getEntityRenderDispatcher().setLevel(level);
         mc.getBlockEntityRenderDispatcher().setLevel(level);
-        if (ctx != null) {
-            ContextSwitcher.run(ctx, () -> renderer.renderLevel(deltaTracker));
-        } else {
-            renderer.renderLevel(deltaTracker);
+        try {
+            if (ctx != null) {
+                ContextSwitcher.run(ctx, () -> renderer.renderLevel(deltaTracker));
+            } else {
+                renderer.renderLevel(deltaTracker);
+            }
+        } finally {
+            SplitDiag.endPass();
         }
     }
 }

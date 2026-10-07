@@ -20,7 +20,8 @@
     "KeyMappingGuardMixin",
     "GameRendererMixin",
     "GuiInvoker",
-    "GuiGraphicsMixin"
+    "GuiGraphicsMixin",
+    "LevelRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

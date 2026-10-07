@@ -7,6 +7,7 @@ import dev.consolepad.split.AutoTest;
 import dev.consolepad.split.ContextSwitcher;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryTick;
+import dev.consolepad.split.SplitDiag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.Commands;
 import net.neoforged.api.distmarker.Dist;
@@ -16,6 +17,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import org.slf4j.Logger;
@@ -38,6 +40,7 @@ public class ConsolePad {
         });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> ContextSwitcher.watchdog(SecondaryPlayers.context()));
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Post e) -> AutoTest.frameEnd());
+        NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent e) -> SplitDiag.onStage(e));
         NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) -> e.getDispatcher().register(
                 Commands.literal("consolepad").then(Commands.literal("join2").executes(ctx -> {
                     SecondaryPlayers.join(Minecraft.getInstance());
