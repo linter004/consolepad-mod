@@ -139,7 +139,16 @@ public final class PadDriver {
         dpadNavigation(mc, mouse, window, s, dt);
 
         // Clics: pulsar y soltar por separado, para poder arrastrar.
-        mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        if (!(mc.screen instanceof AbstractContainerScreen<?>) && mc.getLastInputType().isKeyboard()) {
+            // Modo foco (ultimo movimiento con el D-pad): A activa el elemento enfocado, como Enter.
+            if (s.pressed(PadState.A)) mc.screen.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0);
+            if (s.released(PadState.A) && (mouseDown & 1) != 0) { // clic empezado antes de cambiar de modo
+                mouse.consolepad$onPress(window, GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE, 0);
+                mouseDown &= ~1;
+            }
+        } else {
+            mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        }
         mouseButton(mouse, window, s, PadState.X, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 
         if (s.pressed(PadState.Y) && mc.screen instanceof AbstractContainerScreen<?> container) {
