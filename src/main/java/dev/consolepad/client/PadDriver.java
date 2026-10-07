@@ -1,6 +1,8 @@
 package dev.consolepad.client;
 
+import dev.consolepad.mixin.ContainerScreenInvoker;
 import dev.consolepad.mixin.KeyMappingAccessor;
+import dev.consolepad.mixin.MouseHandlerInvoker;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
@@ -11,7 +13,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
+
+import org.lwjgl.glfw.GLFW;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -29,6 +35,8 @@ public final class PadDriver {
     private long lastNanos = System.nanoTime();
     private boolean sprintLatch;
     private boolean sneakLatch;
+    private int mouseDown;
+    private float scrollAcc;
 
     public void onFrame(RenderFrameEvent.Pre event) {
         Minecraft mc = Minecraft.getInstance();
@@ -46,14 +54,13 @@ public final class PadDriver {
         PadState s = dev.state;
         PadSettings cfg = slot.settings;
 
-        // Con una pantalla abierta: solo cerrar con B / Start (y Y en inventarios). Cursor = fase 2.
+        // Con una pantalla abierta: cursor virtual.
         if (mc.screen != null) {
             releaseAll(mc);
-            boolean close = s.pressed(PadState.B) || s.pressed(PadState.START)
-                    || (s.pressed(PadState.Y) && mc.screen instanceof AbstractContainerScreen<?>);
-            if (close && mc.screen.shouldCloseOnEsc()) mc.screen.onClose();
+            screenFrame(mc, s, cfg, dt);
             return;
         }
+        releaseMouseButtons(mc);
 
         LocalPlayer player = mc.player;
         if (player == null || mc.level == null) {
@@ -87,6 +94,75 @@ public final class PadDriver {
             if (s.pressed(code)) onPress(mc, player, o, action);
             if (s.released(code)) onRelease(o, action);
         }
+    }
+
+    /** Cursor virtual: stick izq = cursor, A/X = clic izq/der, Y = mover rapido, stick der = scroll, B/Start = cerrar. */
+    private void screenFrame(Minecraft mc, PadState s, PadSettings cfg, float dt) {
+        long window = mc.getWindow().getWindow();
+        MouseHandlerInvoker mouse = (MouseHandlerInvoker) mc.mouseHandler;
+
+        // Parte de la posicion real del raton, asi que el raton fisico sigue funcionando.
+        double x = mc.mouseHandler.xpos();
+        double y = mc.mouseHandler.ypos();
+        PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, tmp);
+        if (tmp[0] != 0f || tmp[1] != 0f) {
+            double maxX = Math.max(0, mc.getWindow().getScreenWidth() - 1);
+            double maxY = Math.max(0, mc.getWindow().getScreenHeight() - 1);
+            double nx = Math.max(0, Math.min(maxX, x + tmp[0] * cfg.cursorSpeed * dt));
+            double ny = Math.max(0, Math.min(maxY, y + tmp[1] * cfg.cursorSpeed * dt));
+            if (nx != x || ny != y) {
+                GLFW.glfwSetCursorPos(window, nx, ny);
+                mouse.consolepad$onMove(window, nx, ny);
+            }
+        }
+
+        // Clics: pulsar y soltar por separado, para poder arrastrar.
+        mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        mouseButton(mouse, window, s, PadState.X, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+
+        if (s.pressed(PadState.Y) && mc.screen instanceof AbstractContainerScreen<?> container) {
+            Slot slot = container.getSlotUnderMouse();
+            if (slot != null) {
+                ((ContainerScreenInvoker) container).consolepad$slotClicked(slot, slot.index, 0, ClickType.QUICK_MOVE);
+            }
+        }
+
+        // Scroll con el stick derecho, acumulado por segundo (arriba = scroll hacia arriba).
+        PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, 1.0f, tmp);
+        scrollAcc += -tmp[1] * cfg.scrollSpeed * dt;
+        int steps = (int) scrollAcc;
+        if (steps != 0) {
+            scrollAcc -= steps;
+            mouse.consolepad$onScroll(window, 0.0, steps);
+        }
+
+        if ((s.pressed(PadState.B) || s.pressed(PadState.START)) && mc.screen.shouldCloseOnEsc()) {
+            releaseMouseButtons(mc);
+            mc.screen.onClose();
+        }
+    }
+
+    private void mouseButton(MouseHandlerInvoker mouse, long window, PadState s, int padButton, int mouseButton) {
+        if (s.pressed(padButton)) {
+            mouse.consolepad$onPress(window, mouseButton, GLFW.GLFW_PRESS, 0);
+            mouseDown |= 1 << mouseButton;
+        }
+        if (s.released(padButton) && (mouseDown & (1 << mouseButton)) != 0) {
+            mouse.consolepad$onPress(window, mouseButton, GLFW.GLFW_RELEASE, 0);
+            mouseDown &= ~(1 << mouseButton);
+        }
+    }
+
+    /** Suelta los botones de raton que el mando mantuviera pulsados. */
+    private void releaseMouseButtons(Minecraft mc) {
+        scrollAcc = 0f;
+        if (mouseDown == 0) return;
+        long window = mc.getWindow().getWindow();
+        MouseHandlerInvoker mouse = (MouseHandlerInvoker) mc.mouseHandler;
+        for (int b = 0; b < 2; b++) {
+            if ((mouseDown & (1 << b)) != 0) mouse.consolepad$onPress(window, b, GLFW.GLFW_RELEASE, 0);
+        }
+        mouseDown = 0;
     }
 
     private void onPress(Minecraft mc, LocalPlayer player, Options o, PadAction action) {

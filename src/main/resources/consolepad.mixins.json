@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "KeyboardInputMixin",
-    "KeyMappingAccessor"
+    "KeyMappingAccessor",
+    "MouseHandlerInvoker",
+    "ContainerScreenInvoker"
   ],
   "injectors": {
     "defaultRequire": 1

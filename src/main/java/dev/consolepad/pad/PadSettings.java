@@ -13,6 +13,12 @@ public final class PadSettings {
     public float lookExponent = 1.6f;
     public boolean invertY = false;
     public float triggerThreshold = 0.5f;
+    /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
+    public float cursorSpeed = 900f;
+    public float cursorDeadzone = 0.2f;
+    public float cursorExponent = 1.5f;
+    /** Pasos de scroll por segundo a inclinacion maxima del stick derecho. */
+    public float scrollSpeed = 6f;
 
     /** codigo de boton -> accion. Remapeable por jugador. */
     public final Map<Integer, PadAction> bindings = defaultBindings();
