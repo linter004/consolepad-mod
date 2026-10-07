@@ -1,0 +1,21 @@
+package dev.consolepad.split;
+
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.world.entity.Entity;
+
+/** Estado de cliente de un jugador local extra: lo que vanilla guarda en campos globales de Minecraft. */
+public final class PlayerContext {
+    public LocalPlayer player;
+    public ClientLevel level;
+    public MultiPlayerGameMode gameMode;
+    public Entity cameraEntity;
+    /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
+    public final LevelRenderer renderer;
+
+    PlayerContext(LevelRenderer renderer) {
+        this.renderer = renderer;
+    }
+}

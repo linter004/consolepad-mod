@@ -8,7 +8,14 @@
     "KeyMappingAccessor",
     "MouseHandlerInvoker",
     "ContainerScreenInvoker",
-    "ConnectionMixin"
+    "ConnectionMixin",
+    "MinecraftMixin",
+    "ClientPacketListenerMixin",
+    "SoundManagerMixin",
+    "ParticleEngineMixin",
+    "GuiGuardsMixin",
+    "ChatGuardsMixin",
+    "ToastGuardsMixin"
   ],
   "injectors": {
     "defaultRequire": 1
