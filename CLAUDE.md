@@ -10,6 +10,20 @@
 - **Aprendizaje:** cuando `routing-log.md` tenga 5 o más entradas, resume los patrones como reglas fijas en la sección "Reglas aprendidas" de este archivo.
 - **Sin subagentes:** no uses subagentes ni equipos de agentes salvo petición explícita.
 
+## Autonomía en el prototipo de pantalla dividida (pasos que quedan)
+
+Estas reglas se suman a las de ahorro; no las sustituyen.
+
+- **En cada paso:** explica en 3 líneas qué vas a hacer y empieza sin esperar mi OK. Implementa, compila, usa el autotest y haz un commit por paso, con la tarea y el nivel en `routing-log.md`.
+- **Si la comprobación objetiva pasa**, pasa al siguiente paso del plan (`docs/splitscreen-plan.md`, sección 6) sin pedir permiso.
+- **Para y espera solo si:**
+  - (a) una comprobación falla: propón subir de nivel; no cambies de modelo sin mi confirmación;
+  - (b) ves una fuga de contexto de P2 hacia P1;
+  - (c) necesitas que yo mire algo jugando: dame una lista corta de qué probar;
+  - (d) el uso semanal pasa del 40 % en `/usage`;
+  - (e) hay que usar algo que gaste créditos de pago.
+- **Fallos visuales:** se comprueban con medidas numéricas en el autotest (por ejemplo `SplitDiag` y `aspectTest`), no solo mirando capturas.
+
 ## Reglas aprendidas
 
 Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
