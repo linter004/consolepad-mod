@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.Connection;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.PacketListener;
@@ -59,7 +60,8 @@ public final class SecondaryPlayers {
             return;
         }
         if (!CONNECTIONS.isEmpty()) {
-            ConsolePad.LOGGER.info("Jugador 2: ya hay una conexion extra activa");
+            ConsolePad.LOGGER.info("Jugador 2: ya esta dentro");
+            mc.player.displayClientMessage(Component.literal("Jugador 2 ya está dentro."), false);
             return;
         }
         String name = secondaryName(mc);
@@ -86,11 +88,13 @@ public final class SecondaryPlayers {
                     return null;
                 }
                 if (n.equals("tick")) return null; // el tick real consulta el estado global de Minecraft
-                if (args != null && args.length == 1 && args[0] instanceof ClientboundPlayerPositionPacket p) {
+                if (n.startsWith("handle") && args != null && args.length == 1
+                        && args[0] instanceof ClientboundPlayerPositionPacket p) {
                     connection.send(new ServerboundAcceptTeleportationPacket(p.getId()));
                     return null;
                 }
-                if (n.startsWith("handle") && !FORWARDED_HANDLERS.contains(n)) return null; // ignorado
+                // Solo los handleXxx (void) se ignoran; el resto (shouldHandleMessage, flow, protocol...) va al listener real.
+                if (n.startsWith("handle") && !FORWARDED_HANDLERS.contains(n)) return null;
                 return method.invoke(real, args);
             } catch (InvocationTargetException e) {
                 throw e.getCause();
