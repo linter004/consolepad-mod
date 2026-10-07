@@ -43,9 +43,15 @@ public final class PadManager {
     private long lastScan = 0L;
 
     public PadManager() {
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            slots[i] = new Slot(i);
-            slots[i].settings = PadSettingsStore.load(i);
+        for (int i = 0; i < MAX_PLAYERS; i++) slots[i] = new Slot(i);
+        // El mapeado del jugador 1 es el de partida de los demas: un slot sin archivo propio copia los bindings actuales
+        // del slot 0 (no los de fabrica). Sensibilidad, zonas muertas, etc. quedan con los valores por defecto del slot.
+        slots[0].settings = PadSettingsStore.load(0, new PadSettings());
+        for (int i = 1; i < MAX_PLAYERS; i++) {
+            PadSettings seed = new PadSettings();
+            seed.bindings.clear();
+            seed.bindings.putAll(slots[0].settings.bindings);
+            slots[i].settings = PadSettingsStore.load(i, seed);
         }
     }
 

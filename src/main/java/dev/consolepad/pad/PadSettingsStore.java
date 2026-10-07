@@ -2,6 +2,8 @@ package dev.consolepad.pad;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import dev.consolepad.ConsolePad;
 import net.neoforged.fml.loading.FMLPaths;
 
@@ -22,18 +24,31 @@ public final class PadSettingsStore {
         return FMLPaths.CONFIGDIR.get().resolve("consolepad").resolve("slot" + slot + ".json");
     }
 
-    /** Devuelve los ajustes guardados, o los valores por defecto si el archivo falta o esta mal formado. */
-    public static PadSettings load(int slot) {
+    public static boolean exists(int slot) {
+        return Files.isRegularFile(file(slot));
+    }
+
+    /**
+     * Devuelve los ajustes guardados. Si el archivo falta o esta mal formado, devuelve {@code seed}. Si el archivo existe
+     * pero no trae "bindings", se usan los de {@code seed}. Los bindings guardados en el archivo siempre se respetan.
+     */
+    public static PadSettings load(int slot, PadSettings seed) {
         Path path = file(slot);
-        if (!Files.isRegularFile(path)) return new PadSettings();
+        if (!Files.isRegularFile(path)) return seed;
         try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            PadSettings loaded = GSON.fromJson(reader, PadSettings.class);
-            if (loaded == null) return new PadSettings();
+            JsonElement tree = JsonParser.parseReader(reader);
+            if (tree == null || !tree.isJsonObject()) return seed;
+            PadSettings loaded = GSON.fromJson(tree, PadSettings.class);
+            if (loaded == null) return seed;
+            if (!tree.getAsJsonObject().has("bindings")) {
+                loaded.bindings.clear();
+                loaded.bindings.putAll(seed.bindings);
+            }
             loaded.bindings.values().removeIf(a -> a == null); // acciones desconocidas
             return loaded;
         } catch (Exception e) {
             ConsolePad.LOGGER.warn("No se pudo leer {} ({}); se usan los valores por defecto", path, e.toString());
-            return new PadSettings();
+            return seed;
         }
     }
 

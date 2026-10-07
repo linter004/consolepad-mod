@@ -4,11 +4,14 @@ import dev.consolepad.ConsolePad;
 import dev.consolepad.client.PadDriver;
 import dev.consolepad.mixin.MinecraftInvoker;
 import dev.consolepad.pad.PadManager;
+import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+
+import java.util.Map;
 
 /**
  * Fase 3, paso 3: logica de cada tick de P2, dentro de su contexto. Reproduce lo que Minecraft.tick hace por el jugador
@@ -56,11 +59,18 @@ public final class SecondaryTick {
             PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, TMP);
             lookX = TMP[0];
             lookY = cfg.invertY ? -TMP[1] : TMP[1];
-            jump = s.isDown(PadState.A);
-            attack = s.isDown(PadState.RT);
-            use = s.isDown(PadState.LT);
-            lb = s.isDown(PadState.LB);
-            rb = s.isDown(PadState.RB);
+            // Mismos botones que P1: se leen los bindings del slot (por defecto, copia de los del slot 0).
+            for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
+                boolean down = s.isDown(e.getKey());
+                switch (e.getValue()) {
+                    case JUMP -> jump |= down;
+                    case ATTACK -> attack |= down;
+                    case USE -> use |= down;
+                    case HOTBAR_PREV -> lb |= down;
+                    case HOTBAR_NEXT -> rb |= down;
+                    default -> { } // el resto de acciones aun no existe para P2 (pantallas, soltar, etc.)
+                }
+            }
         }
 
         final float f = forward, l = left, lx = lookX, ly = lookY;
