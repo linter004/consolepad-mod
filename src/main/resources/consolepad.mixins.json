@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.consolepad.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "KeyboardInputMixin",
+    "KeyMappingAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

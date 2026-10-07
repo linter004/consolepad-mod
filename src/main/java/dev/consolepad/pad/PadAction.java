@@ -1,0 +1,10 @@
+package dev.consolepad.pad;
+
+public enum PadAction {
+    JUMP, ATTACK, USE,
+    DROP, SWAP_HANDS, INVENTORY, PERSPECTIVE,
+    HOTBAR_PREV, HOTBAR_NEXT,
+    SPRINT_TOGGLE, SNEAK_TOGGLE,
+    PICK_BLOCK, PLAYER_LIST, CHAT,
+    PAUSE
+}
