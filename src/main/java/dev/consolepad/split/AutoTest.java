@@ -90,6 +90,50 @@ public final class AutoTest {
     }
 
     private static int aspectBad;
+    private static Vec3 pauseP2Start, pauseP2Mid;
+    private static long pauseGameTime0, pauseServerTime0;
+
+    /**
+     * Paso 6: P1 abre el menu de pausa y P2 sigue moviendose. Fase de control (40 ticks sin menu) y fase de pausa (40 ticks
+     * con el menu abierto). Mide: el menu es de pausa, Minecraft y el servidor integrado NO estan en pausa, el reloj avanza
+     * ~40 ticks y P2 recorre en pausa al menos el 75 % de lo que recorre en el control (que a su vez debe ser >= 3 bloques).
+     */
+    private static void pauseTest(Minecraft mc) {
+        ServerPlayer p2 = serverP2(mc);
+        if (ticks == 1) {
+            mc.setScreen(null);
+            pauseP2Start = p2.position();
+            SecondaryTick.scriptActive = true;
+            SecondaryTick.scriptForward = 1f;
+        }
+        if (ticks == 41) {
+            pauseP2Mid = p2.position();
+            mc.pauseGame(false);
+            pauseGameTime0 = mc.level.getGameTime();
+            pauseServerTime0 = mc.getSingleplayerServer().overworld().getGameTime();
+            ConsolePad.LOGGER.info("[autotest] pausa: menu abierto = {}", mc.screen);
+        }
+        if (ticks == 81) {
+            double control = pauseP2Mid.distanceTo(pauseP2Start);
+            double moved = p2.position().distanceTo(pauseP2Mid);
+            long clientTicks = mc.level.getGameTime() - pauseGameTime0;
+            long serverTicks = mc.getSingleplayerServer().overworld().getGameTime() - pauseServerTime0;
+            boolean pauseScreen = mc.screen != null && mc.screen.isPauseScreen();
+            boolean ok = pauseScreen && !mc.isPaused() && !mc.getSingleplayerServer().isPaused() && control >= 3.0
+                    && moved >= 0.75 * control && serverTicks >= 35 && clientTicks >= 35;
+            ConsolePad.LOGGER.info("[autotest] RESULTADO pausa: pantalla de pausa={} ({}), mc.isPaused={}, servidor en pausa={}, "
+                            + "P2 control {} bloques (>=3), en pausa {} (>=75% del control), ticks de servidor {} y de cliente {} (>=35), "
+                            + "choque horizontal P2={} -> {}",
+                    pauseScreen, mc.screen == null ? "null" : mc.screen.getClass().getSimpleName(), mc.isPaused(),
+                    mc.getSingleplayerServer().isPaused(), String.format(java.util.Locale.ROOT, "%.2f", control),
+                    String.format(java.util.Locale.ROOT, "%.2f", moved), serverTicks, clientTicks,
+                    p2.horizontalCollision, ok ? "OK" : "FALLO");
+            SecondaryTick.scriptActive = false;
+            SecondaryTick.scriptForward = 0f;
+            mc.setScreen(null);
+        }
+        if (ticks >= 90) next();
+    }
 
     /**
      * Comprobacion numerica del aspecto: durante unos frames graba, por pasada, el viewport GL real y la proyeccion y
@@ -197,8 +241,9 @@ public final class AutoTest {
             case 4 -> aspectTest(mc, "pequena");
             case 5 -> resizeWindow(mc);
             case 6 -> aspectTest(mc, "1920x1080");
-            case 7 -> fpsPhase(mc, false);
-            case 8 -> fpsPhase(mc, true);
+            case 7 -> pauseTest(mc);
+            case 8 -> fpsPhase(mc, false);
+            case 9 -> fpsPhase(mc, true);
             default -> { }
         }
     }
