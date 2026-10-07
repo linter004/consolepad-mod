@@ -27,7 +27,7 @@ public final class PadManager {
 
     public static final class Slot {
         public final int index;
-        public final PadSettings settings = new PadSettings();
+        public PadSettings settings = new PadSettings();
         public Device device;
 
         Slot(int index) { this.index = index; }
@@ -39,7 +39,14 @@ public final class PadManager {
     private long lastScan = 0L;
 
     public PadManager() {
-        for (int i = 0; i < MAX_PLAYERS; i++) slots[i] = new Slot(i);
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            slots[i] = new Slot(i);
+            slots[i].settings = PadSettingsStore.load(i);
+        }
+    }
+
+    public void saveSettings() {
+        for (Slot s : slots) PadSettingsStore.save(s.index, s.settings);
     }
 
     public Slot slot(int index) { return slots[index]; }

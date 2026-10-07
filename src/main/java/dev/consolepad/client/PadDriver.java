@@ -38,6 +38,11 @@ public final class PadDriver {
     private int mouseDown;
     private float scrollAcc;
 
+    public PadDriver() {
+        // Guarda los ajustes de todos los slots al cerrar el juego.
+        Runtime.getRuntime().addShutdownHook(new Thread(pads::saveSettings, "ConsolePad-save"));
+    }
+
     public void onFrame(RenderFrameEvent.Pre event) {
         Minecraft mc = Minecraft.getInstance();
         long now = System.nanoTime();
@@ -82,7 +87,7 @@ public final class PadDriver {
         // Camara (stick derecho), independiente de los ticks para que sea fluida.
         PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, tmp);
         if (tmp[0] != 0f || tmp[1] != 0f) {
-            float k = cfg.lookSpeed * dt / 0.15f; // Entity.turn multiplica por 0.15
+            float k = cfg.lookSpeed * sensitivityFactor(o) * dt / 0.15f; // Entity.turn multiplica por 0.15
             float pitch = cfg.invertY ? -tmp[1] : tmp[1];
             player.turn(tmp[0] * k, pitch * k);
         }
@@ -163,6 +168,12 @@ public final class PadDriver {
             if ((mouseDown & (1 << b)) != 0) mouse.consolepad$onPress(window, b, GLFW.GLFW_RELEASE, 0);
         }
         mouseDown = 0;
+    }
+
+    /** Misma curva que el raton en vanilla ((s*0.6+0.2)^3*8): el 50 % por defecto equivale a 1. */
+    private static float sensitivityFactor(Options o) {
+        double base = o.sensitivity().get() * 0.6 + 0.2;
+        return (float) (base * base * base * 8.0);
     }
 
     private void onPress(Minecraft mc, LocalPlayer player, Options o, PadAction action) {
