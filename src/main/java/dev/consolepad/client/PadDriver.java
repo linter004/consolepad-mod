@@ -1,5 +1,6 @@
 package dev.consolepad.client;
 
+import dev.consolepad.ConsolePad;
 import dev.consolepad.mixin.ContainerScreenInvoker;
 import dev.consolepad.mixin.KeyMappingAccessor;
 import dev.consolepad.mixin.MouseHandlerInvoker;
@@ -296,6 +297,7 @@ public final class PadDriver {
     }
 
     private void onPress(Minecraft mc, LocalPlayer player, Options o, PadAction action) {
+        if (PadManager.PADLOG && action == PadAction.ATTACK) ConsolePad.LOGGER.info("[padlog] P1 inicia ataque (lee slot 0)");
         KeyMapping hold = holdKey(o, action);
         if (hold != null) {
             hold.setDown(true);

@@ -25,6 +25,8 @@ public final class PadState {
 
     public float lx, ly, rx, ry, lt, rt;
     private int down, prevDown;
+    /** Solo pruebas (AutoTest): botones que se dan por pulsados ademas de los reales de este mando. */
+    public volatile int simDown;
 
     public void update(GLFWGamepadState s, float triggerThreshold) {
         prevDown = down;
@@ -42,9 +44,16 @@ public final class PadState {
         }
         if (lt > triggerThreshold) d |= 1 << LT;
         if (rt > triggerThreshold) d |= 1 << RT;
-        down = d;
+        down = d | simDown;
     }
 
+    public int downBits() { return down; }
+
+    /** Mando virtual de pruebas: no hay hardware, el estado es solo simDown. */
+    public void tickSim() {
+        prevDown = down;
+        down = simDown;
+    }
     public boolean isDown(int code) { return (down & (1 << code)) != 0; }
     public boolean pressed(int code) { return isDown(code) && (prevDown & (1 << code)) == 0; }
     public boolean released(int code) { return !isDown(code) && (prevDown & (1 << code)) != 0; }

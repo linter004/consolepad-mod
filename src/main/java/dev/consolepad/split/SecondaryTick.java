@@ -22,12 +22,16 @@ public final class SecondaryTick {
     public static volatile boolean scriptJump;
     public static volatile boolean scriptAttack;
 
+    // Contadores de diagnostico: cuantas veces ejecuta P2 cada accion.
+    public static volatile int dbgStartAttack, dbgContinueTrue, dbgStartUse, dbgJumpTicks, dbgHotbarSteps;
+
     private static final float TICK_SECONDS = 0.05f;
     private static final int MAX_LOGGED_ERRORS = 5;
 
     private static final float[] TMP = new float[2];
     private static boolean prevAttack;
     private static boolean prevUse;
+    private static boolean prevLb, prevRb;
     private static int errors;
 
     private SecondaryTick() {}
@@ -38,7 +42,7 @@ public final class SecondaryTick {
         if (ctx == null || ctx.player == null || ctx.level == null || ctx.gameMode == null) return;
 
         float forward = 0f, left = 0f, lookX = 0f, lookY = 0f;
-        boolean jump = false, attack = false, use = false;
+        boolean jump = false, attack = false, use = false, lb = false, rb = false;
         PadSettings cfg = slot.settings;
         if (scriptActive) {
             forward = scriptForward;
@@ -55,19 +59,21 @@ public final class SecondaryTick {
             jump = s.isDown(PadState.A);
             attack = s.isDown(PadState.RT);
             use = s.isDown(PadState.LT);
+            lb = s.isDown(PadState.LB);
+            rb = s.isDown(PadState.RB);
         }
 
         final float f = forward, l = left, lx = lookX, ly = lookY;
-        final boolean j = jump, a = attack, u = use;
+        final boolean j = jump, a = attack, u = use, bl = lb, br = rb;
         try {
-            ContextSwitcher.run(ctx, () -> secondaryTick(f, l, lx, ly, j, a, u, cfg));
+            ContextSwitcher.run(ctx, () -> secondaryTick(f, l, lx, ly, j, a, u, bl, br, cfg));
         } catch (RuntimeException e) {
             if (errors++ < MAX_LOGGED_ERRORS) ConsolePad.LOGGER.error("[split] error en el tick de P2 (suprimido)", e);
         }
     }
 
     private static void secondaryTick(float forward, float left, float lookX, float lookY,
-                                      boolean jump, boolean attack, boolean use, PadSettings cfg) {
+                                      boolean jump, boolean attack, boolean use, boolean lb, boolean rb, PadSettings cfg) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         MinecraftInvoker inv = (MinecraftInvoker) mc;
@@ -77,6 +83,7 @@ public final class SecondaryTick {
         input.rawForward = forward;
         input.rawLeft = left;
         input.jumping = jump;
+        if (jump) dbgJumpTicks++;
 
         if (inv.consolepad$getRightClickDelay() > 0) inv.consolepad$setRightClickDelay(inv.consolepad$getRightClickDelay() - 1);
         mc.gameRenderer.pick(1.0F); // a que apunta P2 (hitResult de su contexto)
@@ -88,15 +95,35 @@ public final class SecondaryTick {
         }
 
         // Atacar y usar, como Minecraft.handleKeybinds pero con el mando de P2.
-        if (attack && !prevAttack) inv.consolepad$startAttack();
+        if (attack && !prevAttack) {
+            if (PadManager.PADLOG) ConsolePad.LOGGER.info("[padlog] P2 inicia ataque (lee slot 1)");
+            dbgStartAttack++;
+            inv.consolepad$startAttack();
+        }
+        if (attack) dbgContinueTrue++;
         inv.consolepad$continueAttack(attack);
         prevAttack = attack;
         if (use) {
-            if (inv.consolepad$getRightClickDelay() == 0 && !player.isUsingItem()) inv.consolepad$startUseItem();
+            if (inv.consolepad$getRightClickDelay() == 0 && !player.isUsingItem()) {
+                dbgStartUse++;
+                inv.consolepad$startUseItem();
+            }
         } else if (prevUse && player.isUsingItem()) {
             mc.gameMode.releaseUsingItem(player);
         }
         prevUse = use;
+
+        // Hotbar de P2 (misma logica que P1: LB = anterior, RB = siguiente) sobre el inventario de P2.
+        if (lb && !prevLb) {
+            player.getInventory().swapPaint(1.0);
+            dbgHotbarSteps++;
+        }
+        if (rb && !prevRb) {
+            player.getInventory().swapPaint(-1.0);
+            dbgHotbarSteps++;
+        }
+        prevLb = lb;
+        prevRb = rb;
         if (inv.consolepad$getMissTime() > 0) inv.consolepad$setMissTime(inv.consolepad$getMissTime() - 1);
 
         mc.level.tickRateManager().tick();

@@ -1,49 +1,63 @@
 package dev.consolepad.split;
 
 import dev.consolepad.ConsolePad;
+import dev.consolepad.pad.PadManager;
+import dev.consolepad.pad.PadState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Ayuda de pruebas, solo si se arranca con la variable de entorno CONSOLEPAD_AUTOTEST=<nombre del mundo>.
- * Diagnostico del paso 3: abre el mundo, mete a P2, lo teletransporta a 24 bloques de P1, deja a P1 sin entrada
- * 30 s (comprobando que no se mueve) y hace andar a P2 registrando cada tick posiciones, colisiones, entrada y bloques.
- * Sin la variable no hace nada.
- * Importante: no tocar la ventana del juego mientras corre; cualquier entrada humana (por ejemplo /tp) contamina las medidas.
+ * Abre el mundo, mete a P2, lo aleja de P1 y simula pulsaciones de cada mando por separado (PadState.simDown),
+ * registrando quien ejecuta cada accion. No tocar la ventana del juego mientras corre: la entrada humana contamina las medidas.
  */
 public final class AutoTest {
     private static final String WORLD = System.getenv("CONSOLEPAD_AUTOTEST");
-    private static final int IDLE_TICKS = 20 * 30;
-    private static final int WALK_TICKS = 60;
 
+    /** {slot del mando simulado, boton, ticks pulsado} */
+    private static final int[][] MATRIX = {
+            {0, PadState.RT, 30}, {1, PadState.RT, 30},
+            {0, PadState.LT, 30}, {1, PadState.LT, 30},
+            {0, PadState.A, 10}, {1, PadState.A, 10},
+            {0, PadState.RB, 3}, {1, PadState.RB, 3},
+            {0, PadState.LB, 3}, {1, PadState.LB, 3},
+    };
+    private static final String[] BUTTON_NAMES = new String[17];
+    static {
+        BUTTON_NAMES[PadState.A] = "A(saltar)";
+        BUTTON_NAMES[PadState.RT] = "RT(atacar)";
+        BUTTON_NAMES[PadState.LT] = "LT(usar)";
+        BUTTON_NAMES[PadState.LB] = "LB(hotbar-)";
+        BUTTON_NAMES[PadState.RB] = "RB(hotbar+)";
+    }
+
+    private static PadManager pads;
     private static int state;
     private static int ticks;
-    private static Vec3 p1Start;
-    private static double p1MaxDeviation;
     private static boolean teleported;
     private static Vec3 target;
 
+    private static int testIndex;
+    private static int testTicks;
+    private static boolean testRunning;
+    // observaciones de P1 durante la prueba
+    private static boolean p1Attack, p1Use, p1Jump, p1Swing;
+    private static int p1SelectedBefore, p2SelectedBefore;
+    private static int c0Attack, c0Continue, c0Use, c0Jump, c0Hotbar;
+
     private AutoTest() {}
+
+    public static void init(PadManager manager) {
+        pads = manager;
+    }
 
     private static ServerPlayer serverP2(Minecraft mc) {
         return mc.getSingleplayerServer() == null ? null
                 : mc.getSingleplayerServer().getPlayerList().getPlayerByName(SecondaryPlayers.secondaryName(mc));
-    }
-
-    private static String fmt(Vec3 v) {
-        return v == null ? "null" : String.format("(%.2f, %.2f, %.2f)", v.x, v.y, v.z);
-    }
-
-    private static String blockAt(ClientLevel level, BlockPos pos) {
-        return level.getBlockState(pos).getBlock().builtInRegistryHolder().key().location().getPath();
     }
 
     public static void tick() {
@@ -66,15 +80,11 @@ public final class AutoTest {
                 }
             }
             case 2 -> teleportAway(mc);
-            case 3 -> idle(mc);
-            case 4 -> walk(mc);
-            case 5 -> farActions(mc);
-            case 6 -> adjacent(mc);
+            case 3 -> matrix(mc);
             default -> { }
         }
     }
 
-    /** P2 entra, se asienta y se teletransporta a 24 bloques de P1, en la superficie. */
     private static void teleportAway(Minecraft mc) {
         PlayerContext c = SecondaryPlayers.context();
         ServerPlayer p2 = serverP2(mc);
@@ -82,8 +92,6 @@ public final class AutoTest {
         if (!teleported) {
             Vec3 p1 = mc.player.position();
             ServerLevel level = (ServerLevel) p2.level();
-            ConsolePad.LOGGER.info("[autotest] P1 {} (onGround={}) P2(servidor) {}; teletransportando a P2 a 24 bloques de P1",
-                    fmt(p1), mc.player.onGround(), fmt(p2.position()));
             mc.getSingleplayerServer().execute(() -> {
                 int x = (int) Math.floor(p1.x) + 24;
                 int z = (int) Math.floor(p1.z);
@@ -95,113 +103,73 @@ public final class AutoTest {
             ticks = 0;
             return;
         }
-        // espera a que P2 este en el destino, con chunk cargado en su cliente y en el suelo
         if (target != null && ticks > 100 && p2.position().distanceTo(target) < 3.0 && p2.onGround()
                 && c.level.hasChunkAt(c.player.blockPosition())) {
-            p1Start = mc.player.position();
-            ConsolePad.LOGGER.info("[autotest] P2 en destino {} (servidor) / {} (cliente de P2). Fase 1: 30 s con P1 y P2 sin entrada; P1 inicial {}",
-                    fmt(p2.position()), fmt(c.player.position()), fmt(p1Start));
-            next();
-        }
-    }
-
-    /** 30 s sin entrada: la posicion de P1 no debe cambiar (salvo gravedad). */
-    private static void idle(Minecraft mc) {
-        double dev = mc.player.position().distanceTo(p1Start);
-        p1MaxDeviation = Math.max(p1MaxDeviation, dev);
-        if (ticks % 20 == 0) {
-            PlayerContext c = SecondaryPlayers.context();
-            ConsolePad.LOGGER.info("[diag] idle +{} s: P1 {} (onGround={}, desviacion {}) P2 servidor {} cliente {}",
-                    ticks / 20, fmt(mc.player.position()), mc.player.onGround(), String.format("%.3f", dev),
-                    fmt(serverP2(mc).position()), fmt(c.player.position()));
-        }
-        if (ticks >= IDLE_TICKS) {
-            ConsolePad.LOGGER.info("[autotest] fase 1 terminada: desviacion maxima de P1 en 30 s = {} bloques (P1 {} -> {})",
-                    String.format("%.3f", p1MaxDeviation), fmt(p1Start), fmt(mc.player.position()));
-            SecondaryTick.scriptActive = true;
-            SecondaryTick.scriptForward = 1f;
-            next();
-            ConsolePad.LOGGER.info("[autotest] Fase 2: P2 anda {} ticks hacia +z con registro por tick", WALK_TICKS);
-        }
-    }
-
-    private static void walk(Minecraft mc) {
-        PlayerContext c = SecondaryPlayers.context();
-        LocalPlayer p = c.player;
-        ClientLevel level = c.level;
-        Direction dir = p.getDirection();
-        BlockPos feetAhead = p.blockPosition().relative(dir);
-        String input = p.input instanceof PadInput in
-                ? String.format("fwd=%.2f left=%.2f", in.forwardImpulse, in.leftImpulse) : "sin PadInput";
-        ConsolePad.LOGGER.info("[diag] andar t={} P2 cliente {} servidor {} colision={} suelo={} vel={} entrada[{}] delante({}): pies={} cabeza={} suelo={} | P1 {} (desv {})",
-                ticks, fmt(p.position()), fmt(serverP2(mc).position()), p.horizontalCollision, p.onGround(), fmt(p.getDeltaMovement()),
-                input, dir.getName(), blockAt(level, feetAhead), blockAt(level, feetAhead.above()), blockAt(level, feetAhead.below()),
-                fmt(mc.player.position()), String.format("%.3f", mc.player.position().distanceTo(p1Start)));
-        if (ticks >= WALK_TICKS) {
-            SecondaryTick.scriptForward = 0f;
-            SecondaryTick.scriptActive = false;
-            ConsolePad.LOGGER.info("[autotest] fase 2 terminada: P2 cliente {} servidor {}; P1 {} (desviacion total desde el inicio de la fase 1: {})",
-                    fmt(p.position()), fmt(serverP2(mc).position()), fmt(mc.player.position()),
-                    String.format("%.3f", mc.player.position().distanceTo(p1Start)));
-            next();
-            p1Start = mc.player.position();
-            p1MaxDeviation = 0; // la fase 3 mide solo su propio tramo (antes arrastraba el maximo de la fase 1)
-            ConsolePad.LOGGER.info("[autotest] Fase 3: P2 lejos de P1 salta y rompe el bloque de debajo; se vigila a P1");
-        }
-    }
-
-    private static BlockPos breakTarget;
-    private static boolean breakWasAir;
-
-    /** P2 lejos de P1: saltar y romper un bloque no debe mover a P1 (descarta fuga de contexto en esas acciones). */
-    private static void farActions(Minecraft mc) {
-        PlayerContext c = SecondaryPlayers.context();
-        ServerPlayer p2 = serverP2(mc);
-        SecondaryTick.scriptActive = true;
-        double dev = mc.player.position().distanceTo(p1Start);
-        p1MaxDeviation = Math.max(p1MaxDeviation, dev);
-        if (ticks <= 5) SecondaryTick.scriptJump = true;
-        else if (ticks == 6) SecondaryTick.scriptJump = false;
-        if (ticks == 40) {
-            breakTarget = p2.blockPosition().below();
-            breakWasAir = p2.level().getBlockState(breakTarget).isAir();
-            c.player.setXRot(90f);
-            SecondaryTick.scriptAttack = true;
-        }
-        if (ticks > 40) {
-            boolean air = p2.level().getBlockState(breakTarget).isAir();
-            if ((air && !breakWasAir) || ticks >= 240) {
-                SecondaryTick.scriptAttack = false;
-                SecondaryTick.scriptActive = false;
-                ConsolePad.LOGGER.info("[autotest] fase 3 terminada: bloque {} roto={}; desviacion maxima de P1 durante saltar y romper = {} (P1 {})",
-                        breakTarget.toShortString(), air && !breakWasAir, String.format("%.3f", p1MaxDeviation), fmt(mc.player.position()));
-                next();
-                teleportNextToP1(mc);
+            pads.attachVirtual(0); // si falta algun mando real, se simula uno virtual (solo en el autotest)
+            pads.attachVirtual(1);
+            PadManager.Device d0 = pads.slot(0).device;
+            PadManager.Device d1 = pads.slot(1).device;
+            ConsolePad.LOGGER.info("[autotest] P2 listo y lejos de P1. Mandos: slot0 = {} ; slot1 = {}",
+                    d0 == null ? "NINGUNO" : "jid " + d0.jid + " '" + d0.name + "'",
+                    d1 == null ? "NINGUNO" : "jid " + d1.jid + " '" + d1.name + "'");
+            if (d0 == null || d1 == null) {
+                ConsolePad.LOGGER.error("[autotest] hacen falta dos mandos para esta prueba");
+                state = 99;
+                return;
             }
+            ConsolePad.LOGGER.info("[autotest] lectura de estado: P1 lee slot0 en PadDriver.onFrame (bindings -> keyAttack/keyUse/keyJump + clickCount);"
+                    + " P2 lee slot1 en SecondaryTick.tick (PadState.isDown -> startAttack/continueAttack/startUseItem/PadInput.jumping)");
+            next();
         }
     }
 
-    private static void teleportNextToP1(Minecraft mc) {
-        ServerPlayer p2 = serverP2(mc);
-        Vec3 p1 = mc.player.position();
-        p1Start = p1;
-        ServerLevel level = (ServerLevel) p2.level();
-        mc.getSingleplayerServer().execute(() -> p2.teleportTo(level, p1.x + 0.6, p1.y, p1.z, 0f, 0f));
-        ConsolePad.LOGGER.info("[autotest] Fase 4: P2 teletransportado pegado a P1 ({}), ambos sin entrada", fmt(p1));
-    }
-
-    /** P2 pegado a P1, sin entrada: si P1 se mueve aqui es empuje de colisiones, no entrada ni fuga. */
-    private static void adjacent(Minecraft mc) {
+    private static void matrix(Minecraft mc) {
         PlayerContext c = SecondaryPlayers.context();
-        if (ticks % 10 == 0) {
-            ConsolePad.LOGGER.info("[diag] pegados t={}: P1 {} (desv {}) P2 servidor {} cliente {}", ticks, fmt(mc.player.position()),
-                    String.format("%.3f", mc.player.position().distanceTo(p1Start)), fmt(serverP2(mc).position()), fmt(c.player.position()));
-        }
-        if (ticks >= 100) {
-            ConsolePad.LOGGER.info("[autotest] fase 4 terminada: P1 {} -> {} (desviacion {}); P2 {}", fmt(p1Start), fmt(mc.player.position()),
-                    String.format("%.3f", mc.player.position().distanceTo(p1Start)), fmt(serverP2(mc).position()));
+        if (testIndex >= MATRIX.length) {
             ConsolePad.LOGGER.info("[autotest] terminado");
             next();
+            return;
+        }
+        int[] t = MATRIX[testIndex];
+        PadState simulated = pads.slot(t[0]).device.state;
+        if (!testRunning) {
+            if (ticks < 30) return; // pausa entre pruebas
+            // mirar al cielo para no romper bloques ni golpear nada
+            mc.player.setXRot(-90f);
+            c.player.setXRot(-90f);
+            p1Attack = p1Use = p1Jump = p1Swing = false;
+            c0Attack = SecondaryTick.dbgStartAttack;
+            c0Continue = SecondaryTick.dbgContinueTrue;
+            c0Use = SecondaryTick.dbgStartUse;
+            c0Jump = SecondaryTick.dbgJumpTicks;
+            c0Hotbar = SecondaryTick.dbgHotbarSteps;
+            p1SelectedBefore = mc.player.getInventory().selected;
+            p2SelectedBefore = c.player.getInventory().selected;
+            simulated.simDown = 1 << t[1];
+            testRunning = true;
+            testTicks = 0;
+            return;
+        }
+        testTicks++;
+        p1Attack |= mc.options.keyAttack.isDown();
+        p1Use |= mc.options.keyUse.isDown();
+        p1Jump |= mc.options.keyJump.isDown();
+        p1Swing |= mc.player.swinging;
+        if (testTicks == t[2]) simulated.simDown = 0;
+        if (testTicks >= t[2] + 15) { // margen para que se vea el efecto y se suelten las teclas
+            PadState s0 = pads.slot(0).device.state;
+            PadState s1 = pads.slot(1).device.state;
+            ConsolePad.LOGGER.info("[autotest] RESULTADO mando slot{} {}: P1[keyAttack={} keyUse={} keyJump={} swing={} hotbar {}->{}] "
+                            + "P2[startAttack={} continueAttack(true)={} startUse={} saltoTicks={} hotbarPasos={} hotbar {}->{}] "
+                            + "estado simulado en slot0={} slot1={} (bits); ventana activa={}",
+                    t[0], BUTTON_NAMES[t[1]], p1Attack, p1Use, p1Jump, p1Swing, p1SelectedBefore, mc.player.getInventory().selected,
+                    SecondaryTick.dbgStartAttack - c0Attack, SecondaryTick.dbgContinueTrue - c0Continue,
+                    SecondaryTick.dbgStartUse - c0Use, SecondaryTick.dbgJumpTicks - c0Jump,
+                    SecondaryTick.dbgHotbarSteps - c0Hotbar, p2SelectedBefore, c.player.getInventory().selected,
+                    s0.downBits(), s1.downBits(), mc.isWindowActive());
+            testRunning = false;
+            testIndex++;
+            ticks = 0;
         }
     }
 

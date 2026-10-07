@@ -27,6 +27,7 @@ public class ConsolePad {
 
     public ConsolePad(IEventBus modBus, ModContainer container) {
         PadDriver driver = new PadDriver();
+        AutoTest.init(driver.pads());
         NeoForge.EVENT_BUS.addListener(driver::onFrame);
 
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.

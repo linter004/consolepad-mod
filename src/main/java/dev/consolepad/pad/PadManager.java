@@ -33,7 +33,11 @@ public final class PadManager {
         Slot(int index) { this.index = index; }
     }
 
+    /** Diagnostico opcional (variable de entorno CONSOLEPAD_PADLOG=1): registra los cambios de estado de cada mando. */
+    public static final boolean PADLOG = "1".equals(System.getenv("CONSOLEPAD_PADLOG"));
+    private final int[] lastLoggedBits = new int[GLFW.GLFW_JOYSTICK_LAST + 1];
     private final Slot[] slots = new Slot[MAX_PLAYERS];
+    private final java.util.List<Device> virtualDevices = new java.util.ArrayList<>();
     private final Device[] devices = new Device[GLFW.GLFW_JOYSTICK_LAST + 1];
     private final GLFWGamepadState buffer = GLFWGamepadState.calloc();
     private long lastScan = 0L;
@@ -45,6 +49,15 @@ public final class PadManager {
         }
     }
 
+    /** Solo pruebas (AutoTest): rellena un slot vacio con un mando sin hardware, controlado por PadState.simDown. */
+    public void attachVirtual(int slotIndex) {
+        Slot s = slots[slotIndex];
+        if (s.device != null) return;
+        Device d = new Device(-1, "Virtual (prueba)");
+        s.device = d;
+        virtualDevices.add(d);
+    }
+
     public void saveSettings() {
         for (Slot s : slots) PadSettingsStore.save(s.index, s.settings);
     }
@@ -52,6 +65,7 @@ public final class PadManager {
     public Slot slot(int index) { return slots[index]; }
 
     public void poll() {
+        for (Device d : virtualDevices) d.state.tickSim();
         long now = System.nanoTime();
         if (now - lastScan > SCAN_INTERVAL_NANOS) {
             lastScan = now;
@@ -66,6 +80,14 @@ public final class PadManager {
             }
             Slot s = slotOf(dev);
             dev.state.update(buffer, s != null ? s.settings.triggerThreshold : 0.5f);
+            if (PADLOG && dev.state.downBits() != lastLoggedBits[jid]) {
+                lastLoggedBits[jid] = dev.state.downBits();
+                ConsolePad.LOGGER.info("[padlog] jid={} slot={} '{}' botones=0x{} LT={} RT={} stickIzq=({}, {}) stickDer=({}, {})", jid,
+                        s == null ? "-" : String.valueOf(s.index), dev.name, Integer.toHexString(dev.state.downBits()),
+                        String.format("%.2f", dev.state.lt), String.format("%.2f", dev.state.rt),
+                        String.format("%.2f", dev.state.lx), String.format("%.2f", dev.state.ly),
+                        String.format("%.2f", dev.state.rx), String.format("%.2f", dev.state.ry));
+            }
         }
     }
 
