@@ -56,6 +56,8 @@ public final class AutoTest {
     private static long fpsSum;
     private static int fpsSamples;
     private static boolean screenshotPending;
+    private static String screenshotName = "split-step5.png";
+    private static int p1SelBefore, p2SelBefore;
 
     private AutoTest() {}
 
@@ -64,8 +66,40 @@ public final class AutoTest {
         if (!screenshotPending) return;
         screenshotPending = false;
         Minecraft mc = Minecraft.getInstance();
-        Screenshot.grab(mc.gameDirectory, "split-step4.png", mc.getMainRenderTarget(),
+        Screenshot.grab(mc.gameDirectory, screenshotName, mc.getMainRenderTarget(),
                 msg -> ConsolePad.LOGGER.info("[autotest] captura: {}", msg.getString()));
+    }
+
+    /** Paso 5: P2 cambia de casilla con RB (mando virtual/real del slot 1) y P1 no debe cambiar; captura con las dos hotbars. */
+    private static void hotbarTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        PadState s1 = pads.slot(1).device.state;
+        if (ticks == 1) {
+            p1SelBefore = mc.player.getInventory().selected;
+            p2SelBefore = c.player.getInventory().selected;
+            ConsolePad.LOGGER.info("[autotest] hotbar: antes P1={} P2={}", p1SelBefore, p2SelBefore);
+        }
+        s1.simDown = (ticks >= 2 && ticks < 5) || (ticks >= 10 && ticks < 13) ? 1 << PadState.RB : 0;
+        if (ticks == 30) {
+            ConsolePad.LOGGER.info("[autotest] RESULTADO hotbar: P1 {} -> {} (debe ser igual); P2 {} -> {} (debe avanzar 2 casillas)",
+                    p1SelBefore, mc.player.getInventory().selected, p2SelBefore, c.player.getInventory().selected);
+            screenshotName = "split-step5-small.png";
+            screenshotPending = true;
+        }
+        if (ticks >= 45) next();
+    }
+
+    /** Pone la ventana a 1920x1080 (o lo mas cercano que admita la pantalla) y espera a que se aplique. */
+    private static void resizeWindow(Minecraft mc) {
+        com.mojang.blaze3d.platform.Window window = mc.getWindow();
+        if (ticks == 1) {
+            org.lwjgl.glfw.GLFW.glfwSetWindowSize(window.getWindow(), 1920, 1080);
+        }
+        if (ticks >= 60) {
+            ConsolePad.LOGGER.info("[autotest] ventana: {}x{} (framebuffer), escala de interfaz {}", window.getWidth(), window.getHeight(),
+                    window.getGuiScale());
+            next();
+        }
     }
 
     /** Fase 3 (sin division, 1 jugador) y fase 4 (dividido, 2 jugadores): mide FPS con distancia de renderizado 8. */
@@ -87,7 +121,10 @@ public final class AutoTest {
             fpsSum += mc.getFps();
             fpsSamples++;
         }
-        if (split && ticks == WARMUP_TICKS + 40) screenshotPending = true;
+        if (split && ticks == WARMUP_TICKS + 40) {
+            screenshotName = "split-step5-1080.png";
+            screenshotPending = true;
+        }
         if (ticks >= WARMUP_TICKS + MEASURE_TICKS) {
             PlayerContext c = SecondaryPlayers.context();
             String p2Stats = c != null && c.renderer instanceof SplitLevelRenderer r && r.isLive() ? r.getSectionStatistics() : "n/a";
@@ -129,8 +166,10 @@ public final class AutoTest {
                 }
             }
             case 2 -> teleportAway(mc);
-            case 3 -> fpsPhase(mc, false);
-            case 4 -> fpsPhase(mc, true);
+            case 3 -> hotbarTest(mc);
+            case 4 -> resizeWindow(mc);
+            case 5 -> fpsPhase(mc, false);
+            case 6 -> fpsPhase(mc, true);
             default -> { }
         }
     }

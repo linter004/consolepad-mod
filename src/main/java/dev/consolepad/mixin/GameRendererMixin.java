@@ -2,10 +2,13 @@ package dev.consolepad.mixin;
 
 import com.mojang.blaze3d.platform.Window;
 import dev.consolepad.split.ContextSwitcher;
+import dev.consolepad.split.SplitHud;
 import dev.consolepad.split.SplitRender;
 import dev.consolepad.split.SplitView;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import org.objectweb.asm.Opcodes;
@@ -21,6 +24,13 @@ public abstract class GameRendererMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;renderLevel(Lnet/minecraft/client/DeltaTracker;)V"))
     private void consolepad$splitRenderLevel(GameRenderer self, DeltaTracker deltaTracker) {
         SplitRender.renderLevels(self, deltaTracker);
+    }
+
+    /** El HUD se divide igual que el mundo (SplitHud). */
+    @Redirect(method = "render",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"))
+    private void consolepad$splitHud(Gui gui, GuiGraphics graphics, DeltaTracker deltaTracker) {
+        SplitHud.render(gui, graphics, deltaTracker);
     }
 
     /** Durante la pasada de P2, renderLevel usa el LevelRenderer de P2, no el de P1. */

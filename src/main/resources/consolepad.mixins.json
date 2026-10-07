@@ -18,7 +18,9 @@
     "ToastGuardsMixin",
     "MinecraftInvoker",
     "KeyMappingGuardMixin",
-    "GameRendererMixin"
+    "GameRendererMixin",
+    "GuiInvoker",
+    "GuiGraphicsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -19,14 +19,24 @@ public final class SplitRender {
 
     private SplitRender() {}
 
-    public static void renderLevels(GameRenderer renderer, DeltaTracker deltaTracker) {
-        Minecraft mc = Minecraft.getInstance();
+    /** Contexto de P2 si la pantalla dividida esta activa y P2 esta listo para dibujarse; si no, null. */
+    public static PlayerContext activeContext() {
         PlayerContext p2 = SecondaryPlayers.context();
         if (!SplitView.enabled || p2 == null || p2.player == null || p2.level == null || p2.gameMode == null
-                || !(p2.renderer instanceof SplitLevelRenderer r2)) {
+                || !(p2.renderer instanceof SplitLevelRenderer)) {
+            return null;
+        }
+        return p2;
+    }
+
+    public static void renderLevels(GameRenderer renderer, DeltaTracker deltaTracker) {
+        Minecraft mc = Minecraft.getInstance();
+        PlayerContext p2 = activeContext();
+        if (p2 == null) {
             renderer.renderLevel(deltaTracker);
             return;
         }
+        SplitLevelRenderer r2 = (SplitLevelRenderer) p2.renderer;
         if (!r2.isLive()) {
             r2.goLive(p2.level);
             ConsolePad.LOGGER.info("[split] renderer de P2 activo");
