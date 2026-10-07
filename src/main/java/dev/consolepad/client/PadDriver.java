@@ -9,6 +9,7 @@ import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -37,6 +38,15 @@ public final class PadDriver {
     private boolean sneakLatch;
     private int mouseDown;
     private float scrollAcc;
+
+    // D-pad en pantallas: arriba, abajo, izquierda, derecha.
+    private static final int[] DPAD = {PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};
+    private static final int[] DPAD_KEYS = {GLFW.GLFW_KEY_UP, GLFW.GLFW_KEY_DOWN, GLFW.GLFW_KEY_LEFT, GLFW.GLFW_KEY_RIGHT};
+    private static final float REPEAT_DELAY = 0.35f;
+    private static final float REPEAT_INTERVAL = 0.12f;
+    private final boolean[] dpadActive = new boolean[4];
+    private final float[] dpadHeld = new float[4];
+    private final float[] dpadNext = new float[4];
 
     public PadDriver() {
         // Guarda los ajustes de todos los slots al cerrar el juego.
@@ -113,13 +123,20 @@ public final class PadDriver {
         if (tmp[0] != 0f || tmp[1] != 0f) {
             double maxX = Math.max(0, mc.getWindow().getScreenWidth() - 1);
             double maxY = Math.max(0, mc.getWindow().getScreenHeight() - 1);
-            double nx = Math.max(0, Math.min(maxX, x + tmp[0] * cfg.cursorSpeed * dt));
-            double ny = Math.max(0, Math.min(maxY, y + tmp[1] * cfg.cursorSpeed * dt));
+            float speed = cfg.cursorSpeed;
+            if (mc.screen instanceof AbstractContainerScreen<?> c && c.getSlotUnderMouse() != null) {
+                speed *= cfg.cursorSlotFactor; // precision al apuntar sobre un slot
+            }
+            double nx = Math.max(0, Math.min(maxX, x + tmp[0] * speed * dt));
+            double ny = Math.max(0, Math.min(maxY, y + tmp[1] * speed * dt));
             if (nx != x || ny != y) {
                 GLFW.glfwSetCursorPos(window, nx, ny);
                 mouse.consolepad$onMove(window, nx, ny);
+                mc.setLastInputType(InputType.MOUSE); // el stick devuelve el control al cursor libre
             }
         }
+
+        dpadNavigation(mc, mouse, window, s, dt);
 
         // Clics: pulsar y soltar por separado, para poder arrastrar.
         mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
@@ -147,6 +164,85 @@ public final class PadDriver {
         }
     }
 
+    /** D-pad en pantallas: salta entre slots (contenedores) o usa la navegacion por foco de Minecraft (menus). */
+    private void dpadNavigation(Minecraft mc, MouseHandlerInvoker mouse, long window, PadState s, float dt) {
+        for (int i = 0; i < DPAD.length; i++) {
+            boolean fire = false;
+            if (s.pressed(DPAD[i])) {
+                dpadActive[i] = true;
+                dpadHeld[i] = 0f;
+                dpadNext[i] = REPEAT_DELAY;
+                fire = true;
+            } else if (dpadActive[i] && s.isDown(DPAD[i])) {
+                dpadHeld[i] += dt;
+                if (dpadHeld[i] >= dpadNext[i]) {
+                    dpadNext[i] += REPEAT_INTERVAL;
+                    fire = true;
+                }
+            } else {
+                dpadActive[i] = false;
+            }
+            if (!fire || mc.screen == null) continue;
+            if (mc.screen instanceof AbstractContainerScreen<?> container) {
+                jumpToSlot(mc, mouse, window, container, i);
+            } else {
+                // Mismo camino que las flechas del teclado: Screen.keyPressed -> nextFocusPath(ArrowNavigation).
+                mc.setLastInputType(InputType.KEYBOARD_ARROW);
+                mc.screen.keyPressed(DPAD_KEYS[i], 0, 0);
+            }
+        }
+    }
+
+    /** Mueve el cursor al centro del slot mas cercano en la direccion pedida (0 arriba, 1 abajo, 2 izq, 3 der). */
+    private void jumpToSlot(Minecraft mc, MouseHandlerInvoker mouse, long window,
+                            AbstractContainerScreen<?> screen, int dir) {
+        double sx = (double) mc.getWindow().getScreenWidth() / mc.getWindow().getGuiScaledWidth();
+        double sy = (double) mc.getWindow().getScreenHeight() / mc.getWindow().getGuiScaledHeight();
+        double gx = mc.mouseHandler.xpos() / sx;
+        double gy = mc.mouseHandler.ypos() / sy;
+        Slot current = screen.getSlotUnderMouse();
+        double ox = gx, oy = gy;
+        if (current != null) {
+            ox = screen.getGuiLeft() + current.x + 8;
+            oy = screen.getGuiTop() + current.y + 8;
+        }
+
+        Slot best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (Slot slot : screen.getMenu().slots) {
+            if (slot == current || !slot.isActive()) continue;
+            double cx = screen.getGuiLeft() + slot.x + 8;
+            double cy = screen.getGuiTop() + slot.y + 8;
+            double dx = cx - ox, dy = cy - oy;
+            double score;
+            if (current == null) {
+                score = dx * dx + dy * dy; // lejos de cualquier slot: salta al mas cercano
+            } else {
+                double primary = switch (dir) {
+                    case 0 -> -dy;
+                    case 1 -> dy;
+                    case 2 -> -dx;
+                    default -> dx;
+                };
+                if (primary < 1.0) continue; // no esta en esa direccion
+                double perp = dir < 2 ? Math.abs(dx) : Math.abs(dy);
+                score = primary + 2.0 * perp;
+            }
+            if (score < bestScore) {
+                bestScore = score;
+                best = slot;
+            }
+        }
+        if (best == null) return;
+
+        double nx = (screen.getGuiLeft() + best.x + 8) * sx;
+        double ny = (screen.getGuiTop() + best.y + 8) * sy;
+        nx = Math.max(0, Math.min(mc.getWindow().getScreenWidth() - 1, nx));
+        ny = Math.max(0, Math.min(mc.getWindow().getScreenHeight() - 1, ny));
+        GLFW.glfwSetCursorPos(window, nx, ny);
+        mouse.consolepad$onMove(window, nx, ny);
+    }
+
     private void mouseButton(MouseHandlerInvoker mouse, long window, PadState s, int padButton, int mouseButton) {
         if (s.pressed(padButton)) {
             mouse.consolepad$onPress(window, mouseButton, GLFW.GLFW_PRESS, 0);
@@ -161,6 +257,7 @@ public final class PadDriver {
     /** Suelta los botones de raton que el mando mantuviera pulsados. */
     private void releaseMouseButtons(Minecraft mc) {
         scrollAcc = 0f;
+        java.util.Arrays.fill(dpadActive, false);
         if (mouseDown == 0) return;
         long window = mc.getWindow().getWindow();
         MouseHandlerInvoker mouse = (MouseHandlerInvoker) mc.mouseHandler;

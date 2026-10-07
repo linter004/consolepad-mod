@@ -14,9 +14,11 @@ public final class PadSettings {
     public boolean invertY = false;
     public float triggerThreshold = 0.5f;
     /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
-    public float cursorSpeed = 900f;
+    public float cursorSpeed = 450f;
     public float cursorDeadzone = 0.2f;
-    public float cursorExponent = 1.5f;
+    public float cursorExponent = 2.0f;
+    /** Multiplicador de la velocidad del cursor mientras esta sobre un slot de inventario. */
+    public float cursorSlotFactor = 0.5f;
     /** Pasos de scroll por segundo a inclinacion maxima del stick derecho. */
     public float scrollSpeed = 6f;
 
