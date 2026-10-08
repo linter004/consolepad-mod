@@ -28,7 +28,8 @@
     "DeathScreenAccessor",
     "OptionsAccessor",
     "GuiStateAccessor",
-    "GuiDiagMixin"
+    "GuiDiagMixin",
+    "RenderSystemMixin"
   ],
   "injectors": {
     "defaultRequire": 1

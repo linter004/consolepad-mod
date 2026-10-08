@@ -54,6 +54,10 @@ public final class PlayerPauseScreen extends PlayerMenuScreen {
         return slot == 0; // como el de vanilla; con extras dentro Minecraft no pausa de todos modos
     }
 
+    public boolean resumeHovered() {
+        return resume.isHovered();
+    }
+
     public int[] resumeCenter() {
         return center(resume);
     }

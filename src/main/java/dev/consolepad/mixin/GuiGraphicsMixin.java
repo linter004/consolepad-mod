@@ -58,6 +58,21 @@ public abstract class GuiGraphicsMixin {
         return consolepad$poseY(v);
     }
 
+    /**
+     * AbstractWidget.render decide si el raton esta encima con containsPointInScissor, que compara el raton (en unidades de la pantalla del
+     * jugador) con el recorte de su region (en unidades de la ventana): fuera de la esquina superior izquierda ningun boton de P2-P4 se
+     * marcaba como "encima" (ni el campo de texto reconocia el cursor). El punto se lleva a coordenadas de ventana con la pose.
+     */
+    @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "containsPointInScissor", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private int consolepad$hoverX(int v) {
+        return consolepad$poseX(v);
+    }
+
+    @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "containsPointInScissor", at = @At("HEAD"), argsOnly = true, ordinal = 1)
+    private int consolepad$hoverY(int v) {
+        return consolepad$poseY(v);
+    }
+
     /** Diagnostico: scissor GL real tras cada enableScissor (el del maniqui del inventario debe caer dentro de la region de su jugador). */
     @Inject(method = "enableScissor", at = @At("RETURN"))
     private void consolepad$diagScissor(int minX, int minY, int maxX, int maxY, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {

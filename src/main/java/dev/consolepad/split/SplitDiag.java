@@ -15,6 +15,9 @@ import java.util.List;
  * {@link #recording} es true (autotest).
  */
 public final class SplitDiag {
+    /** Manos en primera persona dibujadas por jugador (la mano oculta no cuenta). */
+    public static final int[] handsDrawn = new int[4];
+
     public static volatile boolean recording;
 
     /** Una muestra: de donde sale, region declarada, viewport/scissor GL reales y la proyeccion. */

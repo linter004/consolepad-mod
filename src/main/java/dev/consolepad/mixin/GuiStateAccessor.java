@@ -41,6 +41,18 @@ public interface GuiStateAccessor {
     @Accessor("toolHighlightTimer")
     void consolepad$setToolHighlightTimer(int v);
 
+    @Accessor("scopeScale")
+    float consolepad$getScopeScale();
+
+    @Accessor("scopeScale")
+    void consolepad$setScopeScale(float v);
+
+    @Accessor("vignetteBrightness")
+    float consolepad$getVignetteBrightness();
+
+    @Accessor("vignetteBrightness")
+    void consolepad$setVignetteBrightness(float v);
+
     @Accessor("lastToolHighlight")
     ItemStack consolepad$getLastToolHighlight();
 

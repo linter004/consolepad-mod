@@ -111,6 +111,7 @@ public final class SecondaryTick {
         // Con un menu abierto el jugador no se mueve ni actua en el mundo (su mando maneja el cursor), pero lo que tiene pulsado se
         // recuerda: al cerrar el menu no cuenta como pulsacion nueva.
         java.util.EnumSet<PadAction> rawDown = java.util.EnumSet.copyOf(downSet);
+        ctx.playerListHeld = ctx.screen == null && rawDown.contains(PadAction.PLAYER_LIST);
         if (ctx.screen != null) {
             forward = left = lookX = lookY = 0f;
             jump = attack = use = lb = rb = false;
@@ -159,8 +160,27 @@ public final class SecondaryTick {
         SplitNotices.tick(self);
 
         if (lookX != 0f || lookY != 0f) {
-            float k = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
-            player.turn(lookX * k, lookY * k);
+            float kx = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
+            float ky = cfg.lookSpeedY() * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
+            player.turn(lookX * kx, lookY * ky);
+        }
+        // Dos empujones seguidos del stick hacia delante = correr, mientras se mantenga hacia delante.
+        st.ticksSinceFwdTap++;
+        if (forward > 0.7f && !st.fwdState) {
+            st.fwdState = true;
+            if (cfg.doubleTapSprint && st.ticksSinceFwdTap <= 7) {
+                st.doubleTapSprint = true;
+                st.sprintHeld = true;
+                st.ticksSinceFwdTap = 1000;
+            } else {
+                st.ticksSinceFwdTap = 0;
+            }
+        } else if (forward < 0.4f) {
+            st.fwdState = false;
+            if (st.doubleTapSprint && forward < 0.1f) {
+                st.doubleTapSprint = false;
+                st.sprintHeld = st.sprintLatch;
+            }
         }
 
         // Atacar y usar, como Minecraft.handleKeybinds pero con el mando de P2.
@@ -222,6 +242,7 @@ public final class SecondaryTick {
                     input.shiftKeyDown = st.sneakLatch;
                 }
                 case PAUSE -> mc.setScreen(new PlayerPauseScreen(self.slotIndex));
+                case CHAT -> mc.setScreen(new ExtraChatScreen());
                 case INVENTORY -> {
                     dbgInventoryRequests++;
                     if (mc.gameMode.isServerControlledInventory()) player.sendOpenInventory();

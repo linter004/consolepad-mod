@@ -55,3 +55,12 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Una prueba que depende de la escala de interfaz global debe fijarla** (en `options.txt` del usuario puede ser 1); el autotest la pone en Automatico y la restaura. Tras cambiar la escala o la orientacion las pantallas se recolocan: el cursor de la prueba hay que volver a ponerlo sobre el boton.
 - **Para repetir solo una prueba**: `CONSOLEPAD_AUTOTEST_CASES=<casillas> tools/run-autotest.sh <salida>`; antes de lanzar, asegurarse de que el juego anterior ha muerto del todo (si no, el mundo sigue bloqueado y el autotest se queda en el titulo).
 - **Los scripts largos con comillas se escriben con la herramienta Write**, no con heredocs de shell (rompen el comando).
+
+### Reglas aprendidas de la tanda de consola (entradas "Tanda de consola" de `routing-log.md`)
+
+- **Un widget que no reacciona al cursor en P2-P4 suele ser el recorte:** `AbstractWidget.render` decide "encima" con `GuiGraphics.containsPointInScissor`, que compara con el recorte de la region en unidades de ventana; `GuiGraphicsMixin` lleva el punto con la pose. Cualquier otra comprobacion contra el recorte tiene el mismo problema.
+- **El boton que abre una pantalla (cruceta del chat, A sobre un campo) sigue pulsado al abrirse:** el teclado en pantalla ignora un fotograma y toma las direcciones ya pulsadas como estado anterior (`skipFrame`, `dirPrev`), si no se mueve solo.
+- **Ejes simulados:** `PadState.simLx/simLy/simRx/simRy` sustituyen al stick (un mando real conectado los pisaria cada fotograma). Las pruebas nuevas deben terminar con P2 dentro (`leaveTo(mc, 2)`): `leaveTest` lo necesita.
+- **Un cartel abierto desde una prueba necesita `sign.setAllowedPlayerEditor(uuid)` en el servidor** (lo hace `SignBlock.openTextEdit`, no `ServerPlayer.openTextEdit`). `ServerBossEvent` esta en `net.minecraft.server.level`.
+- **Si en una tanda filtrada todo lo de P1 falla a la vez y lo de los extra no, es el foco de la ventana** (`PadDriver` no hace nada con `!mc.isWindowActive()`): repetir sin tocar ni abrir nada mas.
+- **Un mixin a una clase de Mixin no puede tener campos estaticos publicos usados desde fuera:** los contadores van en `SplitDiag`.

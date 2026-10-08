@@ -12,11 +12,22 @@ public final class PadSettings {
     /** 1 = lineal; >1 da mas precision cerca del centro. */
     public float lookExponent = 1.6f;
     public boolean invertY = false;
+    /** Sensibilidad vertical (grados por segundo); 0 = la misma que la horizontal. */
+    public float lookSpeedY = 0f;
+    /** Empujar dos veces seguidas el stick izquierdo hacia delante activa el sprint. */
+    public boolean doubleTapSprint = true;
+    /** HUD propio: zona segura (porcentaje de cada borde), opacidad (0 a 1), y si se ven el HUD y la mano. */
+    public int hudMargin = 0;
+    public float hudOpacity = 1f;
+    public boolean showHud = true;
+    public boolean showHand = true;
     /** Campo de vision de este jugador (grados); 0 = el de las opciones del juego. */
     public int fov = 0;
     public float triggerThreshold = 0.5f;
     /** Escala de interfaz de este jugador con la pantalla dividida: 0 = automatica (la que elegiria Minecraft para su region), 1 a 4 = fija. */
     public int guiScale = 0;
+    /** Nombre que ven los demas sobre la cabeza de este jugador; vacio = "Jugador N". */
+    public String playerName = "";
     /** Ayuda de botones del HUD (abajo a izquierda y derecha) y barra de ayuda en pantallas. */
     public boolean showHints = true;
     /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */
@@ -29,6 +40,10 @@ public final class PadSettings {
     public float cursorSlotFactor = 0.5f;
     /** Pasos de scroll por segundo a inclinacion maxima del stick derecho. */
     public float scrollSpeed = 6f;
+
+    public float lookSpeedY() {
+        return lookSpeedY > 0f ? lookSpeedY : lookSpeed;
+    }
 
     /** codigo de boton -> accion. Remapeable por jugador. */
     public final Map<Integer, PadAction> bindings = defaultBindings();

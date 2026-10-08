@@ -34,6 +34,8 @@ public class ConsolePad {
         PADS = driver.pads();
         AutoTest.init(driver.pads());
         NeoForge.EVENT_BUS.addListener(driver::onFrame);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onNameFormat);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onTabName);
 
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> {

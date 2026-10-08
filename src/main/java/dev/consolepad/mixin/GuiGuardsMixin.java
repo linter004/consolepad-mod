@@ -27,6 +27,13 @@ public abstract class GuiGuardsMixin {
         }
     }
 
+    /** Las barras de jefe que llegan a un jugador extra van a las suyas (la de vanilla es la de P1 y se dibuja en su region). */
+    @Inject(method = "getBossOverlay", at = @At("RETURN"), cancellable = true)
+    private void consolepad$ownBossOverlay(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.client.gui.components.BossHealthOverlay> cir) {
+        dev.consolepad.split.PlayerContext c = ContextSwitcher.current();
+        if (c != null) cir.setReturnValue(c.bossOverlay());
+    }
+
     @Inject(method = "setSubtitle", at = @At("HEAD"), cancellable = true)
     private void consolepad$noSubtitle(Component subtitle, CallbackInfo ci) {
         if (ContextSwitcher.isSecondaryActive()) ci.cancel();

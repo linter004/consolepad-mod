@@ -3,6 +3,7 @@ package dev.consolepad.split;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
+import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -1432,6 +1433,626 @@ public final class AutoTest {
         return pauseMenu ? isPauseMenu(sc) : sc == null;
     }
 
+    // ---------------------------------------------------------------- HUD de P2 a P4: calabaza, barras de jefe, marcador y lista de jugadores
+
+    private static boolean hbdOk = true;
+    private static int hbdPhase;
+    private static volatile int hbdCornerP2, hbdCornerP3;
+    private static net.minecraft.server.level.ServerBossEvent hbdBoss;
+    private static net.minecraft.world.scores.Objective hbdObjective;
+
+    private static void hbdVerdict(String name, boolean ok) {
+        hbdOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Brillo medio de un bloque de pixeles junto a la esquina superior izquierda de una region. */
+    private static int hbdCorner(com.mojang.blaze3d.platform.NativeImage img, PlayerContext c) {
+        int x = c.px + 3, y = img.getHeight() - (c.py + c.ph) + 3, sum = 0;
+        for (int dy = 0; dy < 4; dy++) {
+            for (int dx = 0; dx < 4; dx++) {
+                int rgba = img.getPixelRGBA(x + dx, y + dy);
+                sum += (rgba & 0xFF) + ((rgba >> 8) & 0xFF) + ((rgba >> 16) & 0xFF);
+            }
+        }
+        return sum / 16;
+    }
+
+    private static int hbdBossCount(net.minecraft.client.gui.components.BossHealthOverlay overlay) {
+        try {
+            var f = net.minecraft.client.gui.components.BossHealthOverlay.class.getDeclaredField("events");
+            f.setAccessible(true);
+            return ((java.util.Map<?, ?>) f.get(overlay)).size();
+        } catch (ReflectiveOperationException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Lo que antes solo dibujaba P1: la calabaza en la cabeza de P2 oscurece solo la region de P2; la barra de jefe que ve P3 sale solo en la de P3
+     * (la de P1 y la de P2 siguen vacias); el marcador lateral sale en la region de cada jugador; y mantener el boton de lista de jugadores en el
+     * mando de P3 dibuja la lista solo en su region, con el indicador de jugador local ("[P2]") en el nombre.
+     */
+    private static void hudBoardsTest(Minecraft mc) {
+        int t = ticks;
+        switch (hbdPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 3) && t > 20) {
+                    var server = mc.getSingleplayerServer();
+                    ServerPlayer sp2 = serverExtra(mc, 1), sp3 = serverExtra(mc, 2);
+                    server.execute(() -> {
+                        sp2.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.CARVED_PUMPKIN));
+                        hbdBoss = new net.minecraft.server.level.ServerBossEvent(net.minecraft.network.chat.Component.literal("Jefe de prueba"),
+                                net.minecraft.world.BossEvent.BossBarColor.PINK, net.minecraft.world.BossEvent.BossBarOverlay.PROGRESS);
+                        hbdBoss.addPlayer(sp3);
+                        var sb = server.getScoreboard();
+                        hbdObjective = sb.addObjective("cp_test", net.minecraft.world.scores.criteria.ObjectiveCriteria.DUMMY, net.minecraft.network.chat.Component.literal("Prueba"),
+                                net.minecraft.world.scores.criteria.ObjectiveCriteria.RenderType.INTEGER, true, null);
+                        sb.setDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR, hbdObjective);
+                        sb.getOrCreatePlayerScore(net.minecraft.world.scores.ScoreHolder.forNameOnly("linea"), hbdObjective).set(5);
+                        sp2.refreshTabListName();
+                    });
+                    int list = PadHints.buttonFor(pads.slot(2).settings, PadAction.PLAYER_LIST);
+                    simSlot(2, 1 << list); // P3 mantiene el boton de la lista de jugadores
+                    hbdPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                PlayerContext c2 = SecondaryPlayers.context(1), c3 = SecondaryPlayers.context(2);
+                if (t == 14) {
+                    SplitDiag.hudClear();
+                    SplitDiag.hudRecording = true;
+                }
+                if (t == 16) pixelProbe = img -> {
+                    hbdCornerP2 = hbdCorner(img, c2);
+                    hbdCornerP3 = hbdCorner(img, c3);
+                };
+                if (t == 28) {
+                    SplitDiag.hudRecording = false;
+                    var seen = SplitDiag.hudSeen();
+                    hbdVerdict("calabaza en la cabeza de P2: brillo de la esquina de su region " + hbdCornerP2 + " contra " + hbdCornerP3 + " en la de P3 (debe ser menos de la mitad)",
+                            hbdCornerP3 > 60 && hbdCornerP2 * 2 < hbdCornerP3);
+                    int b1 = hbdBossCount(mc.gui.getBossOverlay()), b2 = hbdBossCount(c2.bossOverlay()), b3 = hbdBossCount(c3.bossOverlay());
+                    hbdVerdict("barra de jefe vista por P3: barras de P1=" + b1 + ", P2=" + b2 + ", P3=" + b3 + " (esperado 0, 0, 1)", b1 == 0 && b2 == 0 && b3 == 1);
+                    hbdVerdict("marcador lateral: capa dibujada en P2=" + seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("marcador") + ", en P3="
+                            + seen.getOrDefault("P3", new java.util.TreeMap<>()).containsKey("marcador"),
+                            seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("marcador") && seen.getOrDefault("P3", new java.util.TreeMap<>()).containsKey("marcador"));
+                    hbdVerdict("superposiciones de camara (viñeta, calabaza, portal) dibujadas por jugador: P2="
+                            + seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("superposiciones") + ", P3=" + seen.getOrDefault("P3", new java.util.TreeMap<>()).containsKey("superposiciones"),
+                            seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("superposiciones") && seen.getOrDefault("P3", new java.util.TreeMap<>()).containsKey("superposiciones"));
+                    boolean listP3 = seen.getOrDefault("P3", new java.util.TreeMap<>()).containsKey("lista de jugadores");
+                    boolean listP2 = seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("lista de jugadores");
+                    hbdVerdict("lista de jugadores: mantenida en el mando de P3 se dibuja en P3=" + listP3 + " y no en P2=" + listP2, listP3 && !listP2);
+                    String tab = String.valueOf(serverExtra(mc, 1).getTabListDisplayName());
+                    hbdVerdict("indicador de jugador local en la lista: '" + tab + "' (debe contener [P2])", tab.contains("[P2]"));
+                    simSlot(2, 0);
+                    var server = mc.getSingleplayerServer();
+                    ServerPlayer sp2 = serverExtra(mc, 1);
+                    server.execute(() -> {
+                        sp2.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, ItemStack.EMPTY);
+                        hbdBoss.removeAllPlayers();
+                        server.getScoreboard().setDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR, null);
+                        server.getScoreboard().removeObjective(hbdObjective);
+                    });
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO HUD de P2 a P4: calabaza, barras de jefe, marcador y lista de jugadores en conjunto -> {}", hbdOk ? "OK" : "FALLO");
+                    hbdPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if (t > 10 && leaveTo(mc, 2) || t > 600) {
+                    hbdPhase = 3;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- controles de movimiento por jugador
+
+    private static boolean mvOk = true;
+    private static int mvPhase;
+    private static float mvYaw0, mvPitch0, mvYawDelta, mvPitchDelta;
+
+    private static void mvVerdict(String name, boolean ok) {
+        mvOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static void mvStick(int slot, float lx, float ly, float rx, float ry) {
+        var st = pads.slot(slot).device.state;
+        st.simLx = lx;
+        st.simLy = ly;
+        st.simRx = rx;
+        st.simRy = ry;
+    }
+
+    private static net.minecraft.world.entity.player.Player mvPlayer(Minecraft mc, int slot) {
+        return slot == 0 ? mc.player : SecondaryPlayers.context(slot).player;
+    }
+
+    private static void mvSetPitch(Minecraft mc, int slot, float pitch) {
+        if (slot == 0) mc.player.setXRot(pitch);
+        else ContextSwitcher.run(SecondaryPlayers.context(slot), () -> mc.player.setXRot(pitch));
+    }
+
+    /**
+     * Cada jugador tiene su sensibilidad horizontal y vertical (el mismo empujon del stick derecho gira el doble en horizontal si es el doble), el eje Y
+     * invertido cambia el signo del giro vertical y dos empujones seguidos del stick izquierdo hacia delante activan el sprint (solo si la opcion esta
+     * activa) hasta soltar el stick. Se mide en P1 y en P2.
+     */
+    private static void moveTest(Minecraft mc) {
+        int t = ticks;
+        var cfgs = new PadSettings[] {pads.slot(0).settings, pads.slot(1).settings};
+        switch (mvPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 2) && t > 20) {
+                    for (var cfg : cfgs) {
+                        cfg.lookSpeed = 180f;
+                        cfg.lookSpeedY = 90f;
+                        cfg.invertY = false;
+                        cfg.doubleTapSprint = true;
+                    }
+                    mvPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1, 2 -> { // mvPhase 1 = P1, 2 = P2: giro horizontal, vertical y vertical invertido
+                int slot = mvPhase - 1;
+                String who = "P" + (slot + 1);
+                var player = mvPlayer(mc, slot);
+                var cfg = cfgs[slot];
+                if (t == 2) {
+                    mvSetPitch(mc, slot, 0f);
+                    mvYaw0 = player.getYRot();
+                }
+                if (t == 4) mvStick(slot, 0f, 0f, 1f, 0f);
+                if (t == 24) {
+                    mvStick(slot, 0f, 0f, 0f, 0f);
+                    mvYawDelta = player.getYRot() - mvYaw0;
+                }
+                if (t == 30) mvPitch0 = player.getXRot();
+                if (t == 32) mvStick(slot, 0f, 0f, 0f, 1f);
+                if (t == 52) {
+                    mvStick(slot, 0f, 0f, 0f, 0f);
+                    mvPitchDelta = player.getXRot() - mvPitch0;
+                    float ratio = mvPitchDelta == 0f ? 0f : mvYawDelta / mvPitchDelta;
+                    mvVerdict(who + ": sensibilidad horizontal 180 y vertical 90: giro horizontal " + mvYawDelta + " grados, vertical " + mvPitchDelta + " (cociente " + ratio + ", esperado 2)",
+                            mvYawDelta > 1f && mvPitchDelta > 0.5f && ratio > 1.7f && ratio < 2.3f);
+                    cfg.invertY = true;
+                    mvSetPitch(mc, slot, 0f);
+                }
+                if (t == 56) mvPitch0 = player.getXRot();
+                if (t == 58) mvStick(slot, 0f, 0f, 0f, 1f);
+                if (t == 70) {
+                    mvStick(slot, 0f, 0f, 0f, 0f);
+                    float d = player.getXRot() - mvPitch0;
+                    mvVerdict(who + ": con el eje Y invertido el mismo empujon gira al reves (" + d + " grados, antes " + mvPitchDelta + ")", d < -0.3f && mvPitchDelta > 0f);
+                    cfg.invertY = false;
+                    mvSetPitch(mc, slot, 0f);
+                    mvPhase = slot == 0 ? 2 : 3;
+                    ticks = 0;
+                }
+            }
+            case 3, 4 -> { // mvPhase 3 = P1, 4 = P2: sprint con doble toque
+                int slot = mvPhase - 3;
+                String who = "P" + (slot + 1);
+                var cfg = cfgs[slot];
+                boolean sprint = slot == 0 ? mc.options.keySprint.isDown() : SecondaryPlayers.context(slot).input.sprintHeld;
+                if (t == 4) mvStick(slot, 0f, -1f, 0f, 0f); // primer empujon
+                if (t == 7) mvStick(slot, 0f, 0f, 0f, 0f);
+                if (t == 10) mvStick(slot, 0f, -1f, 0f, 0f); // segundo empujon, mantenido
+                if (t == 14) {
+                    mvVerdict(who + ": dos empujones seguidos del stick hacia delante activan el sprint (sprint=" + sprint + ")", sprint);
+                }
+                if (t == 24) mvStick(slot, 0f, 0f, 0f, 0f);
+                if (t == 30) {
+                    mvVerdict(who + ": al soltar el stick el sprint de doble toque se acaba (sprint=" + sprint + ")", !sprint);
+                    cfg.doubleTapSprint = false;
+                }
+                if (t == 34) mvStick(slot, 0f, -1f, 0f, 0f);
+                if (t == 37) mvStick(slot, 0f, 0f, 0f, 0f);
+                if (t == 40) mvStick(slot, 0f, -1f, 0f, 0f);
+                if (t == 46) {
+                    mvVerdict(who + ": con la opcion desactivada dos empujones no activan el sprint (sprint=" + sprint + ")", !sprint);
+                    mvStick(slot, 0f, 0f, 0f, 0f);
+                    cfg.doubleTapSprint = true;
+                    mvPhase = slot == 0 ? 4 : 5;
+                    ticks = 0;
+                }
+            }
+            case 5 -> {
+                if (t == 1) ConsolePad.LOGGER.info("[autotest] RESULTADO controles de movimiento por jugador en conjunto -> {}", mvOk ? "OK" : "FALLO");
+                if (t > 10) {
+                    for (int i = 0; i < 2; i++) {
+                        cfgs[i].lookSpeedY = 0f;
+                        mvStick(i, 0f, 0f, 0f, 0f);
+                    }
+                    mvPhase = 6;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- opciones de HUD por jugador
+
+    private static boolean hoOk = true;
+    private static int hoPhase;
+    private static int[] hoHands0 = new int[4];
+    private static volatile int hoPixelA, hoPixelB;
+
+    private static void hoVerdict(String name, boolean ok) {
+        hoOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Suma de colores de un bloque de pixeles de la imagen final dentro de la region de un extra (ver la nota de hudOptionsTest). */
+    private static int hoSelectedSlotPixels(com.mojang.blaze3d.platform.NativeImage img, PlayerContext c) {
+        int eff = c.guiScaleEff;
+        int unitX = c.hudW / 2 - 92 + c.player.getInventory().selected * 20 + 1; // borde izquierdo del marco del hueco elegido
+        int unitY = c.hudH - 22 - 1 + 11;
+        int x = c.px + unitX * eff;
+        int top = img.getHeight() - (c.py + c.ph);
+        int y = top + unitY * eff;
+        int sum = 0;
+        for (int dy = 0; dy < Math.max(2, eff); dy++) {
+            for (int dx = 0; dx < Math.max(2, eff); dx++) {
+                int rgba = img.getPixelRGBA(x + dx, y + dy);
+                sum += (rgba & 0xFF) + ((rgba >> 8) & 0xFF) + ((rgba >> 16) & 0xFF);
+            }
+        }
+        return sum / (Math.max(2, eff) * Math.max(2, eff));
+    }
+
+    /**
+     * Opciones de HUD por jugador: la zona segura reduce el ancho y alto con que cada jugador dibuja su HUD (el de la region menos el margen de los
+     * dos lados), ocultar el HUD o la mano de uno no afecta a los demas, y la opacidad cambia el color de los pixeles del HUD en la imagen final.
+     */
+    private static void hudOptionsTest(Minecraft mc) {
+        int t = ticks;
+        var s0 = pads.slot(0).settings;
+        var s1 = pads.slot(1).settings;
+        var s2 = pads.slot(2).settings;
+        switch (hoPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 3) && t > 20) {
+                    s0.hudMargin = 10;
+                    s1.hudMargin = 10;
+                    s2.showHud = false;
+                    s2.showHand = false;
+                    hoHands0 = SplitDiag.handsDrawn.clone();
+                    SplitDiag.hudClear();
+                    SplitDiag.hudRecording = true;
+                    hoPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                if (t == 12) {
+                    SplitDiag.hudRecording = false;
+                    var seen = SplitDiag.hudSeen();
+                    PlayerContext c2 = SecondaryPlayers.context(1), c3 = SecondaryPlayers.context(2);
+                    int w1 = SplitView.p1HudW - 2 * Math.round(SplitView.p1HudW * 0.10f), w2 = c2.hudW - 2 * Math.round(c2.hudW * 0.10f);
+                    int g1 = seen.getOrDefault("P1", new java.util.TreeMap<>()).getOrDefault("hotbar", -1);
+                    int g2 = seen.getOrDefault("P2", new java.util.TreeMap<>()).getOrDefault("hotbar", -1);
+                    hoVerdict("zona segura del 10 %: P1 dibuja su barra de objetos con ancho " + g1 + " (esperado " + w1 + " de " + SplitView.p1HudW + "), P2 con " + g2 + " (esperado " + w2 + " de " + c2.hudW + ")",
+                            g1 == w1 && g2 == w2 && c2.safeW == w2);
+                    var l3 = seen.getOrDefault("P3", new java.util.TreeMap<>());
+                    hoVerdict("P3 con el HUD oculto no dibuja sus capas (" + l3.keySet() + ") pero conserva los avisos, y P1/P2 siguen con las suyas",
+                            !l3.containsKey("hotbar") && !l3.containsKey("vida") && l3.containsKey("avisos") && g1 > 0 && g2 > 0);
+                    int[] now = SplitDiag.handsDrawn;
+                    hoVerdict("mano oculta de P3: manos dibujadas en los ultimos fotogramas P1 +" + (now[0] - hoHands0[0]) + ", P2 +" + (now[1] - hoHands0[1]) + ", P3 +" + (now[2] - hoHands0[2]) + " (P3 debe quedarse en 0)",
+                            now[2] - hoHands0[2] == 0 && now[0] - hoHands0[0] > 0 && now[1] - hoHands0[1] > 0);
+                    s0.hudMargin = 0;
+                    s1.hudMargin = 0;
+                    s2.showHud = true;
+                    s2.showHand = true;
+                    s1.hudOpacity = 1f;
+                    hoPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                PlayerContext c2 = SecondaryPlayers.context(1);
+                if (t == 8) pixelProbe = img -> hoPixelA = hoSelectedSlotPixels(img, c2);
+                if (t == 12) s1.hudOpacity = 0.25f;
+                if (t == 20) pixelProbe = img -> hoPixelB = hoSelectedSlotPixels(img, c2);
+                if (t == 26) {
+                    hoVerdict("opacidad del HUD de P2 al 25 %: color medio del marco del hueco elegido " + hoPixelA + " (100 %) -> " + hoPixelB + " (25 %), debe cambiar al menos 40",
+                            Math.abs(hoPixelA - hoPixelB) >= 40);
+                    s1.hudOpacity = 1f;
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO opciones de HUD por jugador en conjunto -> {}", hoOk ? "OK" : "FALLO");
+                    hoPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (leaveTo(mc, 2) || t > 600) {
+                    hoPhase = 4;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- etiqueta con nombre configurable sobre cada jugador local
+
+    private static boolean lbOk = true;
+    private static int lbPhase;
+
+    private static void lbVerdict(String name, boolean ok) {
+        lbOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static String lbName(net.minecraft.world.entity.player.Player p) {
+        return p == null ? "(no existe)" : p.getDisplayName().getString();
+    }
+
+    /** Nombre que ve cada vista: P1 ve a P2, P2 ve a P1 y el servidor ve a los dos. */
+    private static String lbViews(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        ServerPlayer sp2 = serverExtra(mc, 1);
+        ServerPlayer sp1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+        return "P1 ve a P2='" + lbName(mc.level.getPlayerByUUID(sp2.getUUID())) + "', P2 ve a P1='" + lbName(c.level.getPlayerByUUID(mc.player.getUUID()))
+                + "', servidor P2='" + lbName(sp2) + "' P1='" + lbName(sp1) + "'";
+    }
+
+    private static boolean lbExpect(Minecraft mc, String p1, String p2) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        ServerPlayer sp2 = serverExtra(mc, 1);
+        ServerPlayer sp1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+        return lbName(mc.level.getPlayerByUUID(sp2.getUUID())).equals(p2) && lbName(c.level.getPlayerByUUID(mc.player.getUUID())).equals(p1)
+                && lbName(sp2).equals(p2) && lbName(sp1).equals(p1);
+    }
+
+    /**
+     * Cada jugador local lleva su nombre para mostrar ("Jugador N" por defecto, o el que elija en sus ajustes) en la etiqueta que ven los demas, en el
+     * cliente de cada uno y en el servidor, sin tocar el perfil (nombre y UUID siguen siendo los de siempre: de ellos depende su archivo de datos).
+     */
+    private static void labelTest(Minecraft mc) {
+        var s1 = pads.slot(1).settings;
+        int t = ticks;
+        switch (lbPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 2) && t > 20) {
+                    PlayerLabels.refreshAll(mc);
+                    lbPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                if (t == 8) {
+                    ServerPlayer sp2 = serverExtra(mc, 1);
+                    lbVerdict("nombre por defecto con P2 dentro: " + lbViews(mc), lbExpect(mc, "Jugador 1", "Jugador 2"));
+                    lbVerdict("el perfil de P2 no cambia: '" + sp2.getGameProfile().getName() + "' (esperado '" + SecondaryPlayers.secondaryName(mc, 1) + "') y UUID " + sp2.getUUID(),
+                            sp2.getGameProfile().getName().equals(SecondaryPlayers.secondaryName(mc, 1)) && sp2.getUUID().equals(net.minecraft.core.UUIDUtil.createOfflinePlayerUUID(SecondaryPlayers.secondaryName(mc, 1))));
+                    s1.playerName = "Ana";
+                    PlayerLabels.refreshAll(mc);
+                }
+                if (t == 16) {
+                    lbVerdict("P2 se llama Ana en sus ajustes: " + lbViews(mc), lbExpect(mc, "Jugador 1", "Ana"));
+                    s1.playerName = "";
+                    PlayerLabels.refreshAll(mc);
+                }
+                if (t == 24) {
+                    lbVerdict("al quitar el nombre vuelve a Jugador 2: " + lbViews(mc), lbExpect(mc, "Jugador 1", "Jugador 2"));
+                    PlayerContext c = SecondaryPlayers.context(1);
+                    ContextSwitcher.run(c, () -> mc.setScreen(new PlayerNameScreen(1, null)));
+                }
+                if (t == 34) {
+                    PlayerContext c = SecondaryPlayers.context(1);
+                    lbVerdict("la pantalla del nombre abre el teclado (pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ")", c.screen instanceof PlayerNameScreen && PadKeyboard.of(1).active());
+                }
+                kbStep(1, t, 36, 0, KB_A); // 'q'
+                kbStep(1, t, 36, 1, KB_B); // cierra el teclado
+                if (t == 36 + 2 * 6 - 2) {
+                    PlayerContext c = SecondaryPlayers.context(1);
+                    if (c.screen instanceof PlayerNameScreen ns) {
+                        c.cursorX = ns.doneCenter()[0];
+                        c.cursorY = ns.doneCenter()[1];
+                    }
+                }
+                kbStep(1, t, 36, 2, KB_A); // Hecho
+                if (t == 36 + 3 * 6 + 10) {
+                    PlayerContext c = SecondaryPlayers.context(1);
+                    lbVerdict("escribir 'q' en la pantalla del nombre y pulsar Hecho lo guarda en su slot: playerName='" + s1.playerName + "', pantalla " + c.screen + ", " + lbViews(mc),
+                            "q".equals(s1.playerName) && c.screen == null && lbExpect(mc, "Jugador 1", "q"));
+                    s1.playerName = "";
+                    PlayerLabels.refreshAll(mc);
+                    lbPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // P2 sale: P1 recupera su nombre real
+                if (leaveTo(mc, 1) && t > 10) {
+                    ServerPlayer sp1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+                    lbVerdict("sin jugadores extra P1 vuelve a su nombre real: '" + lbName(sp1) + "' (esperado '" + mc.player.getName().getString() + "')", lbName(sp1).equals(mc.player.getName().getString()));
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO etiquetas con nombre de los jugadores locales en conjunto -> {}", lbOk ? "OK" : "FALLO");
+                    lbPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (joinTo(mc, 2) || t > 600) {
+                    lbPhase = 4;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- teclado en pantalla por jugador
+
+    private static boolean kbOk = true;
+    private static int kbPhase;
+    private static BlockPos kbSignPos;
+    private static volatile String kbSignLine = "?";
+
+    private static void kbVerdict(String name, boolean ok) {
+        kbOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Pulsa un boton del slot en el tick base+paso*6 y lo suelta 3 ticks despues. */
+    private static void kbStep(int slot, int t, int base, int step, int button) {
+        int at = base + step * 6;
+        if (t == at) simSlot(slot, 1 << button);
+        if (t == at + 3) simSlot(slot, 0);
+    }
+
+    private static final int KB_A = PadState.A, KB_B = PadState.B, KB_X = PadState.X, KB_Y = PadState.Y, KB_UP = PadState.DPAD_UP,
+            KB_DOWN = PadState.DPAD_DOWN, KB_RIGHT = PadState.DPAD_RIGHT;
+
+    /**
+     * Teclado en pantalla: (P2) el boton de chat abre el chat de P2 con el teclado abierto; escribir con A, espacio con Y, borrar con X, B cierra el
+     * teclado y A sobre el campo de texto lo vuelve a abrir; la tecla Enviar manda el mensaje con la conexion de P2 (le llega como aviso en su region).
+     * (P1) el chat de vanilla tambien abre el teclado y escribe en su campo. (Cartel) un cartel abierto para P2 se rellena con el teclado y llega al servidor.
+     */
+    private static void keyboardTest(Minecraft mc) {
+        int t = ticks;
+        var s0 = pads.slot(0).settings;
+        var s1 = pads.slot(1).settings;
+        switch (kbPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 2) && t > 20) {
+                    PadKeyboard.of(1).resetTyped();
+                    kbPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // chat de P2
+                PlayerContext c = SecondaryPlayers.context(1);
+                int chat = PadHints.buttonFor(s1, PadAction.CHAT);
+                int base = 30;
+                if (t == 5) simSlot(1, 1 << chat);
+                if (t == 9) simSlot(1, 0);
+                if (t == 20) {
+                    kbVerdict("P2: el boton de chat abre su chat con el teclado abierto (pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ")",
+                            c.screen instanceof ExtraChatScreen && PadKeyboard.of(1).active());
+                    screenshotName = "consola-teclado-p2.png";
+                    screenshotPending = true;
+                    kbVerdict("barra de ayuda con el teclado abierto: '" + PadHints.lastBar[1] + "'", PadHints.lastBar[1].startsWith("0:Escribir|1:Cerrar|2:Borrar|3:Espacio"));
+                }
+                int[] seq = {KB_A, KB_RIGHT, KB_A, KB_Y, KB_X, KB_DOWN, KB_A, KB_B, -1, KB_DOWN, KB_DOWN, KB_DOWN, KB_RIGHT, KB_RIGHT, KB_RIGHT, KB_RIGHT, KB_A};
+                for (int k = 0; k < seq.length; k++) {
+                    if (seq[k] < 0) { // A sobre el campo de texto: reabre el teclado
+                        if (t == base + k * 6 - 2 && c.screen instanceof ExtraChatScreen cs) {
+                            c.cursorX = cs.inputCenter()[0];
+                            c.cursorY = cs.inputCenter()[1];
+                        }
+                        kbStep(1, t, base, k, KB_A);
+                    } else {
+                        kbStep(1, t, base, k, seq[k]);
+                    }
+                }
+                if (t == base + 7 * 6 - 1 && c.screen instanceof ExtraChatScreen cs) {
+                    kbVerdict("P2 escribe con el teclado: A, derecha, A, espacio, borrar, abajo, A -> '" + cs.text() + "' (esperado 'qws')", cs.text().equals("qws"));
+                }
+                if (t == base + 8 * 6 - 1) kbVerdict("B cierra el teclado y deja el chat abierto (teclado=" + PadKeyboard.of(1).active() + ", pantalla " + c.screen + ")",
+                        !PadKeyboard.of(1).active() && c.screen instanceof ExtraChatScreen);
+                if (t == base + 9 * 6 - 1) kbVerdict("A sobre el campo de texto reabre el teclado (teclado=" + PadKeyboard.of(1).active() + ", " + PadKeyboard.of(1).lastClickInfo + ", cursor " + SecondaryPlayers.context(1).cursorX + "," + SecondaryPlayers.context(1).cursorY + " campo " + java.util.Arrays.toString(((ExtraChatScreen) SecondaryPlayers.context(1).screen).inputCenter()) + ")", PadKeyboard.of(1).active());
+                if (t == base + seq.length * 6 + 15) {
+                    boolean got = c.notices.stream().anyMatch(n -> n.text().getString().contains("qws"));
+                    kbVerdict("la tecla Enviar manda el mensaje: pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ", aviso 'qws' recibido por P2=" + got,
+                            c.screen == null && !PadKeyboard.of(1).active() && got);
+                    kbPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // chat de P1 (vanilla)
+                int chat = PadHints.buttonFor(s0, PadAction.CHAT);
+                if (t == 5) simSlot(0, 1 << chat);
+                if (t == 9) simSlot(0, 0);
+                if (t == 20) {
+                    kbVerdict("P1: el chat de vanilla abre el teclado (pantalla " + mc.screen + ", teclado=" + PadKeyboard.of(0).active() + ")",
+                            mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen && PadKeyboard.of(0).active());
+                }
+                kbStep(0, t, 25, 0, KB_A);
+                if (t == 36) {
+                    String text = mc.screen != null && mc.screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox eb ? eb.getValue() : "?";
+                    kbVerdict("P1 escribe 'q' en el campo del chat de vanilla: '" + text + "'", text.equals("q"));
+                }
+                kbStep(0, t, 40, 0, KB_B);
+                if (t == 46) kbVerdict("B cierra el teclado de P1 y el chat sigue abierto", !PadKeyboard.of(0).active() && mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen);
+                kbStep(0, t, 50, 0, KB_B);
+                if (t == 58) {
+                    kbVerdict("un segundo B cierra el chat de P1 (pantalla " + mc.screen + ")", mc.screen == null);
+                    kbPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // cartel de P2
+                ServerPlayer sp = serverExtra(mc, 1);
+                if (t == 1) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> {
+                        ServerLevel level = (ServerLevel) sp.level();
+                        kbSignPos = sp.blockPosition().above(3);
+                        level.setBlock(kbSignPos, net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState(), 2);
+                        if (level.getBlockEntity(kbSignPos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+                            sign.setAllowedPlayerEditor(sp.getUUID()); // como SignBlock.openTextEdit
+                            sp.openTextEdit(sign, true);
+                        }
+                    });
+                }
+                PlayerContext c = SecondaryPlayers.context(1);
+                if (t == 20) {
+                    kbVerdict("P2: el cartel abierto por el servidor sale en su region con el teclado (pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ")",
+                            c.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen && PadKeyboard.of(1).active());
+                }
+                kbStep(1, t, 25, 0, KB_A); // 'q' en la primera linea
+                if (t == 38 && c.screen != null) {
+                    try {
+                        var f = net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen.class.getDeclaredField("messages");
+                        f.setAccessible(true);
+                        ConsolePad.LOGGER.info("[autotest] cartel de P2 antes de cerrar: lineas = {}", java.util.Arrays.toString((String[]) f.get(c.screen)));
+                    } catch (ReflectiveOperationException ex) {
+                        ConsolePad.LOGGER.info("[autotest] no se pudo leer el cartel: {}", ex.toString());
+                    }
+                }
+                if (t == 40 && c.screen != null) {
+                    ContextSwitcher.run(c, () -> mc.screen.onClose()); // cerrar el cartel envia el texto al servidor
+                }
+                if (t == 52) {
+                    mc.getSingleplayerServer().execute(() -> { // Level.getBlockEntity solo vale en el hilo del servidor
+                        String line = "?";
+                        if (sp.level().getBlockEntity(kbSignPos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+                            line = sign.getFrontText().getMessage(0, false).getString();
+                        }
+                        kbSignLine = line;
+                    });
+                }
+                if (t == 60) {
+                    String line = kbSignLine;
+                    kbVerdict("el texto del cartel de P2 llega al servidor: primera linea '" + line + "' (esperada 'q')", line.equals("q"));
+                    mc.getSingleplayerServer().execute(() -> sp.level().setBlock(kbSignPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2));
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO teclado en pantalla en conjunto -> {}", kbOk ? "OK" : "FALLO");
+                    kbPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                if (t > 10) {
+                    kbPhase = 5;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
     // ---------------------------------------------------------------- menu de pausa de P1 jugando solo y velocidad del cursor
 
     private static boolean smOk = true;
@@ -1700,6 +2321,8 @@ public final class AutoTest {
                             PadHints.lastLeft[slot].equals(exp[0]) && PadHints.lastRight[slot].equals(exp[1]) && !exp[0].isEmpty());
                     hbVerdict("P" + (slot + 1) + ": la ayuda cabe en su region " + reg[0] + "x" + reg[1] + " " + java.util.Arrays.toString(bl) + " " + java.util.Arrays.toString(br) + " y no pisa la barra de objetos", inside && clear);
                 }
+                screenshotName = "consola-ayuda-hud-4j.png";
+                screenshotPending = true;
                 hbVerdict("P1 apunta a un bloque: el boton de atacar dice Romper (" + PadHints.lastRight[0] + ")", PadHints.lastRight[0].contains(":Romper"));
                 hbPhase = 2;
                 ticks = 0;
@@ -1740,6 +2363,8 @@ public final class AutoTest {
                 if (ticks == 1) {
                     scaOpenScreens(mc);
                 } else if (ticks == 10) {
+                    screenshotName = "consola-barra-inventario-4j.png";
+                    screenshotPending = true;
                     String exp = hbBarExpected(true, false);
                     for (int slot = 0; slot < 4; slot++) {
                         hbVerdict("P" + (slot + 1) + ": barra de ayuda del inventario '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
@@ -1757,6 +2382,20 @@ public final class AutoTest {
                     String exp = hbBarExpected(false, true);
                     for (int slot = 0; slot < 4; slot++) {
                         hbVerdict("P" + (slot + 1) + ": barra de ayuda del menu de pausa '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
+                    }
+                    // el cursor sobre "Volver a la partida" de cada jugador marca el boton como "encima" (el recorte de su region y su pantalla tienen unidades distintas)
+                    if (mc.screen instanceof PlayerPauseScreen pp0) p1MoveTo(mc, pp0.resumeCenter()[0], pp0.resumeCenter()[1]);
+                    for (PlayerContext c : SplitRender.activeContexts()) {
+                        if (c.screen instanceof PlayerPauseScreen pp) {
+                            c.cursorX = pp.resumeCenter()[0];
+                            c.cursorY = pp.resumeCenter()[1];
+                        }
+                    }
+                } else if (ticks == 16) {
+                    for (int slot = 0; slot < 4; slot++) {
+                        var sc = screenOf(mc, slot);
+                        boolean hov = sc instanceof PlayerPauseScreen pp && pp.resumeHovered();
+                        hbVerdict("P" + (slot + 1) + ": el boton Volver se marca como encima con el cursor sobre el (pantalla " + sc + ")", hov);
                     }
                     scaCloseScreens(mc);
                     hbPhase = 6;
@@ -1828,6 +2467,8 @@ public final class AutoTest {
                     boolean bottom = box[1] + box[3] > reg[1] / 2;
                     jpVerdict("aviso de unirse: caja " + java.util.Arrays.toString(box) + " dentro de la region " + reg[0] + "x" + reg[1] + ", centrada y en la mitad inferior",
                             inside && centered && bottom);
+                    screenshotName = "consola-aviso-unirse.png";
+                    screenshotPending = true;
                     String xb = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.XBOX);
                     String ps = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.PLAYSTATION);
                     String ns = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.NINTENDO);
@@ -3136,6 +3777,11 @@ public final class AutoTest {
             case 30 -> hintsTest(mc);
             case 31 -> soloMenuTest(mc);
             case 32 -> snapNavTest(mc);
+            case 33 -> keyboardTest(mc);
+            case 34 -> labelTest(mc);
+            case 35 -> moveTest(mc);
+            case 36 -> hudOptionsTest(mc);
+            case 37 -> hudBoardsTest(mc);
             case 40 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 40) next(); // casilla libre entre las pruebas y la salida

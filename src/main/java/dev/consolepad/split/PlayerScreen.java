@@ -10,6 +10,11 @@ public interface PlayerScreen {
         return false;
     }
 
+    /** True si la pantalla es de escribir: el teclado en pantalla se abre solo al entrar. */
+    default boolean wantsKeyboard() {
+        return false;
+    }
+
     /** True si la pantalla cambia de pestana con LB/RB (la barra de ayuda lo anuncia). */
     default boolean hintTabs() {
         return false;

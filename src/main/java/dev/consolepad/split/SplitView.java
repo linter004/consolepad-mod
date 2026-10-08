@@ -30,6 +30,9 @@ public final class SplitView {
         return p1HalfScreen ? p1ScreenScale : 1f;
     }
 
+    /** Opacidad con la que se dibuja el HUD del jugador en curso (1 = opaco): RenderSystemMixin la aplica a todo setShaderColor. */
+    public static volatile float hudAlpha = 1f;
+
     private SplitView() {}
 
     /**

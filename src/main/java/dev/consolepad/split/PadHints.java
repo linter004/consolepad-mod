@@ -143,10 +143,21 @@ public final class PadHints {
     // ------------------------------------------------------------------ pantallas
 
     /** Botones que hace cada pantalla (los fijos del cursor virtual de P1 y de los extra: A clic, X clic derecho, Y mover rapido, B salir). */
+    private static int keyboardSlot = -1;
+
     public static List<Hint> screenHints(Screen screen) {
         List<Hint> out = new ArrayList<>();
         if (screen == null) return out;
         if (screen instanceof PlayerScreen ps && ps.listeningForPad()) return out;
+        if (keyboardSlot >= 0 && PadKeyboard.of(keyboardSlot).active()) {
+            out.add(new Hint(PadState.A, "Escribir"));
+            out.add(new Hint(PadState.B, "Cerrar"));
+            out.add(new Hint(PadState.X, "Borrar"));
+            out.add(new Hint(PadState.Y, "Espacio"));
+            out.add(new Hint(PadState.LB, "<"));
+            out.add(new Hint(PadState.RB, ">"));
+            return out;
+        }
         out.add(new Hint(PadState.A, "Seleccionar"));
         out.add(new Hint(PadState.B, screen instanceof PlayerMenuScreen || screen instanceof net.minecraft.client.gui.screens.PauseScreen ? "Volver" : "Salir"));
         if (screen instanceof AbstractContainerScreen<?>) {
@@ -165,7 +176,9 @@ public final class PadHints {
         lastBar[slot] = "";
         PadManager.Slot ps = ConsolePad.PADS.slot(slot);
         if (screen == null || ps.device == null || !ps.settings.showHints) return;
+        keyboardSlot = slot;
         List<Hint> hints = screenHints(screen);
+        keyboardSlot = -1;
         if (hints.isEmpty()) return;
         Font font = mc.font;
         PadType type = ps.device.type;

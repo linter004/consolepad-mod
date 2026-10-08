@@ -144,6 +144,7 @@ public final class SecondaryPlayers {
                 mc.level.getGameTime()));
         e.context = ctx;
         e.connection = c; // antes de iniciar el protocolo: ConnectionMixin envuelve el listener de juego
+        PlayerLabels.refreshAll(mc); // P1 pasa a llevar su etiqueta mientras haya extras
         c.initiateServerboundPlayConnection(address.toString(), 0, new SecondaryHandshakeListener(c, mc));
         c.send(new ServerboundHelloPacket(name, profile.getId()));
     }
@@ -231,6 +232,7 @@ public final class SecondaryPlayers {
         PlayerContext ctx = entry.context;
         entry.context = null;
         if (slot == 1) SecondaryTick.reset();
+        PlayerLabels.refreshAll(Minecraft.getInstance()); // sin extras P1 recupera su nombre
         SplitView.width = 0;
         SplitView.height = 0;
         if (ctx != null) {

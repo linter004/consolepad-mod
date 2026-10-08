@@ -18,17 +18,18 @@ Complementa `docs/splitscreen-plan.md` (diseño y prototipo, pasos 1-7). Primero
 | 4g Avisos propios (chat, barra de acciones, título) y FOV y sensibilidad por jugador desde su menú | [V] |
 | Segunda tanda (2026-10-08): Start/B cierran el menu del propio jugador, desenfoque y objeto del cursor recortados a su region, pantalla de muerte por jugador, chat y avisos en la region de cada uno, escala de interfaz propia (automatica o 1-4), maniqui de P2-P4, menu ampliado (ajustes, controles remapeables, reparto lado a lado/apilado) | [V] `startCloseTest`, `uiClipTest`, `deathTest`, `chatTest`, `scaleTest`, `menusTest`, `mannequinTest` |
 | Aislamiento P1 ↔ extras | [V] clic de ratón, teclas de sprint/agacharse, FOV al correr, títulos, inventario, chat |
+| Tanda de consola (2026-10-08): aviso "Unirse como el jugador N" y Start para entrar, ayuda de botones en el HUD (contextual, iconos por tipo de mando) y barra de ayuda en pantallas, menú de pausa del mod para P1 solo, velocidad del cursor y navegación por casillas con el stick, teclado en pantalla (chat de P1 y de P2-P4, cartel, campos de texto), etiqueta con nombre configurable, doble toque para correr, sensibilidad X/Y, invertir eje Y, zona segura/opacidad/ocultar HUD y mano, y HUD de P2-P4 con viñeta, calabaza, portal, barras de jefe, marcador y lista de jugadores | [V] `joinPromptTest`, `hintsTest`, `soloMenuTest`, `snapNavTest`, `keyboardTest`, `labelTest`, `moveTest`, `hudOptionsTest`, `hudBoardsTest` |
 
 FPS (distancia 8, sin vsync, 854×480): 1 jugador ≈ 3300, 2 jugadores ≈ 1600, 3 jugadores ≈ 765, 4 jugadores ≈ 408. El coste es casi proporcional al número de jugadores.
 
 ## 1. Pendientes (con el motivo)
 
-- **Maniquí del jugador en el inventario de P2-P4:** el recuadro sale vacío (el de P1 sí se dibuja). No bloquea; causa sin identificar (probable skin/`PlayerInfo` del jugador extra o estado de render de entidad).
-- **Escribir en el chat con mando:** hace falta un teclado en pantalla; el chat con historial por jugador tampoco existe (hoy: últimos 5 avisos por jugador, sin entrada de texto).
-- **HUD de P2-P4 que sigue siendo solo de P1:** superposiciones de cámara (viñeta, calabaza, portal), cabalgadura (barra de salto, vida del vehículo), bossbars, marcador, depuración y lista de jugadores.
-- **Pantallas distintas del contenedor para P2-P4** (avances, ajustes de vanilla, muerte): se ignoran a propósito; la muerte se resuelve reapareciendo solo a los 3 s. El menú de pausa de P2-P4 es propio y mínimo (Volver, Campo de visión, Sensibilidad, Salir).
+- **Cabalgadura y depuración en P2-P4:** barra de salto y vida del vehículo, y la pantalla de depuración (F3) siguen siendo solo de P1. Motivo: pocas veces se usan con mando y cada una es otra capa del `Gui` con estado propio; se hacen igual que las barras de jefe (invoker + estado por jugador) si se piden.
+- **Pantallas distintas del contenedor para P2-P4** (avances, estadísticas, ajustes de vanilla, libro, bloque de comandos): se ignoran a propósito. Sí se admiten el cartel (con teclado en pantalla), el chat propio (`ExtraChatScreen`) y las del mod. P1 solo con mando sigue sin "Avances", "Estadísticas" ni "Abrir a LAN" en su menú de pausa del mod (mismo motivo: otra fila de menú por cada una).
 - **Compensar el estrechamiento horizontal al dividir:** el FOV vertical se mantiene (70°) y el horizontal baja de ≈102° a ≈64° con dos jugadores. Es estético; va al final.
 - **Rendimiento:** con 4 jugadores el coste de GPU es ~4×; se puede bajar la distancia de renderizado. No se ha optimizado.
+- **Teclado en pantalla:** distribución fija en español (sin teclas de acento muertas ni emojis); no hay deslizar ni predictivo. Para la búsqueda del inventario creativo (tanda 2) ya sirve el mismo teclado.
+- **Etiqueta con nombre:** solo cambia el nombre para mostrar (etiqueta sobre la cabeza, chat, avisos, lista de jugadores), nunca el perfil del servidor (nombre y UUID siguen siendo `Dev_N`), así que los datos de cada jugador no se tocan. La skin propia por jugador va a la tanda 2.
 - Sonido por jugador, partículas por jugador, Sodium/Iris y servidores externos quedan fuera.
 
 ## 2. Qué se ha comprobado solo con simulación (hay que probar con mandos reales)

@@ -9,6 +9,7 @@ import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
+import dev.consolepad.split.PadKeyboard;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryScreens;
 import dev.consolepad.split.SplitView;
@@ -39,6 +40,9 @@ public final class PadDriver {
     private final float[] tmp = new float[2];
     private long lastNanos = System.nanoTime();
     private boolean sprintLatch;
+    private boolean fwdState;
+    private long lastFwdTap;
+    private static final long DOUBLE_TAP_NANOS = 350_000_000L;
     private boolean sneakLatch;
     private int mouseDown;
     private float scrollAcc;
@@ -73,6 +77,7 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
+        dev.consolepad.split.PlayerLabels.tick(mc);
         // Start+Back en el mando de un slot 1..3: pulsar = entra ese jugador local extra; mantener 2 s con el jugador dentro = sale.
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
             PadManager.Device devI = pads.slot(i).device;
@@ -117,6 +122,12 @@ public final class PadDriver {
         // Con una pantalla abierta: cursor virtual.
         if (mc.screen != null) {
             releaseAll(mc);
+            PadKeyboard kb = PadKeyboard.of(0);
+            kb.sync(mc.screen);
+            if (kb.active()) { // el teclado en pantalla se queda con todo el mando
+                kb.handle(s, cfg, dt, mc.screen);
+                return;
+            }
             if (mc.screen instanceof dev.consolepad.split.PlayerScreen ps && ps.listeningForPad()) { // remapeo de controles
                 int code = SecondaryScreens.firstPressed(s);
                 if (code >= 0) ps.padButton(code);
@@ -126,6 +137,7 @@ public final class PadDriver {
             return;
         }
         releaseMouseButtons(mc);
+        PadKeyboard.of(0).sync(null);
 
         LocalPlayer player = mc.player;
         if (player == null || mc.level == null) {
@@ -143,13 +155,28 @@ public final class PadDriver {
             sprintLatch = false;
             o.keySprint.setDown(false);
         }
+        // Dos empujones seguidos del stick hacia delante = correr (se suelta al soltar el stick).
+        if (analogForward > 0.7f && !fwdState) {
+            fwdState = true;
+            long tapNow = System.nanoTime();
+            if (cfg.doubleTapSprint && lastFwdTap != 0L && tapNow - lastFwdTap < DOUBLE_TAP_NANOS) {
+                sprintLatch = true;
+                o.keySprint.setDown(true);
+                lastFwdTap = 0L;
+            } else {
+                lastFwdTap = tapNow;
+            }
+        } else if (analogForward < 0.4f) {
+            fwdState = false;
+        }
 
         // Camara (stick derecho), independiente de los ticks para que sea fluida.
         PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, tmp);
         if (tmp[0] != 0f || tmp[1] != 0f) {
-            float k = cfg.lookSpeed * sensitivityFactor(o) * dt / 0.15f; // Entity.turn multiplica por 0.15
+            float kx = cfg.lookSpeed * sensitivityFactor(o) * dt / 0.15f; // Entity.turn multiplica por 0.15
+            float ky = cfg.lookSpeedY() * sensitivityFactor(o) * dt / 0.15f;
             float pitch = cfg.invertY ? -tmp[1] : tmp[1];
-            player.turn(tmp[0] * k, pitch * k);
+            player.turn(tmp[0] * kx, pitch * ky);
         }
 
         // Botones segun los bindings del jugador.
@@ -202,6 +229,7 @@ public final class PadDriver {
             mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
         }
         mouseButton(mouse, window, s, PadState.X, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+        if (s.pressed(PadState.A) && mc.screen != null) PadKeyboard.of(0).tryOpenFromClick(mc.screen); // A sobre un campo de texto abre el teclado
 
         if (s.pressed(PadState.Y) && mc.screen instanceof AbstractContainerScreen<?> container) {
             Slot slot = container.getSlotUnderMouse();

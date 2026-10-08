@@ -28,6 +28,19 @@ public interface GuiInvoker {
     @Invoker("maybeRenderSelectedItemName")
     void consolepad$renderSelectedItemName(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
 
+    /** Viñeta, calabaza, nieve en polvo, portal y catalejo. */
+    @Invoker("renderCameraOverlays")
+    void consolepad$renderCameraOverlays(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("renderSleepOverlay")
+    void consolepad$renderSleepOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("displayScoreboardSidebar")
+    void consolepad$displayScoreboardSidebar(GuiGraphics guiGraphics, net.minecraft.world.scores.Objective objective);
+
+    @Invoker("updateVignetteBrightness")
+    void consolepad$updateVignetteBrightness(net.minecraft.world.entity.Entity entity);
+
     @Invoker("renderEffects")
     void consolepad$renderEffects(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
 }

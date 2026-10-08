@@ -20,6 +20,8 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     public static final int[] FOVS = {0, 60, 70, 80, 90, 100, 110};
     public static final float[] SPEEDS = {90f, 135f, 180f, 225f, 270f, 315f};
     public static final float[] DEADZONES = {0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f};
+    public static final int[] HUD_MARGINS = {0, 2, 4, 6, 8, 10};
+    public static final float[] HUD_OPACITIES = {1f, 0.75f, 0.5f, 0.25f};
     public static final float[] CURSOR_SPEEDS = {250f, 350f, 450f, 550f, 700f, 850f, 1000f};
 
     private record Item(String id, Supplier<String> label, Runnable next) {}
@@ -67,12 +69,20 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         PadSettings s = settings();
         items.add(new Item("guiScale", () -> "Escala de interfaz: " + (s.guiScale <= 0 ? "automática" : String.valueOf(s.guiScale)),
                 () -> s.guiScale = nextInt(GUI_SCALES, s.guiScale)));
-        items.add(new Item("sens", () -> "Sensibilidad: " + Math.round(s.lookSpeed), () -> s.lookSpeed = nextFloat(SPEEDS, s.lookSpeed)));
+        items.add(new Item("sens", () -> "Sensibilidad horizontal: " + Math.round(s.lookSpeed), () -> s.lookSpeed = nextFloat(SPEEDS, s.lookSpeed)));
         items.add(new Item("fov", () -> "Campo de visión: " + (s.fov <= 0 ? "global" : String.valueOf(s.fov)), () -> s.fov = nextInt(FOVS, s.fov)));
         items.add(new Item("moveDead", () -> "Zona muerta del movimiento: " + dz(s.moveDeadzone), () -> s.moveDeadzone = nextFloat(DEADZONES, s.moveDeadzone)));
         items.add(new Item("lookDead", () -> "Zona muerta de la cámara: " + dz(s.lookDeadzone), () -> s.lookDeadzone = nextFloat(DEADZONES, s.lookDeadzone)));
+        items.add(new Item("sensY", () -> "Sensibilidad vertical: " + Math.round(s.lookSpeedY()), () -> s.lookSpeedY = nextFloat(SPEEDS, s.lookSpeedY())));
+        items.add(new Item("invertY", () -> "Invertir eje Y: " + yesNo(s.invertY), () -> s.invertY = !s.invertY));
+        items.add(new Item("doubleTap", () -> "Correr con doble toque: " + yesNo(s.doubleTapSprint), () -> s.doubleTapSprint = !s.doubleTapSprint));
         items.add(new Item("cursorSpeed", () -> "Velocidad del cursor: " + Math.round(s.cursorSpeed), () -> s.cursorSpeed = nextFloat(CURSOR_SPEEDS, s.cursorSpeed)));
         items.add(new Item("snapNav", () -> "Cursor en menús: " + (s.snapNav ? "por casillas" : "libre"), () -> s.snapNav = !s.snapNav));
+        items.add(new Item("name", () -> "Nombre: " + PlayerLabels.labelOf(slot), () -> Minecraft.getInstance().setScreen(new PlayerNameScreen(slot, this))));
+        items.add(new Item("hudMargin", () -> "Zona segura del HUD: " + s.hudMargin + " %", () -> s.hudMargin = nextInt(HUD_MARGINS, s.hudMargin)));
+        items.add(new Item("hudOpacity", () -> "Opacidad del HUD: " + Math.round(s.hudOpacity * 100) + " %", () -> s.hudOpacity = nextFloat(HUD_OPACITIES, s.hudOpacity)));
+        items.add(new Item("showHud", () -> "Mostrar HUD: " + yesNo(s.showHud), () -> s.showHud = !s.showHud));
+        items.add(new Item("showHand", () -> "Mostrar mano: " + yesNo(s.showHand), () -> s.showHand = !s.showHand));
         items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
     }
 
@@ -91,6 +101,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
             Item it = items.get(idx);
             Button b = addRenderableWidget(Button.builder(Component.literal(it.label().get()), btn -> {
                 it.next().run();
+                if (Minecraft.getInstance().screen != this) return; // la opcion abrio otra pantalla
                 btn.setMessage(Component.literal(it.label().get()));
             }).bounds(x, 24 + k * PITCH, ROW_W, ROW_H).build());
             buttons.put(it.id(), b);

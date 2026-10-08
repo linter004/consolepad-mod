@@ -59,6 +59,8 @@ public final class PlayerContext {
     public float hudRatio = 1f;
     /** Tamano de su region en unidades de su propia interfaz: lo que ve el HUD (guiWidth/guiHeight). */
     public int hudW, hudH;
+    /** Lo que queda de su region dentro de la zona segura (los avisos se ajustan a esto); 0 = aun sin calcular. */
+    public int safeW, safeH;
     /** Relacion (respecto a la escala de la ventana) con la que se dibujan sus pantallas: la de su HUD, reducida si no cabria un inventario. */
     public float screenScale = 1f;
     /** Tamano logico de sus pantallas (unidades antes de aplicar screenScale). */
@@ -78,7 +80,21 @@ public final class PlayerContext {
     /** Un aviso con el tick de cliente en que llego. */
     public record Notice(net.minecraft.network.chat.Component text, long tick) {}
 
+    /** Barras de jefe de este jugador (las que le llegan por su conexion). */
+    private net.minecraft.client.gui.components.BossHealthOverlay bossOverlay;
+    /** Marcado por el HUD: lo que se dibujo en el ultimo fotograma (autotest). */
+    public volatile int lastBossBars;
+
+    public net.minecraft.client.gui.components.BossHealthOverlay bossOverlay() {
+        if (bossOverlay == null) bossOverlay = new net.minecraft.client.gui.components.BossHealthOverlay(net.minecraft.client.Minecraft.getInstance());
+        return bossOverlay;
+    }
+
+    /** Sujeto a la bandera de la lista de jugadores: tecla mantenida y sin pantalla abierta. */
+    public volatile boolean playerListHeld;
+
     public static final class HudState {
+        public float scopeScale = 0.5F, vignetteBrightness = 1.0F;
         public int lastHealth, displayHealth, toolHighlightTimer;
         public long lastHealthTime, healthBlinkTime;
         public net.minecraft.world.item.ItemStack lastToolHighlight = net.minecraft.world.item.ItemStack.EMPTY;
@@ -88,6 +104,9 @@ public final class PlayerContext {
     public static final class InputState {
         public boolean prevAttack, prevUse, prevLb, prevRb;
         public boolean sprintLatch, sneakLatch, comboLatch;
+        /** Sprint por doble toque del stick hacia delante: dura mientras el stick siga hacia delante. */
+        public boolean doubleTapSprint, fwdState;
+        public int ticksSinceFwdTap = 1000;
         /** Botones (mascara de codigos de PadState) que acaban de cerrar una pantalla: hasta soltarlos no disparan su accion de juego (soltar, inventario, pausa...). */
         public int closeLatch;
         /** Sprint conmutado: lo lee KeyMappingGuardMixin cuando LocalPlayer.aiStep pregunta por keySprint. */

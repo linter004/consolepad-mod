@@ -37,7 +37,8 @@ public final class SecondaryScreens {
         if (screen instanceof net.minecraft.client.gui.screens.DeathScreen death) {
             screen = new ExtraDeathScreen(ctx.slotIndex, ((dev.consolepad.mixin.DeathScreenAccessor) death).consolepad$getCauseOfDeath());
         }
-        if (screen != null && !(screen instanceof AbstractContainerScreen<?>) && !(screen instanceof PlayerScreen)) return;
+        if (screen != null && !(screen instanceof AbstractContainerScreen<?>) && !(screen instanceof PlayerScreen)
+                && !(screen instanceof net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen)) return;
         Screen old = mc.screen;
         if (old != null && old != screen) old.removed();
         mc.screen = screen;
@@ -74,6 +75,7 @@ public final class SecondaryScreens {
         try {
             screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
             PadHints.renderScreenBar(mc, graphics, ctx.slotIndex, screen, w, h);
+            PadKeyboard.of(ctx.slotIndex).render(graphics, mc.font, w, h);
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 500);
             int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
@@ -96,7 +98,9 @@ public final class SecondaryScreens {
 
     /** Entrada de P2 con una pantalla abierta, una vez por fotograma: stick izq = cursor, A/X = clic izq/der, Y = mover rapido, stick der = scroll, B/inventario = cerrar. */
     public static void frame(Minecraft mc, PadManager.Slot slot, float dt, PlayerContext ctx) {
-        if (ctx == null || ctx.player == null || ctx.screen == null || slot.device == null) return;
+        if (ctx == null) return;
+        if (ctx.screen == null) PadKeyboard.of(ctx.slotIndex).sync(null);
+        if (ctx.player == null || ctx.screen == null || slot.device == null) return;
         PadState s = slot.device.state;
         PadSettings cfg = slot.settings;
         ContextSwitcher.run(ctx, () -> {
@@ -105,6 +109,12 @@ public final class SecondaryScreens {
             if (screen instanceof PlayerScreen ps && ps.listeningForPad()) { // remapeo: el siguiente boton es el dato, no un clic ni un cierre
                 int code = firstPressed(s);
                 if (code >= 0) ps.padButton(code);
+                return;
+            }
+            PadKeyboard kb = PadKeyboard.of(ctx.slotIndex);
+            kb.sync(screen);
+            if (kb.active()) { // el teclado en pantalla se queda con todo el mando
+                kb.handle(s, cfg, dt, screen);
                 return;
             }
             // Cursor.
@@ -124,6 +134,7 @@ public final class SecondaryScreens {
             dpad(ctx, screen, s, cfg.snapNav, dt);
             // Clics: pulsar y soltar por separado, para poder arrastrar.
             click(screen, ctx, s, PadState.A, 0);
+            if (s.pressed(PadState.A)) kb.tryOpenFromClick(screen); // A sobre un campo de texto abre el teclado
             click(screen, ctx, s, PadState.X, 1);
             if (s.pressed(PadState.Y) && screen instanceof AbstractContainerScreen<?> container) {
                 Slot hovered = container.getSlotUnderMouse();

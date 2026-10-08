@@ -46,6 +46,18 @@ public abstract class GameRendererMixin {
         return ContextSwitcher.rendererOr(mc, mc.levelRenderer);
     }
 
+    /** Mano oculta por el jugador en sus ajustes: no se dibuja en su region (cuenta las manos dibujadas por jugador para el autotest). */
+    @org.spongepowered.asm.mixin.injection.Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
+    private void consolepad$hideHand(net.minecraft.client.Camera camera, float partialTick, org.joml.Matrix4f projection,
+                                     org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        int slot = SplitRender.passSlot;
+        if (dev.consolepad.ConsolePad.PADS != null && !dev.consolepad.ConsolePad.PADS.slot(slot).settings.showHand) {
+            ci.cancel();
+            return;
+        }
+        dev.consolepad.split.SplitDiag.handsDrawn[slot]++;
+    }
+
     /** La mano en primera persona es la del jugador que se dibuja (objeto y animaciones propios). */
     @Redirect(method = "renderItemInHand",
             at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,
@@ -62,6 +74,7 @@ public abstract class GameRendererMixin {
         if (!SplitView.p1HalfScreen) {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
+            dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
             return;
         }
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
@@ -74,6 +87,7 @@ public abstract class GameRendererMixin {
         try {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, Math.round(mouseX / k), Math.round(mouseY / k), partial);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
+            dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;
