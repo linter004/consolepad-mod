@@ -24,9 +24,17 @@ public final class SecondaryTick {
     public static volatile float scriptForward;
     public static volatile boolean scriptJump;
     public static volatile boolean scriptAttack;
+    public static volatile java.util.EnumSet<PadAction> scriptActions = java.util.EnumSet.noneOf(PadAction.class);
+    /** Sprint conmutado de P2: lo lee KeyMappingGuardMixin cuando LocalPlayer.aiStep pregunta por keySprint. */
+    public static volatile boolean sprintHeld;
 
     // Contadores de diagnostico: cuantas veces ejecuta P2 cada accion.
     public static volatile int dbgStartAttack, dbgContinueTrue, dbgStartUse, dbgJumpTicks, dbgHotbarSteps;
+    public static volatile int dbgDrop, dbgSwapHands, dbgPerspective, dbgInventoryRequests;
+
+    private static java.util.EnumSet<PadAction> prevDown = java.util.EnumSet.noneOf(PadAction.class);
+    private static java.util.EnumSet<PadAction> pressedNow = java.util.EnumSet.noneOf(PadAction.class);
+    private static boolean sprintLatch, sneakLatch;
 
     private static final float TICK_SECONDS = 0.05f;
     private static final int MAX_LOGGED_ERRORS = 5;
@@ -42,6 +50,10 @@ public final class SecondaryTick {
     /** P2 sale: ningun boton queda "pulsado" para la proxima vez que entre. */
     public static void reset() {
         prevAttack = prevUse = prevLb = prevRb = false;
+        prevDown = java.util.EnumSet.noneOf(PadAction.class);
+        pressedNow = java.util.EnumSet.noneOf(PadAction.class);
+        sprintLatch = sneakLatch = sprintHeld = false;
+        scriptActions = java.util.EnumSet.noneOf(PadAction.class);
         scriptActive = false;
         scriptForward = 0f;
     }
@@ -53,11 +65,13 @@ public final class SecondaryTick {
 
         float forward = 0f, left = 0f, lookX = 0f, lookY = 0f;
         boolean jump = false, attack = false, use = false, lb = false, rb = false;
+        java.util.EnumSet<PadAction> downSet = java.util.EnumSet.noneOf(PadAction.class);
         PadSettings cfg = slot.settings;
         if (scriptActive) {
             forward = scriptForward;
             jump = scriptJump;
             attack = scriptAttack;
+            downSet.addAll(scriptActions);
         } else if (slot.device != null) {
             PadState s = slot.device.state;
             PadMath.radial(s.lx, s.ly, cfg.moveDeadzone, 1.0f, TMP);
@@ -69,17 +83,22 @@ public final class SecondaryTick {
             // Mismos botones que P1: se leen los bindings del slot (por defecto, copia de los del slot 0).
             for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
                 boolean down = s.isDown(e.getKey());
+                if (down) downSet.add(e.getValue());
                 switch (e.getValue()) {
                     case JUMP -> jump |= down;
                     case ATTACK -> attack |= down;
                     case USE -> use |= down;
                     case HOTBAR_PREV -> lb |= down;
                     case HOTBAR_NEXT -> rb |= down;
-                    default -> { } // el resto de acciones aun no existe para P2 (pantallas, soltar, etc.)
+                    default -> { } // el resto (soltar, cambio de mano, perspectiva, sprint, agacharse...) se ejecuta por flancos en secondaryTick
                 }
             }
         }
 
+        java.util.EnumSet<PadAction> pressed = java.util.EnumSet.copyOf(downSet);
+        pressed.removeAll(prevDown);
+        prevDown = downSet;
+        pressedNow = pressed;
         final float f = forward, l = left, lx = lookX, ly = lookY;
         final boolean j = jump, a = attack, u = use, bl = lb, br = rb;
         try {
@@ -100,6 +119,7 @@ public final class SecondaryTick {
         input.rawForward = forward;
         input.rawLeft = left;
         input.jumping = jump;
+        input.shiftKeyDown = sneakLatch;
         if (jump) dbgJumpTicks++;
 
         if (inv.consolepad$getRightClickDelay() > 0) inv.consolepad$setRightClickDelay(inv.consolepad$getRightClickDelay() - 1);
@@ -145,6 +165,41 @@ public final class SecondaryTick {
         }
         prevLb = lb;
         prevRb = rb;
+        // Acciones por flanco, con los bindings de P2 (por defecto, los de P1): como Minecraft.handleKeybinds / PadDriver.onPress.
+        for (PadAction act : pressedNow) {
+            switch (act) {
+                case DROP -> {
+                    if (!player.isSpectator() && player.drop(false)) player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+                    dbgDrop++;
+                }
+                case SWAP_HANDS -> {
+                    if (!player.isSpectator()) {
+                        player.connection.send(new net.minecraft.network.protocol.game.ServerboundPlayerActionPacket(
+                                net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND,
+                                net.minecraft.core.BlockPos.ZERO, net.minecraft.core.Direction.DOWN));
+                    }
+                    dbgSwapHands++;
+                }
+                case PERSPECTIVE -> {
+                    var opts = (dev.consolepad.mixin.OptionsAccessor) mc.options; // dentro del contexto: el tipo de camara es el de P2
+                    opts.consolepad$setCameraType(opts.consolepad$getCameraType().cycle());
+                    dbgPerspective++;
+                }
+                case SPRINT_TOGGLE -> {
+                    sprintLatch = !sprintLatch;
+                    sprintHeld = sprintLatch;
+                }
+                case SNEAK_TOGGLE -> {
+                    sneakLatch = !sneakLatch;
+                    input.shiftKeyDown = sneakLatch;
+                }
+                case INVENTORY -> {
+                    dbgInventoryRequests++; // la pantalla de inventario de P2 llega con el paso 4c
+                    if (PadManager.PADLOG) ConsolePad.LOGGER.info("[padlog] P2 pide el inventario (pantalla pendiente, paso 4c)");
+                }
+                default -> { }
+            }
+        }
         if (inv.consolepad$getMissTime() > 0) inv.consolepad$setMissTime(inv.consolepad$getMissTime() - 1);
 
         mc.level.tickRateManager().tick();

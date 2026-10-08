@@ -3,6 +3,7 @@ package dev.consolepad.split;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.mixin.GameRendererAccessor;
 import dev.consolepad.mixin.MinecraftInvoker;
+import dev.consolepad.mixin.OptionsAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
@@ -54,6 +55,8 @@ public final class ContextSwitcher {
         int p1Miss = inv.consolepad$getMissTime();
         int p1Delay = inv.consolepad$getRightClickDelay();
         GameRendererAccessor gr = (GameRendererAccessor) mc.gameRenderer;
+        OptionsAccessor opts = (OptionsAccessor) mc.options;
+        net.minecraft.client.CameraType p1CameraType = opts.consolepad$getCameraType();
         float p1Fov = gr.consolepad$getFov();
         float p1OldFov = gr.consolepad$getOldFov();
 
@@ -67,6 +70,7 @@ public final class ContextSwitcher {
         mc.crosshairPickEntity = ctx.crosshairPickEntity;
         inv.consolepad$setMissTime(ctx.missTime);
         inv.consolepad$setRightClickDelay(ctx.rightClickDelay);
+        opts.consolepad$setCameraType(ctx.cameraType);
         gr.consolepad$setFov(ctx.fov);
         gr.consolepad$setOldFov(ctx.oldFov);
         try {
@@ -81,6 +85,8 @@ public final class ContextSwitcher {
             ctx.crosshairPickEntity = mc.crosshairPickEntity;
             ctx.missTime = inv.consolepad$getMissTime();
             ctx.rightClickDelay = inv.consolepad$getRightClickDelay();
+            ctx.cameraType = opts.consolepad$getCameraType();
+            opts.consolepad$setCameraType(p1CameraType);
             ctx.fov = gr.consolepad$getFov();
             ctx.oldFov = gr.consolepad$getOldFov();
             gr.consolepad$setFov(p1Fov);

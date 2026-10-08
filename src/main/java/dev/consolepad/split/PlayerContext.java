@@ -24,6 +24,8 @@ public final class PlayerContext {
     public net.minecraft.client.renderer.ItemInHandRenderer hand;
     /** Estado del HUD que es del jugador (parpadeo de vida, nombre del objeto): SplitHud lo intercambia con el de Gui. */
     public final HudState hud = new HudState();
+    /** Perspectiva (F5) de este jugador: Minecraft la guarda en Options, que es global. */
+    public net.minecraft.client.CameraType cameraType = net.minecraft.client.CameraType.FIRST_PERSON;
 
     public static final class HudState {
         public int lastHealth, displayHealth, toolHighlightTimer;

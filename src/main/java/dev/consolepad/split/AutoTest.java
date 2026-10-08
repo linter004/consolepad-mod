@@ -1,6 +1,7 @@
 package dev.consolepad.split;
 
 import dev.consolepad.ConsolePad;
+import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.KeyMapping;
@@ -393,6 +394,127 @@ public final class AutoTest {
         }
     }
 
+    private static int actDropBefore, actP1DropBefore;
+    private static boolean actSprintP2, actSprintP1, actSneakP2, actSneakP1;
+    private static String actSwapReport = "", actCamReport = "";
+    private static boolean actOk = true;
+
+    private static void press(PadAction a) {
+        SecondaryTick.scriptActions = java.util.EnumSet.of(a);
+    }
+
+    private static void release() {
+        SecondaryTick.scriptActions = java.util.EnumSet.noneOf(PadAction.class);
+    }
+
+    /**
+     * Paso 4b: acciones de P2 con los bindings de P1 como base (script en el slot 1): sprint, agacharse, soltar, cambio de mano,
+     * perspectiva e inventario (solo la peticion: la pantalla es del paso 4c). Cada una cambia el estado de P2 y no el de P1.
+     */
+    private static void actionsTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        switch (ticks) {
+            case 1 -> {
+                SecondaryTick.scriptActive = true;
+                SecondaryTick.scriptForward = 0f;
+                mc.getSingleplayerServer().execute(() -> {
+                    p2.getInventory().setItem(p2.getInventory().selected, new ItemStack(Items.DIRT, 5));
+                    p2.getInventory().offhand.set(0, ItemStack.EMPTY);
+                });
+            }
+            case 20 -> {
+                SecondaryTick.scriptForward = 1f; // sprint: hay que avanzar para que se active
+                press(PadAction.SPRINT_TOGGLE);
+            }
+            case 22 -> release();
+            case 45 -> {
+                actSprintP2 = c.player.isSprinting();
+                actSprintP1 = mc.player.isSprinting();
+                press(PadAction.SPRINT_TOGGLE); // lo apaga
+            }
+            case 47 -> {
+                release();
+                SecondaryTick.scriptForward = 0f;
+            }
+            case 55 -> press(PadAction.SNEAK_TOGGLE);
+            case 57 -> release();
+            case 65 -> {
+                actSneakP2 = c.player.isShiftKeyDown();
+                actSneakP1 = mc.player.isShiftKeyDown();
+                press(PadAction.SNEAK_TOGGLE); // lo apaga
+            }
+            case 67 -> release();
+            case 75 -> {
+                actDropBefore = c.player.getInventory().getSelected().getCount();
+                actP1DropBefore = mc.player.getInventory().getSelected().getCount();
+                press(PadAction.DROP);
+            }
+            case 77 -> release();
+            case 95 -> {
+                int after = c.player.getInventory().getSelected().getCount();
+                int serverAfter = p2.getInventory().getSelected().getCount();
+                int p1After = mc.player.getInventory().getSelected().getCount();
+                boolean ok = actDropBefore == 5 && after == 4 && serverAfter == 4 && p1After == actP1DropBefore;
+                actOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO soltar de P2: cliente {} -> {}, servidor {} (esperado 5 -> 4 -> 4); P1 {} -> {} (igual) -> {}",
+                        actDropBefore, after, serverAfter, actP1DropBefore, p1After, ok ? "OK" : "FALLO");
+                press(PadAction.SWAP_HANDS);
+            }
+            case 97 -> release();
+            case 115 -> {
+                ItemStack off = p2.getInventory().offhand.get(0);
+                ItemStack main = p2.getInventory().getSelected();
+                ItemStack clientOff = c.player.getInventory().offhand.get(0);
+                boolean p1Off = mc.player.getInventory().offhand.get(0).is(Items.DIRT);
+                boolean ok = off.is(Items.DIRT) && off.getCount() == 4 && main.isEmpty() && clientOff.is(Items.DIRT) && !p1Off;
+                actOk &= ok;
+                actSwapReport = String.format("servidor: mano secundaria=%s x%d, principal vacia=%s; cliente de P2: mano secundaria=%s; P1 recibio tierra=%s -> %s",
+                        off.getItem(), off.getCount(), main.isEmpty(), clientOff.getItem(), p1Off, ok ? "OK" : "FALLO");
+                ConsolePad.LOGGER.info("[autotest] RESULTADO cambio de mano de P2: {}", actSwapReport);
+                press(PadAction.PERSPECTIVE);
+            }
+            case 117 -> release();
+            case 125 -> {
+                var opts = (dev.consolepad.mixin.OptionsAccessor) mc.options;
+                boolean ok = c.cameraType != net.minecraft.client.CameraType.FIRST_PERSON
+                        && opts.consolepad$getCameraType() == net.minecraft.client.CameraType.FIRST_PERSON;
+                actOk &= ok;
+                actCamReport = String.format("P2 %s, P1 %s -> %s", c.cameraType, opts.consolepad$getCameraType(), ok ? "OK" : "FALLO");
+                press(PadAction.PERSPECTIVE);
+            }
+            case 127 -> release();
+            case 135 -> press(PadAction.PERSPECTIVE);
+            case 137 -> release();
+            case 145 -> {
+                var opts = (dev.consolepad.mixin.OptionsAccessor) mc.options;
+                boolean back = c.cameraType == net.minecraft.client.CameraType.FIRST_PERSON && opts.consolepad$getCameraType() == net.minecraft.client.CameraType.FIRST_PERSON;
+                actOk &= back;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO perspectiva de P2: tras 1 pulsacion {}; tras 3 vuelve a primera persona={} -> {}",
+                        actCamReport, back, back ? "OK" : "FALLO");
+                press(PadAction.INVENTORY);
+            }
+            case 147 -> release();
+            case 155 -> {
+                boolean ok = SecondaryTick.dbgInventoryRequests == 1;
+                actOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO inventario de P2: peticiones={} (esperado 1; la pantalla llega en 4c) -> {}",
+                        SecondaryTick.dbgInventoryRequests, ok ? "OK" : "FALLO");
+                boolean sprintOk = actSprintP2 && !actSprintP1;
+                boolean sneakOk = actSneakP2 && !actSneakP1;
+                actOk &= sprintOk && sneakOk;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO sprint y agacharse de P2: sprint P2={} P1={} (esperado true/false) -> {}; agacharse P2={} P1={} (esperado true/false) -> {}",
+                        actSprintP2, actSprintP1, sprintOk ? "OK" : "FALLO", actSneakP2, actSneakP1, sneakOk ? "OK" : "FALLO");
+                ConsolePad.LOGGER.info("[autotest] RESULTADO acciones de P2 en conjunto -> {}", actOk ? "OK" : "FALLO");
+                SecondaryTick.scriptActive = false;
+                SecondaryTick.scriptForward = 0f;
+                release();
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -555,14 +677,15 @@ public final class AutoTest {
             case 3 -> hotbarTest(mc);
             case 4 -> mouseTest(mc);
             case 5 -> hudTest(mc);
-            case 6 -> aspectTest(mc, "pequena");
-            case 7 -> resizeWindow(mc);
-            case 8 -> aspectTest(mc, "1920x1080");
-            case 9 -> pauseTest(mc);
-            case 10 -> fovTest(mc);
-            case 11 -> fpsPhase(mc, false);
-            case 12 -> fpsPhase(mc, true);
-            case 13 -> leaveTest(mc);
+            case 6 -> actionsTest(mc);
+            case 7 -> aspectTest(mc, "pequena");
+            case 8 -> resizeWindow(mc);
+            case 9 -> aspectTest(mc, "1920x1080");
+            case 10 -> pauseTest(mc);
+            case 11 -> fovTest(mc);
+            case 12 -> fpsPhase(mc, false);
+            case 13 -> fpsPhase(mc, true);
+            case 14 -> leaveTest(mc);
             default -> { }
         }
     }
