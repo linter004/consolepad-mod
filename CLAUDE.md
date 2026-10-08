@@ -39,7 +39,7 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Ajustes guardados mandan sobre los valores por defecto.** Al cambiar un valor por defecto de `PadSettings`, actualizar también `run/config/consolepad/slot*.json` con el juego cerrado. Cerrar el juego a la fuerza evita que lo sobrescriba al salir.
 - **Coste:** el gasto principal es esperar el arranque de `runClient` (unos 30 s si ya está descargado). Usar un Monitor corto con `grep` del log y pararlo al terminar.
 
-### Reglas aprendidas de la pantalla dividida (entradas 10 a 41 de `routing-log.md`, 2026-10-08)
+### Reglas aprendidas de la pantalla dividida (entradas 10 a 36 de `routing-log.md`, 2026-10-08)
 
 - **Un fallo del autotest suele ser del test, no del mod.** De ~12 fallos, 7 fueron del test (criterios fijos sin control, `Level.getBlockEntity` fuera del hilo del servidor, supervivencia de noche, esperas de carga). Antes de tocar el mod, medir con una linea de log temporal.
 - **Los fallos reales los destapo el autotest, no `build`:** guarda de teclas que no cubria `ToggleKeyMapping`, proxy que solo reenviaba `handle*` (titulos de P2 llegaban a P1), Start+Back abria el menu de P2, P2 activo con el mundo descargado. Cada hallazgo de aislamiento se cierra con una medida numerica por jugador.
