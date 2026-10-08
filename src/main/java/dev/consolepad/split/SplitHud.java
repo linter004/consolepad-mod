@@ -45,6 +45,7 @@ public final class SplitHud {
                 SplitDiag.hudOwner = "P2";
                 SplitDiag.hudExpected = p2.player;
                 GuiInvoker invoker = (GuiInvoker) gui;
+                final net.minecraft.client.multiplayer.ClientLevel p1Level = mc.level;
                 ContextSwitcher.run(p2, () -> withState(gui, p2.hud, () -> {
                     gui.leftHeight = 39; // Gui.render() los reinicia al empezar cada HUD
                     gui.rightHeight = 39;
@@ -55,7 +56,7 @@ public final class SplitHud {
                     invoker.consolepad$renderExperienceLevel(graphics, deltaTracker);
                     invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
                     invoker.consolepad$renderEffects(graphics, deltaTracker);
-                    SecondaryScreens.render(mc, p2, graphics, deltaTracker.getGameTimeDeltaPartialTick(false));
+                    SecondaryScreens.render(mc, p2, graphics, deltaTracker.getGameTimeDeltaPartialTick(false), p1Level);
                 }));
             } finally {
                 gui.leftHeight = p1Left;

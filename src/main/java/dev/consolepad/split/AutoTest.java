@@ -635,6 +635,183 @@ public final class AutoTest {
         }
     }
 
+    private static net.minecraft.world.level.GameType s2Prev1, s2Prev2;
+    private static String s2P1Digest = "";
+    private static boolean s2Ok = true;
+    private static net.minecraft.core.BlockPos s2Pos;
+
+    private static void p1CursorOnSlot(Minecraft mc, int menuSlot, boolean click) {
+        var screen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) mc.screen;
+        net.minecraft.world.inventory.Slot sl = screen.getMenu().slots.get(menuSlot);
+        double gx = screen.getGuiLeft() + sl.x + 8, gy = screen.getGuiTop() + sl.y + 8;
+        if (click) screen.mouseClicked(gx, gy, 0);
+        else screen.mouseReleased(gx, gy, 0);
+    }
+
+    private static void verdict(String name, boolean ok) {
+        s2Ok &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /**
+     * Paso 4c-2: (a) las pantallas de P1 y P2 abiertas a la vez, cada una en su mitad y con su inventario (P1 coge/coloca con
+     * clics directos sobre su pantalla, P2 con su mando); (b) un cofre y una mesa de crafteo abiertos por el servidor en P2.
+     */
+    private static void screens2Test(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        ServerPlayer p1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+        switch (ticks) {
+            case 1 -> {
+                s2Prev1 = p1.gameMode.getGameModeForPlayer();
+                s2Prev2 = p2.gameMode.getGameModeForPlayer();
+                mc.getSingleplayerServer().execute(() -> {
+                    p1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                    p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                    p1.getInventory().setItem(20, new ItemStack(Items.DIRT, 10));
+                    p1.getInventory().setItem(21, ItemStack.EMPTY);
+                    p2.getInventory().setItem(20, new ItemStack(Items.COBBLESTONE, 7));
+                    p2.getInventory().setItem(21, ItemStack.EMPTY);
+                    p2.getInventory().setItem(22, ItemStack.EMPTY);
+                });
+                SecondaryTick.scriptActive = true;
+                SecondaryTick.scriptForward = 0f;
+            }
+            case 10 -> {
+                press(PadAction.INVENTORY);
+                mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            }
+            case 12 -> release();
+            case 25 -> {
+                int full = mc.getWindow().getGuiScaledWidth();
+                boolean p1Half = mc.screen != null && mc.screen.width == full / 2;
+                boolean p2Half = c.screen != null && c.screen.width == full - full / 2;
+                s2P1Digest = p1InventoryDigest(mc);
+                ConsolePad.LOGGER.info("[autotest] dos pantallas: P1 {} ancho {} (mitad {}), P2 {} ancho {} (mitad {}), p1HalfScreen={}",
+                        mc.screen == null ? "null" : mc.screen.getClass().getSimpleName(), mc.screen == null ? -1 : mc.screen.width, full / 2,
+                        c.screen == null ? "null" : c.screen.getClass().getSimpleName(), c.screen == null ? -1 : c.screen.width, full - full / 2,
+                        SplitView.p1HalfScreen);
+                verdict("dos pantallas a la vez, cada una en su mitad", p1Half && p2Half && SplitView.p1HalfScreen);
+                screenshotName = "split-two-screens.png";
+                screenshotPending = true;
+                if (mc.screen != null) p1CursorOnSlot(mc, 20, true);
+            }
+            case 27 -> p1CursorOnSlot(mc, 20, false);
+            case 35 -> {
+                ItemStack p1Carried = mc.player.containerMenu.getCarried();
+                ItemStack p2Carried = c.player.containerMenu.getCarried();
+                ItemStack p2Slot20 = p2.getInventory().getItem(20);
+                verdict("P1 coge con su pantalla: cursor de P1 " + p1Carried.getItem() + " x" + p1Carried.getCount() + ", cursor de P2 vacio=" + p2Carried.isEmpty()
+                        + ", slot 20 de P2 " + p2Slot20.getItem() + " x" + p2Slot20.getCount(),
+                        p1Carried.is(Items.DIRT) && p1Carried.getCount() == 10 && p2Carried.isEmpty() && p2Slot20.is(Items.COBBLESTONE) && p2Slot20.getCount() == 7);
+                p1CursorOnSlot(mc, 21, true);
+            }
+            case 37 -> p1CursorOnSlot(mc, 21, false);
+            case 50 -> {
+                ItemStack a = p1.getInventory().getItem(21);
+                ItemStack b = p2.getInventory().getItem(20);
+                verdict("P1 coloca en el slot 21 (servidor): " + a.getItem() + " x" + a.getCount() + "; P2 conserva " + b.getItem() + " x" + b.getCount(),
+                        a.is(Items.DIRT) && a.getCount() == 10 && b.is(Items.COBBLESTONE) && b.getCount() == 7);
+                cursorOnSlot(c, 20);
+            }
+            case 55 -> simP2(1 << PadState.A);
+            case 61 -> simP2(0);
+            case 70 -> {
+                ItemStack p2Carried = c.player.containerMenu.getCarried();
+                ItemStack p1Carried = mc.player.containerMenu.getCarried();
+                verdict("P2 coge con su mando: cursor de P2 " + p2Carried.getItem() + " x" + p2Carried.getCount() + ", cursor de P1 vacio=" + p1Carried.isEmpty(),
+                        p2Carried.is(Items.COBBLESTONE) && p2Carried.getCount() == 7 && p1Carried.isEmpty());
+                cursorOnSlot(c, 22);
+            }
+            case 75 -> simP2(1 << PadState.A);
+            case 81 -> simP2(0);
+            case 95 -> {
+                ItemStack a = p2.getInventory().getItem(22);
+                ItemStack b = p1.getInventory().getItem(21);
+                verdict("P2 coloca en el slot 22 (servidor): " + a.getItem() + " x" + a.getCount() + "; P1 conserva " + b.getItem() + " x" + b.getCount(),
+                        a.is(Items.COBBLESTONE) && a.getCount() == 7 && b.is(Items.DIRT) && b.getCount() == 10);
+                if (mc.screen != null) mc.screen.onClose();
+                simP2(1 << PadState.B);
+            }
+            case 101 -> simP2(0);
+            case 115 -> {
+                boolean closed = mc.screen == null && c.screen == null && p1.containerMenu == p1.inventoryMenu && p2.containerMenu == p2.inventoryMenu;
+                verdict("cerrar las dos pantallas (P1 con onClose, P2 con B); p1HalfScreen=" + SplitView.p1HalfScreen, closed);
+                // (b) cofre en el servidor, abierto para P2
+                mc.getSingleplayerServer().execute(() -> {
+                    s2Pos = p2.blockPosition().above(2);
+                    ServerLevel level = (ServerLevel) p2.level();
+                    level.setBlockAndUpdate(s2Pos, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+                    var be = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(s2Pos);
+                    be.setItem(0, new ItemStack(Items.GOLD_INGOT, 5));
+                    p2.openMenu(be);
+                });
+            }
+            case 140 -> {
+                boolean isChest = c.screen instanceof net.minecraft.client.gui.screens.inventory.ContainerScreen;
+                verdict("cofre abierto por el servidor en P2: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName()) + ", pantalla de P1=" + mc.screen,
+                        isChest && mc.screen == null && c.screen.width == SecondaryScreens.regionWidth(mc));
+                if (isChest) cursorOnSlot(c, 0);
+            }
+            case 145 -> simP2(1 << PadState.Y);
+            case 151 -> simP2(0);
+            case 165 -> {
+                int gold = 0;
+                for (int i = 0; i < 36; i++) {
+                    ItemStack st = p2.getInventory().getItem(i);
+                    if (st.is(Items.GOLD_INGOT)) gold += st.getCount();
+                }
+                boolean p1Gold = false;
+                for (int i = 0; i < 36; i++) p1Gold |= p1.getInventory().getItem(i).is(Items.GOLD_INGOT);
+                // Level.getBlockEntity devuelve null fuera del hilo del servidor: se lee alli.
+                boolean chestEmpty;
+                try {
+                    chestEmpty = mc.getSingleplayerServer().submit(() -> {
+                        var be = (net.minecraft.world.level.block.entity.ChestBlockEntity) p2.level().getBlockEntity(s2Pos);
+                        return be != null && be.getItem(0).isEmpty();
+                    }).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    chestEmpty = false;
+                }
+                verdict("mover rapido del cofre al inventario de P2: oro en P2=" + gold + " (5), cofre vacio=" + chestEmpty + ", P1 sin oro=" + !p1Gold,
+                        gold == 5 && chestEmpty && !p1Gold);
+                simP2(1 << PadState.B);
+            }
+            case 171 -> simP2(0);
+            case 185 -> {
+                verdict("cerrar el cofre con B: pantalla de P2 null=" + (c.screen == null) + ", contenedor cerrado en el servidor=" + (p2.containerMenu == p2.inventoryMenu),
+                        c.screen == null && p2.containerMenu == p2.inventoryMenu);
+                // mesa de crafteo
+                mc.getSingleplayerServer().execute(() -> {
+                    ServerLevel level = (ServerLevel) p2.level();
+                    level.setBlockAndUpdate(s2Pos, net.minecraft.world.level.block.Blocks.CRAFTING_TABLE.defaultBlockState());
+                    p2.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inv, pl) -> new net.minecraft.world.inventory.CraftingMenu(id, inv,
+                            net.minecraft.world.inventory.ContainerLevelAccess.create(level, s2Pos)), net.minecraft.network.chat.Component.literal("Crafting")));
+                });
+            }
+            case 210 -> {
+                boolean craft = c.screen instanceof net.minecraft.client.gui.screens.inventory.CraftingScreen;
+                verdict("mesa de crafteo abierta por el servidor en P2: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName()) + ", pantalla de P1=" + mc.screen,
+                        craft && mc.screen == null);
+                simP2(1 << PadState.B);
+            }
+            case 216 -> simP2(0);
+            case 230 -> {
+                verdict("cerrar la mesa con B", c.screen == null && p2.containerMenu == p2.inventoryMenu);
+                ConsolePad.LOGGER.info("[autotest] RESULTADO pantallas 4c-2 en conjunto -> {}", s2Ok ? "OK" : "FALLO");
+                mc.getSingleplayerServer().execute(() -> {
+                    ((ServerLevel) p2.level()).setBlockAndUpdate(s2Pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    p1.setGameMode(s2Prev1);
+                    p2.setGameMode(s2Prev2);
+                });
+                SecondaryTick.scriptActive = false;
+                simP2(0);
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -799,14 +976,15 @@ public final class AutoTest {
             case 5 -> hudTest(mc);
             case 6 -> actionsTest(mc);
             case 7 -> screensTest(mc);
-            case 8 -> aspectTest(mc, "pequena");
-            case 9 -> resizeWindow(mc);
-            case 10 -> aspectTest(mc, "1920x1080");
-            case 11 -> pauseTest(mc);
-            case 12 -> fovTest(mc);
-            case 13 -> fpsPhase(mc, false);
-            case 14 -> fpsPhase(mc, true);
-            case 15 -> leaveTest(mc);
+            case 8 -> screens2Test(mc);
+            case 9 -> aspectTest(mc, "pequena");
+            case 10 -> resizeWindow(mc);
+            case 11 -> aspectTest(mc, "1920x1080");
+            case 12 -> pauseTest(mc);
+            case 13 -> fovTest(mc);
+            case 14 -> fpsPhase(mc, false);
+            case 15 -> fpsPhase(mc, true);
+            case 16 -> leaveTest(mc);
             default -> { }
         }
     }

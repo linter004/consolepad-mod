@@ -54,12 +54,17 @@ public final class SecondaryScreens {
     }
 
     /** Dibuja la pantalla de P2 y su cursor. Dentro del contexto de P2 y con la pose ya trasladada a su mitad. */
-    public static void render(Minecraft mc, PlayerContext ctx, GuiGraphics graphics, float partialTick) {
+    public static void render(Minecraft mc, PlayerContext ctx, GuiGraphics graphics, float partialTick, net.minecraft.client.multiplayer.ClientLevel p1Level) {
         Screen screen = mc.screen;
         if (screen == null) return;
+        mc.getEntityRenderDispatcher().setLevel(ctx.level); // el maniqui del inventario es una entidad de P2
         int w = regionWidth(mc), h = graphics.guiHeight();
         if (screen.width != w || screen.height != h) screen.resize(mc, w, h);
-        screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
+        try {
+            screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
+        } finally {
+            mc.getEntityRenderDispatcher().setLevel(p1Level);
+        }
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
         int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
