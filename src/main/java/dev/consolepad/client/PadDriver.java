@@ -49,6 +49,7 @@ public final class PadDriver {
     private static final float REPEAT_DELAY = 0.35f;
     private static final float REPEAT_INTERVAL = 0.12f;
     private final boolean[] dpadActive = new boolean[4];
+    private final boolean[] dirPrev = new boolean[4];
     private final float[] dpadHeld = new float[4];
     private final float[] dpadNext = new float[4];
 
@@ -81,16 +82,21 @@ public final class PadDriver {
             }
             PadState si = devI.state;
             boolean both = si.isDown(PadState.START) && si.isDown(PadState.BACK);
-            if (!both) {
+            if (!SecondaryPlayers.isActive(i)) {
+                // Fuera de la partida: pulsar Start en ese mando mete al jugador (el aviso de P1 lo anuncia); Start+Back sigue valiendo.
                 joinHold[i] = 0f;
-                joinLatch[i] = false; // hay que soltar los botones antes de que cuenten otra vez
-            } else if (!SecondaryPlayers.isActive(i)) {
-                if (!joinLatch[i] && (si.pressed(PadState.START) || si.pressed(PadState.BACK))) {
+                if (si.pressed(PadState.START) || (both && si.pressed(PadState.BACK))) {
                     SecondaryPlayers.join(mc, i);
+                    var joined = SecondaryPlayers.context(i);
+                    if (joined != null) joined.input.comboLatch = true; // Start (y Back) no cuentan como pulsaciones del jugador hasta soltarlos
                     joinLatch[i] = true;
                 }
+                if (!si.isDown(PadState.START) && !si.isDown(PadState.BACK)) joinLatch[i] = false;
+            } else if (!both) {
+                joinHold[i] = 0f;
+                joinLatch[i] = false; // hay que soltar los botones antes de que cuenten otra vez
             } else if (!joinLatch[i]) {
-                joinHold[i] += dt;
+                joinHold[i] += dt; // dentro de la partida, Start+Back mantenido 2 s lo saca
                 if (joinHold[i] >= LEAVE_HOLD_SECONDS) {
                     SecondaryPlayers.leave(mc, i);
                     joinLatch[i] = true;
@@ -164,7 +170,7 @@ public final class PadDriver {
         double x = mc.mouseHandler.xpos();
         double y = mc.mouseHandler.ypos();
         PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, tmp);
-        if (tmp[0] != 0f || tmp[1] != 0f) {
+        if (!cfg.snapNav && (tmp[0] != 0f || tmp[1] != 0f)) { // con la navegacion por casillas el stick no mueve el cursor libre
             int regionW = SplitView.p1HalfScreen ? SplitView.p1Px[2] : mc.getWindow().getScreenWidth();
             int regionH = SplitView.p1HalfScreen ? SplitView.p1Px[3] : mc.getWindow().getScreenHeight();
             double maxX = Math.max(0, regionW - 1); // con extras, el cursor de P1 se queda en su region (arriba a la izquierda)
@@ -182,7 +188,7 @@ public final class PadDriver {
             }
         }
 
-        dpadNavigation(mc, mouse, window, s, dt);
+        dpadNavigation(mc, mouse, window, s, cfg.snapNav, dt);
 
         // Clics: pulsar y soltar por separado, para poder arrastrar.
         if (!(mc.screen instanceof AbstractContainerScreen<?>) && mc.getLastInputType().isKeyboard()) {
@@ -224,15 +230,19 @@ public final class PadDriver {
     }
 
     /** D-pad en pantallas: salta entre slots (contenedores) o usa la navegacion por foco de Minecraft (menus). */
-    private void dpadNavigation(Minecraft mc, MouseHandlerInvoker mouse, long window, PadState s, float dt) {
+    private void dpadNavigation(Minecraft mc, MouseHandlerInvoker mouse, long window, PadState s, boolean snapNav, float dt) {
+        boolean[] down = new boolean[4];
+        PadMath.navDirections(s, snapNav, down);
         for (int i = 0; i < DPAD.length; i++) {
             boolean fire = false;
-            if (s.pressed(DPAD[i])) {
+            boolean pressedNow = down[i] && !dirPrev[i];
+            dirPrev[i] = down[i];
+            if (pressedNow) {
                 dpadActive[i] = true;
                 dpadHeld[i] = 0f;
                 dpadNext[i] = REPEAT_DELAY;
                 fire = true;
-            } else if (dpadActive[i] && s.isDown(DPAD[i])) {
+            } else if (dpadActive[i] && down[i]) {
                 dpadHeld[i] += dt;
                 if (dpadHeld[i] >= dpadNext[i]) {
                     dpadNext[i] += REPEAT_INTERVAL;

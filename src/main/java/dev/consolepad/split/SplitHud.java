@@ -27,6 +27,8 @@ public final class SplitHud {
         if (extras.isEmpty()) {
             fitP1Screen(mc, graphics.guiWidth(), graphics.guiHeight());
             gui.render(graphics, deltaTracker);
+            JoinPrompt.render(mc, graphics, graphics.guiWidth(), graphics.guiHeight());
+            PadHints.renderHud(mc, graphics, 0, graphics.guiWidth(), graphics.guiHeight());
             return;
         }
         SplitLayout.update(mc, extras);
@@ -49,6 +51,8 @@ public final class SplitHud {
             graphics.pose().scale(SplitView.p1HudRatio, SplitView.p1HudRatio, 1f); // escala de interfaz propia de P1
             try {
                 gui.render(graphics, deltaTracker); // region de P1: origen (0, 0)
+                JoinPrompt.render(mc, graphics, SplitView.p1HudW, SplitView.p1HudH);
+                PadHints.renderHud(mc, graphics, 0, SplitView.p1HudW, SplitView.p1HudH);
             } finally {
                 graphics.pose().popPose();
                 graphics.disableScissor();
@@ -81,6 +85,7 @@ public final class SplitHud {
                                 invoker.consolepad$renderEffects(graphics, deltaTracker);
                             });
                             SplitNotices.render(mc, p, graphics);
+                            PadHints.renderHud(mc, graphics, p.slotIndex, p.hudW, p.hudH);
                             pose.popPose();
                             SecondaryScreens.render(mc, p, graphics, partial, p1Level);
                         });

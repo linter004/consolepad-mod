@@ -73,6 +73,7 @@ public final class SecondaryScreens {
         SplitView.guiHeight = h;
         try {
             screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
+            PadHints.renderScreenBar(mc, graphics, ctx.slotIndex, screen, w, h);
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 500);
             int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
@@ -108,7 +109,7 @@ public final class SecondaryScreens {
             }
             // Cursor.
             PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, TMP);
-            if (TMP[0] != 0f || TMP[1] != 0f) {
+            if (!cfg.snapNav && (TMP[0] != 0f || TMP[1] != 0f)) { // con la navegacion por casillas el stick no mueve el cursor libre
                 double speed = cfg.cursorSpeed / mc.getWindow().getGuiScale() / ctx.screenScale; // pixeles/s -> unidades logicas/s
                 if (screen instanceof AbstractContainerScreen<?> c && c.getSlotUnderMouse() != null) speed *= cfg.cursorSlotFactor;
                 double nx = Math.max(0, Math.min(screen.width - 1, ctx.cursorX + TMP[0] * speed * dt));
@@ -120,7 +121,7 @@ public final class SecondaryScreens {
                 else if (ctx.buttonDown[1]) screen.mouseDragged(nx, ny, 1, dx, dy);
                 else screen.mouseMoved(nx, ny);
             }
-            dpad(ctx, screen, s, dt);
+            dpad(ctx, screen, s, cfg.snapNav, dt);
             // Clics: pulsar y soltar por separado, para poder arrastrar.
             click(screen, ctx, s, PadState.A, 0);
             click(screen, ctx, s, PadState.X, 1);
@@ -162,15 +163,19 @@ public final class SecondaryScreens {
     private static final int[] DPAD = {PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};
 
     /** D-pad: el cursor salta al hueco (contenedores) o boton (menus) mas cercano en esa direccion; con repeticion al mantener. */
-    private static void dpad(PlayerContext ctx, Screen screen, PadState s, float dt) {
+    private static void dpad(PlayerContext ctx, Screen screen, PadState s, boolean snapNav, float dt) {
+        boolean[] down = new boolean[4];
+        PadMath.navDirections(s, snapNav, down);
         for (int i = 0; i < DPAD.length; i++) {
             boolean fire = false;
-            if (s.pressed(DPAD[i])) {
+            boolean pressedNow = down[i] && !ctx.dirPrev[i];
+            ctx.dirPrev[i] = down[i];
+            if (pressedNow) {
                 ctx.dpadActive[i] = true;
                 ctx.dpadHeld[i] = 0f;
                 ctx.dpadNext[i] = 0.35f;
                 fire = true;
-            } else if (ctx.dpadActive[i] && s.isDown(DPAD[i])) {
+            } else if (ctx.dpadActive[i] && down[i]) {
                 ctx.dpadHeld[i] += dt;
                 if (ctx.dpadHeld[i] >= ctx.dpadNext[i]) {
                     ctx.dpadNext[i] += 0.12f;

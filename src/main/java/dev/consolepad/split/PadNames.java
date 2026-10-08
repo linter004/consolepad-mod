@@ -51,8 +51,8 @@ public final class PadNames {
         if (c == PadState.RB) return "RB";
         if (c == PadState.LT) return "LT";
         if (c == PadState.RT) return "RT";
-        if (c == PadState.BACK) return "Atrás";
-        if (c == PadState.START) return "Inicio";
+        if (c == PadState.BACK) return "Vista";
+        if (c == PadState.START) return "Menú";
         return "Botón " + c;
     }
 

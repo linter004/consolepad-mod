@@ -17,4 +17,19 @@ public final class PadMath {
         out[0] = x * k;
         out[1] = y * k;
     }
+
+    /**
+     * Direcciones de navegacion (0 arriba, 1 abajo, 2 izquierda, 3 derecha) pulsadas ahora: el D-pad y, con la navegacion por casillas,
+     * el stick izquierdo (la direccion dominante pasado el 55 % de su recorrido).
+     */
+    public static void navDirections(PadState s, boolean snapNav, boolean[] out) {
+        out[0] = s.isDown(PadState.DPAD_UP);
+        out[1] = s.isDown(PadState.DPAD_DOWN);
+        out[2] = s.isDown(PadState.DPAD_LEFT);
+        out[3] = s.isDown(PadState.DPAD_RIGHT);
+        if (snapNav && Math.max(Math.abs(s.lx), Math.abs(s.ly)) >= 0.55f) {
+            if (Math.abs(s.ly) >= Math.abs(s.lx)) out[s.ly < 0 ? 0 : 1] = true;
+            else out[s.lx < 0 ? 2 : 3] = true;
+        }
+    }
 }

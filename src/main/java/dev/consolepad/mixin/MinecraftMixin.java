@@ -32,11 +32,12 @@ public abstract class MinecraftMixin {
         }
     }
 
-    /** Con jugadores extra dentro, el menu de pausa de P1 es el del mod (reanudar, ajustes, controles, reparto y salir), no el de vanilla. */
+    /** Con jugadores extra dentro, o con un mando en el slot 1, el menu de pausa de P1 es el del mod (reanudar, ajustes, controles, reparto y salir), no el de vanilla. */
     @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "setScreen", at = @At("HEAD"), argsOnly = true)
     private Screen consolepad$p1PauseMenu(Screen screen) {
         if (screen != null && screen.getClass() == net.minecraft.client.gui.screens.PauseScreen.class
-                && !ContextSwitcher.isSecondaryActive() && SecondaryPlayers.anyActive()) {
+                && !ContextSwitcher.isSecondaryActive()
+                && (SecondaryPlayers.anyActive() || (dev.consolepad.ConsolePad.PADS != null && dev.consolepad.ConsolePad.PADS.slot(0).device != null))) {
             return new dev.consolepad.split.PlayerPauseScreen(0);
         }
         return screen;

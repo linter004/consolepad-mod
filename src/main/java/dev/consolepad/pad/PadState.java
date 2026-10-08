@@ -27,6 +27,8 @@ public final class PadState {
     private int down, prevDown;
     /** Solo pruebas (AutoTest): botones que se dan por pulsados ademas de los reales de este mando. */
     public volatile int simDown;
+    /** Solo pruebas: stick izquierdo simulado (si no es 0, sustituye al del mando). */
+    public volatile float simLx, simLy;
 
     public void update(GLFWGamepadState s, float triggerThreshold) {
         prevDown = down;
@@ -42,6 +44,10 @@ public final class PadState {
         for (int i = 0; i <= GLFW.GLFW_GAMEPAD_BUTTON_LAST; i++) {
             if (s.buttons(i) == GLFW.GLFW_PRESS) d |= 1 << i;
         }
+        if (simLx != 0f || simLy != 0f) {
+            lx = simLx;
+            ly = simLy;
+        }
         if (lt > triggerThreshold) d |= 1 << LT;
         if (rt > triggerThreshold) d |= 1 << RT;
         down = d | simDown;
@@ -53,6 +59,8 @@ public final class PadState {
     public void tickSim() {
         prevDown = down;
         down = simDown;
+        lx = simLx;
+        ly = simLy;
     }
     public boolean isDown(int code) { return (down & (1 << code)) != 0; }
     public boolean pressed(int code) { return isDown(code) && (prevDown & (1 << code)) == 0; }

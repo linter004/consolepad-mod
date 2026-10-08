@@ -17,6 +17,10 @@ public final class PadSettings {
     public float triggerThreshold = 0.5f;
     /** Escala de interfaz de este jugador con la pantalla dividida: 0 = automatica (la que elegiria Minecraft para su region), 1 a 4 = fija. */
     public int guiScale = 0;
+    /** Ayuda de botones del HUD (abajo a izquierda y derecha) y barra de ayuda en pantallas. */
+    public boolean showHints = true;
+    /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */
+    public boolean snapNav = false;
     /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
     public float cursorSpeed = 550f;
     public float cursorDeadzone = 0.2f;

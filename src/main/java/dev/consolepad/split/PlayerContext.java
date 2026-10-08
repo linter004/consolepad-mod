@@ -36,6 +36,8 @@ public final class PlayerContext {
     public double cursorX, cursorY;
     public final boolean[] buttonDown = new boolean[2];
     public final boolean[] dpadActive = new boolean[4];
+    /** Direcciones (arriba, abajo, izquierda, derecha) del D-pad o del stick en modo casillas en el fotograma anterior. */
+    public final boolean[] dirPrev = new boolean[4];
     public final float[] dpadHeld = new float[4], dpadNext = new float[4];
     public double scrollAcc;
     /** Avisos propios: chat y mensajes del servidor que recibe este jugador, mensaje sobre la barra y titulo (el chat/avisos de P1 son los de vanilla). */

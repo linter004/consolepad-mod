@@ -1432,6 +1432,444 @@ public final class AutoTest {
         return pauseMenu ? isPauseMenu(sc) : sc == null;
     }
 
+    // ---------------------------------------------------------------- menu de pausa de P1 jugando solo y velocidad del cursor
+
+    private static boolean smOk = true;
+    private static int smPhase;
+    private static float smSpeed0;
+    private static SplitSettings.Orientation smOrient0;
+
+    private static void smVerdict(String name, boolean ok) {
+        smOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Un clic de P1 por la ruta real del raton: pulsa en t0 y suelta 3 ticks despues. */
+    private static void smClick(Minecraft mc, int t, int t0, int[] at) {
+        if (t == t0) p1ClickAt(mc, at);
+        if (t == t0 + 3) p1Mouse(mc, false);
+    }
+
+    /**
+     * P1 sin nadie mas en la partida: Start abre el menu de pausa del mod (no el de vanilla) con Ajustes, Controles y Reparto; desde Ajustes se cambia la
+     * velocidad del cursor y el modo de cursor (se guardan en su slot) y desde el menu se abren los Controles.
+     */
+    private static void soloMenuTest(Minecraft mc) {
+        var s0 = pads.slot(0).settings;
+        int t = ticks;
+        switch (smPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (leaveTo(mc, 1) && t > 20) {
+                    smSpeed0 = s0.cursorSpeed;
+                    smOrient0 = SplitSettings.orientation();
+                    smPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                if (t == 5) simSlot(0, 1 << PadState.START);
+                if (t == 12) simSlot(0, 0);
+                if (t == 20) {
+                    smVerdict("P1 solo: Start abre el menu de pausa del mod (pantalla: " + mc.screen + ", extras dentro=" + SecondaryPlayers.anyActive() + ")",
+                            mc.screen instanceof PlayerPauseScreen pp && pp.slot() == 0 && !SecondaryPlayers.anyActive());
+                }
+                if (mc.screen instanceof PlayerPauseScreen pp) {
+                    smClick(mc, t, 21, pp.layoutCenter());
+                    if (t == 28) {
+                        smVerdict("P1 solo: Reparto cambia la orientacion (" + smOrient0 + " -> " + SplitSettings.orientation() + ")", SplitSettings.orientation() != smOrient0);
+                        SplitSettings.setOrientation(smOrient0);
+                    }
+                    smClick(mc, t, 30, pp.settingsCenter());
+                }
+                if (t == 40) {
+                    smVerdict("P1 solo: Ajustes del jugador se abre (pantalla: " + mc.screen + ")", mc.screen instanceof PlayerSettingsScreen);
+                }
+                if (mc.screen instanceof PlayerSettingsScreen ss) {
+                    smClick(mc, t, 41, ss.cursorSpeedCenter());
+                    if (t == 48) {
+                        float exp = PlayerSettingsScreen.nextFloat(PlayerSettingsScreen.CURSOR_SPEEDS, smSpeed0);
+                        smVerdict("velocidad del cursor de P1: " + smSpeed0 + " -> " + s0.cursorSpeed + " (esperada " + exp + ")", s0.cursorSpeed == exp && exp != smSpeed0);
+                        s0.cursorSpeed = smSpeed0;
+                    }
+                    smClick(mc, t, 50, ss.snapNavCenter());
+                    if (t == 58) {
+                        smVerdict("cursor por casillas de P1 se activa en su slot (snapNav=" + s0.snapNav + ")", s0.snapNav);
+                        s0.snapNav = false;
+                    }
+                    smClick(mc, t, 60, ss.backCenter());
+                }
+                if (t == 70) {
+                    smVerdict("Atras en Ajustes vuelve al menu de pausa (pantalla: " + mc.screen + ")", mc.screen instanceof PlayerPauseScreen);
+                }
+                if (mc.screen instanceof PlayerPauseScreen pp) smClick(mc, t, 71, pp.controlsCenter());
+                if (t == 80) {
+                    smVerdict("P1 solo: Controles se abre (pantalla: " + mc.screen + ")", mc.screen instanceof PlayerControlsScreen);
+                    mc.setScreen(null);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO menu de pausa de P1 jugando solo en conjunto -> {}", smOk ? "OK" : "FALLO");
+                    smPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if (joinTo(mc, 2) || t > 600) {
+                    smPhase = 3;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- navegacion por casillas con el stick izquierdo
+
+    private static boolean snOk = true;
+    private static int snPhase;
+    private static int snP2Slot0, snP1Slot0;
+    private static double snCursor0;
+
+    private static void snVerdict(String name, boolean ok) {
+        snOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static int snSlotAt(net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> s, double x, double y) {
+        for (net.minecraft.world.inventory.Slot sl : s.getMenu().slots) {
+            double cx = s.getGuiLeft() + sl.x + 8, cy = s.getGuiTop() + sl.y + 8;
+            if (Math.abs(x - cx) <= 8 && Math.abs(y - cy) <= 8) return sl.index;
+        }
+        return -1;
+    }
+
+    private static void snStick(float lx) {
+        for (int i = 0; i < 2; i++) {
+            PadManager.Device d = pads.slot(i).device;
+            if (d != null) d.state.simLx = lx;
+        }
+    }
+
+    /**
+     * Con "Cursor en menus: por casillas" el stick izquierdo salta de hueco en hueco como el D-pad (un salto por empujon, sin mover el cursor libre);
+     * con cursor libre sigue moviendo el cursor. Se mide en el inventario de P1 y de P2 (hotbar: del hueco 37 al 38 con el stick a la derecha).
+     */
+    private static void snapNavTest(Minecraft mc) {
+        var s0 = pads.slot(0).settings;
+        var s1 = pads.slot(1).settings;
+        int t = ticks;
+        switch (snPhase) {
+            case 0 -> {
+                if (joinTo(mc, 2) && t > 20) {
+                    scaOpenScreens(mc);
+                    s0.snapNav = true;
+                    s1.snapNav = true;
+                    snPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                PlayerContext c = SecondaryPlayers.context(1);
+                var p1s = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) mc.screen;
+                var p2s = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) c.screen;
+                if (t == 3) {
+                    cursorOnSlot(c, 37);
+                    var sl = p1s.getMenu().slots.get(37);
+                    p1MoveTo(mc, p1s.getGuiLeft() + sl.x + 8, p1s.getGuiTop() + sl.y + 8);
+                }
+                if (t == 8) {
+                    snP2Slot0 = snSlotAt(p2s, c.cursorX, c.cursorY);
+                    snP1Slot0 = p1s.getSlotUnderMouse() == null ? -1 : p1s.getSlotUnderMouse().index;
+                    snStick(1f);
+                }
+                if (t == 13) snStick(0f);
+                if (t == 18) {
+                    int p2Slot = snSlotAt(p2s, c.cursorX, c.cursorY);
+                    int p1Slot = p1s.getSlotUnderMouse() == null ? -1 : p1s.getSlotUnderMouse().index;
+                    snVerdict("stick a la derecha en modo casillas: P2 salta del hueco " + snP2Slot0 + " al " + p2Slot + " (esperado 37 -> 38)", snP2Slot0 == 37 && p2Slot == 38);
+                    snVerdict("stick a la derecha en modo casillas: P1 salta del hueco " + snP1Slot0 + " al " + p1Slot + " (esperado 37 -> 38)", snP1Slot0 == 37 && p1Slot == 38);
+                    snCursor0 = c.cursorX;
+                    snStick(0.35f); // empuja poco: pasa la zona muerta del cursor pero no el umbral del salto
+                }
+                if (t == 30) {
+                    int p2Slot = snSlotAt(p2s, c.cursorX, c.cursorY);
+                    int p1Slot = p1s.getSlotUnderMouse() == null ? -1 : p1s.getSlotUnderMouse().index;
+                    snVerdict("modo casillas: con el stick poco inclinado el cursor no se mueve libre (P2 x " + snCursor0 + " -> " + c.cursorX + ", hueco P1 " + p1Slot + ")",
+                            c.cursorX == snCursor0 && p2Slot == 38 && p1Slot == 38);
+                    s0.snapNav = false;
+                    s1.snapNav = false;
+                    snStick(0.9f);
+                }
+                if (t == 42) {
+                    snVerdict("cursor libre: el mismo empujon si mueve el cursor de P2 (x " + snCursor0 + " -> " + c.cursorX + ")", c.cursorX > snCursor0 + 5);
+                    snStick(0f);
+                    scaCloseScreens(mc);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO navegacion por casillas con el stick izquierdo en conjunto -> {}", snOk ? "OK" : "FALLO");
+                    snPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if (t > 10) {
+                    snPhase = 3;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- ayuda de botones en el HUD y en las pantallas
+
+    private static boolean hbOk = true;
+    private static int hbPhase;
+    private static ItemStack hbSaved = ItemStack.EMPTY;
+
+    private static void hbVerdict(String name, boolean ok) {
+        hbOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static String hbHint(int code, String text) {
+        return code < 0 ? null : code + ":" + text;
+    }
+
+    private static String hbJoin(String... parts) {
+        StringBuilder b = new StringBuilder();
+        for (String p : parts) {
+            if (p == null) continue;
+            if (b.length() > 0) b.append('|');
+            b.append(p);
+        }
+        return b.toString();
+    }
+
+    private static int[] hbRegion(Minecraft mc, int slot) {
+        if (slot == 0) return new int[] {SplitView.p1HudW, SplitView.p1HudH};
+        PlayerContext c = SecondaryPlayers.context(slot);
+        return new int[] {c.hudW, c.hudH};
+    }
+
+    /** Ayuda esperada del HUD de un jugador segun sus bindings y lo que apunta/lleva (la misma regla que PadHints pero escrita aparte). */
+    private static String[] hbExpected(Minecraft mc, int slot) {
+        var cfg = pads.slot(slot).settings;
+        net.minecraft.world.entity.player.Player player;
+        net.minecraft.world.phys.HitResult hit;
+        if (slot == 0) {
+            player = mc.player;
+            hit = mc.hitResult;
+        } else {
+            PlayerContext c = SecondaryPlayers.context(slot);
+            player = c.player;
+            hit = c.hitResult;
+        }
+        String atk = hit == null ? null : hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK ? "Romper" : hit.getType() == net.minecraft.world.phys.HitResult.Type.ENTITY ? "Atacar" : null;
+        String use = player.getMainHandItem().getItem() instanceof net.minecraft.world.item.BlockItem ? "Colocar bloque" : "Usar objeto";
+        String left = hbJoin(hbHint(PadHints.buttonFor(cfg, PadAction.DROP), "Tirar objeto"), hbHint(PadHints.buttonFor(cfg, PadAction.INVENTORY), "Inventario"));
+        String right = hbJoin(atk == null ? null : hbHint(PadHints.buttonFor(cfg, PadAction.ATTACK), atk), hbHint(PadHints.buttonFor(cfg, PadAction.USE), use));
+        return new String[] {left, right};
+    }
+
+    private static String hbBarExpected(boolean container, boolean menu) {
+        return container ? "0:Seleccionar|1:Salir|2:Mitad|3:Mover rápido" : menu ? "0:Seleccionar|1:Volver" : "0:Seleccionar|1:Salir";
+    }
+
+    /**
+     * Ayuda de botones: con 4 jugadores, cada uno ve abajo a la izquierda "Tirar objeto" e "Inventario" y abajo a la derecha las acciones de atacar y
+     * usar (contextuales: Romper al apuntar a un bloque, Colocar bloque con un bloque en la mano) segun SUS bindings, dentro de su region y sin pisar la
+     * barra de objetos. Se oculta con la opcion del jugador, una accion sin boton no muestra nada, y en las pantallas (inventario, menu) hay una barra
+     * con los botones que valen. Los iconos cambian segun el tipo de mando.
+     */
+    private static void hintsTest(Minecraft mc) {
+        switch (hbPhase) {
+            case 0 -> {
+                if (joinTo(mc, 4) && ticks > 20) {
+                    mc.setScreen(null);
+                    mc.player.setXRot(90f); // P1 mira al suelo: apunta a un bloque
+                    hbPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                if (ticks != 12) return;
+                for (int slot = 0; slot < 4; slot++) {
+                    String[] exp = hbExpected(mc, slot);
+                    int[] reg = hbRegion(mc, slot);
+                    int[] bl = PadHints.lastBoxL[slot], br = PadHints.lastBoxR[slot];
+                    boolean inside = bl[2] > 0 && br[2] > 0 && bl[0] >= 0 && br[0] + br[2] <= reg[0] && Math.min(bl[1], br[1]) >= 0 && Math.max(bl[1] + bl[3], br[1] + br[3]) <= reg[1];
+                    boolean clear = bl[0] + bl[2] <= reg[0] / 2 - 91 + 1 && br[0] >= reg[0] / 2 + 91 - 1; // no pisa la barra de objetos (182 de ancho en el centro)
+                    hbVerdict("P" + (slot + 1) + ": ayuda del HUD izquierda '" + PadHints.lastLeft[slot] + "' (esperada '" + exp[0] + "'), derecha '" + PadHints.lastRight[slot] + "' (esperada '" + exp[1] + "')",
+                            PadHints.lastLeft[slot].equals(exp[0]) && PadHints.lastRight[slot].equals(exp[1]) && !exp[0].isEmpty());
+                    hbVerdict("P" + (slot + 1) + ": la ayuda cabe en su region " + reg[0] + "x" + reg[1] + " " + java.util.Arrays.toString(bl) + " " + java.util.Arrays.toString(br) + " y no pisa la barra de objetos", inside && clear);
+                }
+                hbVerdict("P1 apunta a un bloque: el boton de atacar dice Romper (" + PadHints.lastRight[0] + ")", PadHints.lastRight[0].contains(":Romper"));
+                hbPhase = 2;
+                ticks = 0;
+            }
+            case 2 -> { // P1 con un bloque en la mano: Colocar bloque
+                if (ticks == 1) {
+                    hbSaved = mc.player.getInventory().getSelected().copy();
+                    mc.player.getInventory().setItem(mc.player.getInventory().selected, new ItemStack(Items.DIRT, 5));
+                } else if (ticks == 8) {
+                    hbVerdict("P1 con tierra en la mano: el boton de usar dice Colocar bloque (" + PadHints.lastRight[0] + ")", PadHints.lastRight[0].endsWith(":Colocar bloque"));
+                    mc.player.getInventory().setItem(mc.player.getInventory().selected, hbSaved);
+                    hbPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // acciones sin boton, opcion de ocultar y texto contextual
+                var cfg1 = pads.slot(1).settings;
+                if (ticks == 1) {
+                    hbVerdict("apuntar a una entidad dice Atacar y a nada no muestra el boton de atacar",
+                            "Atacar".equals(PadHints.attackLabel(new net.minecraft.world.phys.EntityHitResult(mc.player)))
+                                    && PadHints.attackLabel(net.minecraft.world.phys.BlockHitResult.miss(Vec3.ZERO, net.minecraft.core.Direction.UP, BlockPos.ZERO)) == null);
+                    int drop = PadHints.buttonFor(cfg1, PadAction.DROP);
+                    hbSaved = ItemStack.EMPTY;
+                    hbDropButton = drop;
+                    cfg1.bindings.remove(drop);
+                    pads.slot(0).settings.showHints = false;
+                } else if (ticks == 8) {
+                    hbVerdict("P2 sin boton de Tirar objeto: no se muestra (" + PadHints.lastLeft[1] + ")", !PadHints.lastLeft[1].contains("Tirar objeto") && PadHints.lastLeft[1].contains("Inventario"));
+                    hbVerdict("P1 con la ayuda desactivada no dibuja nada ('" + PadHints.lastLeft[0] + "' '" + PadHints.lastRight[0] + "') y P3 la sigue viendo",
+                            PadHints.lastLeft[0].isEmpty() && PadHints.lastRight[0].isEmpty() && !PadHints.lastLeft[2].isEmpty());
+                    cfg1.bindings.put(hbDropButton, PadAction.DROP);
+                    pads.slot(0).settings.showHints = true;
+                    hbPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> { // barra de ayuda en inventarios
+                if (ticks == 1) {
+                    scaOpenScreens(mc);
+                } else if (ticks == 10) {
+                    String exp = hbBarExpected(true, false);
+                    for (int slot = 0; slot < 4; slot++) {
+                        hbVerdict("P" + (slot + 1) + ": barra de ayuda del inventario '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
+                    }
+                    scaCloseScreens(mc);
+                    hbPhase = 5;
+                    ticks = 0;
+                }
+            }
+            case 5 -> { // barra de ayuda en menus de pausa
+                if (ticks == 1) {
+                    mc.setScreen(new PlayerPauseScreen(0));
+                    for (PlayerContext c : SplitRender.activeContexts()) ContextSwitcher.run(c, () -> mc.setScreen(new PlayerPauseScreen(c.slotIndex)));
+                } else if (ticks == 10) {
+                    String exp = hbBarExpected(false, true);
+                    for (int slot = 0; slot < 4; slot++) {
+                        hbVerdict("P" + (slot + 1) + ": barra de ayuda del menu de pausa '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
+                    }
+                    scaCloseScreens(mc);
+                    hbPhase = 6;
+                    ticks = 0;
+                }
+            }
+            case 6 -> {
+                if (ticks == 1) {
+                    String a = PadIcons.glyph(PadState.A, dev.consolepad.pad.PadType.XBOX), b = PadIcons.glyph(PadState.A, dev.consolepad.pad.PadType.PLAYSTATION),
+                            c = PadIcons.glyph(PadState.A, dev.consolepad.pad.PadType.NINTENDO);
+                    hbVerdict("icono del boton inferior segun el mando: Xbox '" + a + "', PlayStation '" + b + "', Nintendo '" + c + "'", a.equals("A") && b.equals("\u00d7") && c.equals("B"));
+                    mc.player.setXRot(0f);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO ayuda de botones del HUD y de las pantallas en conjunto -> {}", hbOk ? "OK" : "FALLO");
+                }
+                if (ticks > 1 && leaveTo(mc, 2) || ticks > 600) {
+                    hbPhase = 7;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private static int hbDropButton;
+
+    // ---------------------------------------------------------------- aviso "Unirse como el jugador N" y Start para entrar
+
+    private static boolean jpOk = true;
+    private static int jpPhase;
+    private static int jpExpect;
+
+    private static void jpVerdict(String name, boolean ok) {
+        jpOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static int jpPendingMask() {
+        int mask = 0;
+        for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
+            if (pads.slot(i).device != null && !SecondaryPlayers.isActive(i)) mask |= 1 << i;
+        }
+        return mask;
+    }
+
+    /**
+     * Con mandos conectados cuyo jugador no esta dentro, P1 ve abajo en el centro de su region "[boton] Unirse como el jugador N" (una linea por
+     * mando pendiente, con el nombre del boton Start segun el tipo de mando). Pulsar Start (sin Back) en ese mando mete al jugador, el aviso de
+     * ese mando desaparece y el jugador no entra con el menu de pausa abierto. Con una pantalla abierta en P1 no se dibuja.
+     */
+    private static void joinPromptTest(Minecraft mc) {
+        switch (jpPhase) {
+            case 0 -> {
+                if (ticks == 1) mc.setScreen(null);
+                if (leaveTo(mc, 1) && ticks > 20) {
+                    pads.attachVirtual(1);
+                    pads.attachVirtual(2);
+                    jpExpect = jpPendingMask();
+                    jpPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                if (ticks == 15) {
+                    int[] box = JoinPrompt.lastBox, reg = JoinPrompt.lastRegion;
+                    jpVerdict("aviso de unirse: lineas dibujadas para los slots " + Integer.toBinaryString(JoinPrompt.lastSlots) + " (esperados " + Integer.toBinaryString(jpExpect) + ")",
+                            JoinPrompt.lastSlots == jpExpect && jpExpect != 0);
+                    boolean inside = box[2] > 0 && box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= reg[0] && box[1] + box[3] <= reg[1];
+                    boolean centered = Math.abs(box[0] + box[2] / 2 - reg[0] / 2) <= 3;
+                    boolean bottom = box[1] + box[3] > reg[1] / 2;
+                    jpVerdict("aviso de unirse: caja " + java.util.Arrays.toString(box) + " dentro de la region " + reg[0] + "x" + reg[1] + ", centrada y en la mitad inferior",
+                            inside && centered && bottom);
+                    String xb = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.XBOX);
+                    String ps = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.PLAYSTATION);
+                    String ns = PadIcons.glyph(PadState.START, dev.consolepad.pad.PadType.NINTENDO);
+                    jpVerdict("nombre del boton Start segun el mando: Xbox '" + xb + "', PlayStation '" + ps + "', Nintendo '" + ns + "'",
+                            xb.equals("Menú") && ps.equals("Options") && ns.equals("+"));
+                    mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+                } else if (ticks == 30) {
+                    jpVerdict("aviso de unirse: con una pantalla abierta en P1 no se dibuja (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ")", JoinPrompt.lastSlots == 0);
+                    mc.setScreen(null);
+                    jpPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // Start solo (sin Back) en el mando 2
+                if (ticks == 5) simSlot(1, 1 << PadState.START);
+                if (ticks == 12) simSlot(1, 0);
+                if (ticks > 12 && SecondaryPlayers.isActive(1) && extraReady(mc, 1)) {
+                    jpVerdict("Start solo (sin Back) en el mando 2 mete a P2", true);
+                    jpPhase = 3;
+                    ticks = 0;
+                } else if (ticks > 400) {
+                    jpVerdict("Start solo (sin Back) en el mando 2 mete a P2", false);
+                    jpPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (ticks == 20) {
+                    jpVerdict("tras unirse P2, su aviso desaparece y queda el de los demas: lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + " (esperadas " + Integer.toBinaryString(jpPendingMask()) + ")",
+                            JoinPrompt.lastSlots == jpPendingMask() && (JoinPrompt.lastSlots & 2) == 0 && jpPendingMask() == (jpExpect & ~2));
+                    jpVerdict("P2 entra sin menu de pausa abierto (pantalla de P2: " + screenOf(mc, 1) + ")", screenOf(mc, 1) == null);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO aviso de unirse y Start para entrar en conjunto -> {}", jpOk ? "OK" : "FALLO");
+                }
+                if (ticks > 20 && leaveTo(mc, 2) || ticks > 600) {
+                    jpPhase = 4;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
     // ---------------------------------------------------------------- Start y B cierran el menu de su jugador
 
     private static int deathTestPhase;
@@ -2694,6 +3132,10 @@ public final class AutoTest {
             case 26 -> chatTest(mc);
             case 27 -> menusTest(mc);
             case 28 -> mannequinTest(mc);
+            case 29 -> joinPromptTest(mc);
+            case 30 -> hintsTest(mc);
+            case 31 -> soloMenuTest(mc);
+            case 32 -> snapNavTest(mc);
             case 40 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 40) next(); // casilla libre entre las pruebas y la salida

@@ -61,6 +61,7 @@ public abstract class GameRendererMixin {
         float k = SplitView.p1Scale();
         if (!SplitView.p1HalfScreen) {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
+            dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             return;
         }
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
@@ -72,6 +73,7 @@ public abstract class GameRendererMixin {
         SplitView.guiHeight = screen.height;
         try {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, Math.round(mouseX / k), Math.round(mouseY / k), partial);
+            dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;

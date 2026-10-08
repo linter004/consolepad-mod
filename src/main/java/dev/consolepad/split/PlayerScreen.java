@@ -10,6 +10,11 @@ public interface PlayerScreen {
         return false;
     }
 
+    /** True si la pantalla cambia de pestana con LB/RB (la barra de ayuda lo anuncia). */
+    default boolean hintTabs() {
+        return false;
+    }
+
     /** Boton del mando (codigo de PadState) que se acaba de pulsar mientras se escuchaba. */
     default void padButton(int code) {}
 }
