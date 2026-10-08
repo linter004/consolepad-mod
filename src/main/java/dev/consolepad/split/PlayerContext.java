@@ -17,6 +17,9 @@ public final class PlayerContext {
     public Entity crosshairPickEntity;
     public int missTime;
     public int rightClickDelay;
+    /** FOV suavizado de GameRenderer (fov/oldFov): efecto de correr, arco, etc. Cada jugador el suyo. */
+    public float fov = 1.0F;
+    public float oldFov = 1.0F;
     /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
     public final LevelRenderer renderer;
 

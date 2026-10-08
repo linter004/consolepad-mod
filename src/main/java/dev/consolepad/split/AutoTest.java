@@ -157,6 +157,69 @@ public final class AutoTest {
         }
     }
 
+    /** Resume, por pasada, los FOV (vertical y horizontal) de las proyecciones de mundo grabadas desde el ultimo clear. */
+    private static String fovSummary() {
+        java.util.Map<String, java.util.TreeSet<String>> byPass = new java.util.TreeMap<>();
+        for (SplitDiag.Sample sm : SplitDiag.samples()) {
+            if (!sm.where().equals("getProjectionMatrix")) continue;
+            double v = sm.fovDeg();
+            double h = Math.toDegrees(2 * Math.atan(sm.aspect() * Math.tan(Math.toRadians(v) / 2)));
+            byPass.computeIfAbsent(sm.pass(), k -> new java.util.TreeSet<>())
+                    .add(String.format(java.util.Locale.ROOT, "V%.1f/H%.1f", v, h));
+        }
+        return byPass.toString();
+    }
+
+    /**
+     * Tarea 2: FOV vertical/horizontal por pasada con 1 jugador y dividido, parado y corriendo (P1 sprint), con el ajuste
+     * "Efectos de FOV" de Minecraft a 1,0 y a 0. Si correr cambia el FOV solo con el efecto a 1,0, es el efecto de vanilla.
+     */
+    private static void fovTest(Minecraft mc) {
+        switch (ticks) {
+            case 1 -> {
+                mc.options.fovEffectScale().set(1.0);
+                mc.player.setSprinting(false);
+                SplitView.enabled = false;
+                SplitDiag.clear();
+                SplitDiag.recording = true;
+            }
+            case 10 -> {
+                SplitDiag.recording = false;
+                ConsolePad.LOGGER.info("[autotest] FOV 1 jugador, parado: {}", fovSummary());
+                SplitView.enabled = true;
+                SplitDiag.clear();
+                SplitDiag.recording = true;
+            }
+            case 20 -> {
+                SplitDiag.recording = false;
+                ConsolePad.LOGGER.info("[autotest] FOV dividido, parado: {}", fovSummary());
+                SplitDiag.clear();
+            }
+            case 45 -> {
+                SplitDiag.recording = true;
+            }
+            case 50 -> {
+                SplitDiag.recording = false;
+                String sum = fovSummary();
+                boolean p2Sprint = sum.contains("P2=[V70.0/H63.8, V80");
+                ConsolePad.LOGGER.info("[autotest] FOV dividido, P1 corriendo, efectos de FOV 1,0: {} -> P2 hereda el FOV de P1: {}",
+                        sum, p2Sprint ? "SI (FALLO)" : "NO (OK)");
+                mc.options.fovEffectScale().set(0.0);
+                SplitDiag.clear();
+            }
+            case 70 -> SplitDiag.recording = true;
+            case 75 -> {
+                SplitDiag.recording = false;
+                ConsolePad.LOGGER.info("[autotest] FOV dividido, P1 corriendo, efectos de FOV 0: {}", fovSummary());
+                mc.options.fovEffectScale().set(1.0);
+                mc.player.setSprinting(false);
+                next();
+            }
+            default -> { }
+        }
+        if (ticks > 20 && ticks < 75) mc.player.setSprinting(true);
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -311,8 +374,9 @@ public final class AutoTest {
             case 6 -> resizeWindow(mc);
             case 7 -> aspectTest(mc, "1920x1080");
             case 8 -> pauseTest(mc);
-            case 9 -> fpsPhase(mc, false);
-            case 10 -> fpsPhase(mc, true);
+            case 9 -> fovTest(mc);
+            case 10 -> fpsPhase(mc, false);
+            case 11 -> fpsPhase(mc, true);
             default -> { }
         }
     }

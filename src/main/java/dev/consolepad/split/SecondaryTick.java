@@ -98,6 +98,7 @@ public final class SecondaryTick {
         if (inv.consolepad$getRightClickDelay() > 0) inv.consolepad$setRightClickDelay(inv.consolepad$getRightClickDelay() - 1);
         mc.gameRenderer.pick(1.0F); // a que apunta P2 (hitResult de su contexto)
         mc.gameMode.tick();
+        ((dev.consolepad.mixin.GameRendererAccessor) mc.gameRenderer).consolepad$tickFov(); // FOV propio de P2 (camara = P2)
 
         if (lookX != 0f || lookY != 0f) {
             float k = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;

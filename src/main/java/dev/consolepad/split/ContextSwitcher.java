@@ -1,6 +1,7 @@
 package dev.consolepad.split;
 
 import dev.consolepad.ConsolePad;
+import dev.consolepad.mixin.GameRendererAccessor;
 import dev.consolepad.mixin.MinecraftInvoker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -47,6 +48,9 @@ public final class ContextSwitcher {
         MinecraftInvoker inv = (MinecraftInvoker) mc;
         int p1Miss = inv.consolepad$getMissTime();
         int p1Delay = inv.consolepad$getRightClickDelay();
+        GameRendererAccessor gr = (GameRendererAccessor) mc.gameRenderer;
+        float p1Fov = gr.consolepad$getFov();
+        float p1OldFov = gr.consolepad$getOldFov();
 
         active = true;
         current = ctx;
@@ -58,6 +62,8 @@ public final class ContextSwitcher {
         mc.crosshairPickEntity = ctx.crosshairPickEntity;
         inv.consolepad$setMissTime(ctx.missTime);
         inv.consolepad$setRightClickDelay(ctx.rightClickDelay);
+        gr.consolepad$setFov(ctx.fov);
+        gr.consolepad$setOldFov(ctx.oldFov);
         try {
             body.run();
         } finally {
@@ -70,6 +76,10 @@ public final class ContextSwitcher {
             ctx.crosshairPickEntity = mc.crosshairPickEntity;
             ctx.missTime = inv.consolepad$getMissTime();
             ctx.rightClickDelay = inv.consolepad$getRightClickDelay();
+            ctx.fov = gr.consolepad$getFov();
+            ctx.oldFov = gr.consolepad$getOldFov();
+            gr.consolepad$setFov(p1Fov);
+            gr.consolepad$setOldFov(p1OldFov);
             mc.hitResult = p1Hit;
             mc.crosshairPickEntity = p1Cross;
             inv.consolepad$setMissTime(p1Miss);
