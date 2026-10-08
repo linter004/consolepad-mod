@@ -1345,6 +1345,181 @@ public final class AutoTest {
         }
     }
 
+    private static boolean ptOk = true;
+    private static net.minecraft.world.level.GameType ptPrev;
+    private static int ptPhase;
+
+    private static void ptVerdict(String name, boolean ok) {
+        ptOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static void simSlot(int slot, int bits) {
+        PadManager.Device d = pads.slot(slot).device;
+        if (d != null) d.state.simDown = bits;
+    }
+
+    private static boolean cursorAt(PlayerContext c, double x, double y) {
+        return Math.abs(c.cursorX - x) < 1.5 && Math.abs(c.cursorY - y) < 1.5;
+    }
+
+    private static double[] slotCenter(PlayerContext c, int menuSlot) {
+        var screen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) c.screen;
+        net.minecraft.world.inventory.Slot sl = screen.getMenu().slots.get(menuSlot);
+        return new double[] {screen.getGuiLeft() + sl.x + 8, screen.getGuiTop() + sl.y + 8};
+    }
+
+    /** Indice de slot de menu cuyo centro esta en (x, y) (con tolerancia), o -1. */
+    private static int slotAt(PlayerContext c, double x, double y) {
+        var screen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) c.screen;
+        for (net.minecraft.world.inventory.Slot sl : screen.getMenu().slots) {
+            if (Math.abs(screen.getGuiLeft() + sl.x + 8 - x) < 1.5 && Math.abs(screen.getGuiTop() + sl.y + 8 - y) < 1.5) return sl.index;
+        }
+        return -1;
+    }
+
+    /**
+     * Pasos pendientes de medir: (A) D-pad en el inventario de P2 (el cursor salta de hueco en hueco), (B) D-pad en su menu de pausa (de boton
+     * en boton), (C) atajo Start+Back de P3 y P4 con mandos virtuales en los slots 2 y 3: pulsar entra, mantener 2 s sale.
+     */
+    private static void padTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        int both = (1 << PadState.START) | (1 << PadState.BACK);
+        switch (ptPhase) {
+            case 0 -> {
+                switch (ticks) {
+                    case 1 -> {
+                        ptPrev = p2.gameMode.getGameModeForPlayer();
+                        mc.getSingleplayerServer().execute(() -> p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL));
+                        SecondaryTick.scriptActive = true;
+                        SecondaryTick.scriptForward = 0f;
+                    }
+                    case 10 -> press(PadAction.INVENTORY);
+                    case 12 -> release();
+                    case 30 -> {
+                        double[] a = slotCenter(c, 20);
+                        c.cursorX = a[0];
+                        c.cursorY = a[1];
+                    }
+                    case 33 -> simP2(1 << PadState.DPAD_RIGHT);
+                    case 37 -> simP2(0);
+                    case 50 -> {
+                        double[] e = slotCenter(c, 21);
+                        ptVerdict("D-pad derecha en el inventario de P2: cursor (" + c.cursorX + ", " + c.cursorY + ") en el centro del slot 21 (" + e[0] + ", " + e[1] + ")", cursorAt(c, e[0], e[1]));
+                    }
+                    case 52 -> simP2(1 << PadState.DPAD_DOWN);
+                    case 56 -> simP2(0);
+                    case 70 -> {
+                        double[] e = slotCenter(c, 21);
+                        int below = slotAt(c, e[0], e[1] + 18);
+                        ptVerdict("D-pad abajo en el inventario de P2: cursor sobre el slot " + slotAt(c, c.cursorX, c.cursorY) + ", el de debajo del 21 es el " + below, below >= 0 && cursorAt(c, e[0], e[1] + 18));
+                    }
+                    case 72 -> simP2(1 << PadState.DPAD_LEFT);
+                    case 76 -> simP2(0);
+                    case 90 -> {
+                        double[] e = slotCenter(c, 20);
+                        ptVerdict("D-pad izquierda en el inventario de P2: cursor sobre el slot " + slotAt(c, c.cursorX, c.cursorY) + ", esperado el de debajo del 20", cursorAt(c, e[0], e[1] + 18));
+                        simP2(1 << PadState.B);
+                    }
+                    case 96 -> simP2(0);
+                    case 110 -> {
+                        ptVerdict("cerrar el inventario con B", c.screen == null);
+                        press(PadAction.PAUSE);
+                    }
+                    case 112 -> release();
+                    case 130 -> {
+                        if (c.screen instanceof P2PauseScreen m) {
+                            int[] r = m.resumeCenter();
+                            c.cursorX = r[0];
+                            c.cursorY = r[1];
+                        }
+                    }
+                    case 133 -> simP2(1 << PadState.DPAD_DOWN);
+                    case 137 -> simP2(0);
+                    case 145 -> {
+                        int[] f = ((P2PauseScreen) c.screen).fovCenter();
+                        ptVerdict("D-pad abajo en el menu de P2: de Volver a Campo de vision", cursorAt(c, f[0], f[1]));
+                    }
+                    case 147 -> simP2(1 << PadState.DPAD_DOWN);
+                    case 151 -> simP2(0);
+                    case 160 -> {
+                        int[] q = ((P2PauseScreen) c.screen).sensCenter();
+                        ptVerdict("D-pad abajo en el menu de P2: de Campo de vision a Sensibilidad", cursorAt(c, q[0], q[1]));
+                    }
+                    case 162 -> simP2(1 << PadState.DPAD_UP);
+                    case 166 -> simP2(0);
+                    case 175 -> {
+                        int[] f = ((P2PauseScreen) c.screen).fovCenter();
+                        ptVerdict("D-pad arriba en el menu de P2: de Sensibilidad a Campo de vision", cursorAt(c, f[0], f[1]));
+                        simP2(1 << PadState.B);
+                    }
+                    case 181 -> simP2(0);
+                    case 195 -> {
+                        ptVerdict("cerrar el menu con B", c.screen == null);
+                        mc.getSingleplayerServer().execute(() -> p2.setGameMode(ptPrev));
+                        SecondaryTick.scriptActive = false;
+                        pads.attachVirtual(2);
+                        pads.attachVirtual(3);
+                        ptPhase = 1;
+                        ticks = 0;
+                    }
+                    default -> { }
+                }
+            }
+            case 1 -> { // P3 entra con Start+Back en el slot 2
+                if (ticks == 5) simSlot(2, both);
+                if (ticks == 10) simSlot(2, 0);
+                if (ticks > 30 && SecondaryPlayers.isActive(2) && extraReady(mc, 2)) {
+                    ptVerdict("Start+Back en el mando 3 mete a P3 (slot 2)", true);
+                    ptPhase = 2;
+                    ticks = 0;
+                } else if (ticks > 1500) {
+                    ptVerdict("Start+Back en el mando 3 mete a P3 (slot 2)", false);
+                    ptPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // P4 entra con Start+Back en el slot 3
+                if (ticks == 5) simSlot(3, both);
+                if (ticks == 10) simSlot(3, 0);
+                if (ticks > 30 && SecondaryPlayers.isActive(3) && extraReady(mc, 3)) {
+                    ptVerdict("Start+Back en el mando 4 mete a P4 (slot 3), con P2 y P3 dentro: jugadores dibujados=" + (1 + SplitRender.activeContexts().size()) + " (4)",
+                            SplitRender.activeContexts().size() == 3);
+                    ptPhase = 3;
+                    ticks = 0;
+                } else if (ticks > 1500) {
+                    ptVerdict("Start+Back en el mando 4 mete a P4 (slot 3)", false);
+                    ptPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // mantener 2 s en el slot 3 saca a P4; en el slot 2 saca a P3
+                if (ticks == 5) simSlot(3, both);
+                if (ticks == 80) simSlot(3, 0);
+                if (ticks == 95) {
+                    boolean gone = !SecondaryPlayers.isActive(3) && serverExtra(mc, 3) == null;
+                    ptVerdict("mantener Start+Back en el mando 4 saca solo a P4: P4 fuera=" + gone + ", P3 dentro=" + SecondaryPlayers.isActive(2) + ", P2 dentro=" + SecondaryPlayers.isActive(1),
+                            gone && SecondaryPlayers.isActive(2) && SecondaryPlayers.isActive(1));
+                    simSlot(2, both);
+                }
+                if (ticks == 170) simSlot(2, 0);
+                if (ticks == 190) {
+                    boolean gone = !SecondaryPlayers.isActive(2) && serverExtra(mc, 2) == null;
+                    ptVerdict("mantener Start+Back en el mando 3 saca solo a P3: P3 fuera=" + gone + ", P2 dentro=" + SecondaryPlayers.isActive(1), gone && SecondaryPlayers.isActive(1));
+                    ptPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                ConsolePad.LOGGER.info("[autotest] RESULTADO D-pad y atajos de P3/P4 en conjunto -> {}", ptOk ? "OK" : "FALLO");
+                ptPhase = 5;
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -1514,14 +1689,15 @@ public final class AutoTest {
             case 10 -> joinLeaveTest(mc);
             case 11 -> multiTest(mc);
             case 12 -> notesTest(mc);
-            case 13 -> aspectTest(mc, "pequena");
-            case 14 -> resizeWindow(mc);
-            case 15 -> aspectTest(mc, "1920x1080");
-            case 16 -> pauseTest(mc);
-            case 17 -> fovTest(mc);
-            case 18 -> fpsPhase(mc, false);
-            case 19 -> fpsPhase(mc, true);
-            case 20 -> leaveTest(mc);
+            case 13 -> padTest(mc);
+            case 14 -> aspectTest(mc, "pequena");
+            case 15 -> resizeWindow(mc);
+            case 16 -> aspectTest(mc, "1920x1080");
+            case 17 -> pauseTest(mc);
+            case 18 -> fovTest(mc);
+            case 19 -> fpsPhase(mc, false);
+            case 20 -> fpsPhase(mc, true);
+            case 21 -> leaveTest(mc);
             default -> { }
         }
     }
