@@ -11,6 +11,8 @@ public final class SplitView {
     public static volatile int guiWidth;
     /** Permite apagar la division en pruebas (medir FPS con un solo jugador). */
     public static volatile boolean enabled = true;
+    /** True mientras la pantalla de P1 se encaja en la mitad izquierda (hay un P2 dibujandose); la fija SplitHud. */
+    public static volatile boolean p1HalfScreen;
 
     private SplitView() {}
 

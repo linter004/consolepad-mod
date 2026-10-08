@@ -10,6 +10,8 @@ import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import dev.consolepad.split.SecondaryPlayers;
+import dev.consolepad.split.SecondaryScreens;
+import dev.consolepad.split.SplitView;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -74,6 +76,7 @@ public final class PadDriver {
                 SecondaryPlayers.join(mc);
             }
         }
+        SecondaryScreens.frame(mc, pads.slot(1), dt);
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
         if (dev == null || !mc.isWindowActive()) {
@@ -135,7 +138,8 @@ public final class PadDriver {
         double y = mc.mouseHandler.ypos();
         PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, tmp);
         if (tmp[0] != 0f || tmp[1] != 0f) {
-            double maxX = Math.max(0, mc.getWindow().getScreenWidth() - 1);
+            int regionW = SplitView.p1HalfScreen ? mc.getWindow().getScreenWidth() / 2 : mc.getWindow().getScreenWidth();
+            double maxX = Math.max(0, regionW - 1); // con P2, el cursor de P1 se queda en su mitad
             double maxY = Math.max(0, mc.getWindow().getScreenHeight() - 1);
             float speed = cfg.cursorSpeed;
             if (mc.screen instanceof AbstractContainerScreen<?> c && c.getSlotUnderMouse() != null) {

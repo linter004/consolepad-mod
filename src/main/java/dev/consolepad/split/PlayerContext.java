@@ -24,6 +24,10 @@ public final class PlayerContext {
     public net.minecraft.client.renderer.ItemInHandRenderer hand;
     /** Estado del HUD que es del jugador (parpadeo de vida, nombre del objeto): SplitHud lo intercambia con el de Gui. */
     public final HudState hud = new HudState();
+    /** Pantalla de este jugador (inventario, contenedores...) y su cursor virtual, en unidades de GUI relativas a su mitad. */
+    public net.minecraft.client.gui.screens.Screen screen;
+    public double cursorX, cursorY;
+    public final boolean[] buttonDown = new boolean[2];
     /** Perspectiva (F5) de este jugador: Minecraft la guarda en Options, que es global. */
     public net.minecraft.client.CameraType cameraType = net.minecraft.client.CameraType.FIRST_PERSON;
 

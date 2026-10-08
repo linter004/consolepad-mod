@@ -515,6 +515,126 @@ public final class AutoTest {
         }
     }
 
+    private static net.minecraft.world.level.GameType scrPrevMode;
+    private static String scrP1Before = "";
+    private static boolean scrOk = true;
+
+    private static String p1InventoryDigest(Minecraft mc) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 36; i++) {
+            ItemStack st = mc.player.getInventory().getItem(i);
+            sb.append(st.isEmpty() ? "-" : st.getItem() + "x" + st.getCount()).append(',');
+        }
+        return sb.toString();
+    }
+
+    private static void simP2(int bits) {
+        PadManager.Device d = pads.slot(1).device;
+        if (d != null) d.state.simDown = bits;
+    }
+
+    private static void cursorOnSlot(PlayerContext c, int menuSlot) {
+        var screen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) c.screen;
+        net.minecraft.world.inventory.Slot sl = screen.getMenu().slots.get(menuSlot);
+        c.cursorX = screen.getGuiLeft() + sl.x + 8;
+        c.cursorY = screen.getGuiTop() + sl.y + 8;
+    }
+
+    /**
+     * Paso 4c-1: inventario de P2 en su mitad, con su cursor. P2 (supervivencia) tiene 10 de tierra en el slot 20 del inventario;
+     * se abre con INVENTORY, se coge con A, se coloca en el slot 21, se mueve con Y (mover rapido) a la barra y se cierra con B.
+     * P1 no debe tener pantalla ni cambiar de inventario.
+     */
+    private static void screensTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        switch (ticks) {
+            case 1 -> {
+                scrP1Before = p1InventoryDigest(mc);
+                scrPrevMode = p2.gameMode.getGameModeForPlayer();
+                mc.getSingleplayerServer().execute(() -> {
+                    p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                    p2.getInventory().setItem(20, new ItemStack(Items.DIRT, 10));
+                    p2.getInventory().setItem(21, ItemStack.EMPTY);
+                    for (int i = 0; i < 9; i++) p2.getInventory().setItem(i, ItemStack.EMPTY);
+                    p2.getInventory().offhand.set(0, ItemStack.EMPTY);
+                });
+                SecondaryTick.scriptActive = true;
+                SecondaryTick.scriptForward = 0f;
+            }
+            case 10 -> press(PadAction.INVENTORY);
+            case 12 -> release();
+            case 25 -> {
+                boolean open = c.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
+                int w2 = SecondaryScreens.regionWidth(mc);
+                boolean sized = open && c.screen.width == w2;
+                boolean p1Free = mc.screen == null;
+                boolean ok = open && sized && p1Free;
+                scrOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO pantalla de P2: abierta={} ({}), ancho={} (region {}), pantalla de P1={} (debe ser null) -> {}",
+                        open, c.screen == null ? "null" : c.screen.getClass().getSimpleName(), c.screen == null ? -1 : c.screen.width, w2,
+                        mc.screen, ok ? "OK" : "FALLO");
+                screenshotName = "split-inventory.png";
+                screenshotPending = true;
+                if (open) cursorOnSlot(c, 20);
+            }
+            case 32 -> simP2(1 << PadState.A);
+            case 38 -> simP2(0);
+            case 45 -> {
+                ItemStack carried = c.player.containerMenu.getCarried();
+                boolean ok = carried.is(Items.DIRT) && carried.getCount() == 10;
+                scrOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO coger con A: objeto en el cursor de P2 = {} x{} (esperado 10 de tierra) -> {}",
+                        carried.getItem(), carried.getCount(), ok ? "OK" : "FALLO");
+                cursorOnSlot(c, 21);
+            }
+            case 50 -> simP2(1 << PadState.A);
+            case 56 -> simP2(0);
+            case 70 -> {
+                ItemStack at21 = p2.getInventory().getItem(21);
+                ItemStack at20 = p2.getInventory().getItem(20);
+                boolean ok = at21.is(Items.DIRT) && at21.getCount() == 10 && at20.isEmpty();
+                scrOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO colocar con A: servidor slot 21 = {} x{}, slot 20 vacio={} (esperado 10 de tierra y vacio) -> {}",
+                        at21.getItem(), at21.getCount(), at20.isEmpty(), ok ? "OK" : "FALLO");
+                cursorOnSlot(c, 21);
+            }
+            case 76 -> simP2(1 << PadState.Y);
+            case 82 -> simP2(0);
+            case 95 -> {
+                boolean slot21Empty = p2.getInventory().getItem(21).isEmpty();
+                int hotbarDirt = 0;
+                for (int i = 0; i < 9; i++) {
+                    ItemStack st = p2.getInventory().getItem(i);
+                    if (st.is(Items.DIRT)) hotbarDirt += st.getCount();
+                }
+                boolean ok = slot21Empty && hotbarDirt == 10;
+                scrOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO mover rapido con Y: slot 21 vacio={}, tierra en la barra de P2={} (esperado 10) -> {}",
+                        slot21Empty, hotbarDirt, ok ? "OK" : "FALLO");
+            }
+            case 100 -> simP2(1 << PadState.B);
+            case 106 -> simP2(0);
+            case 120 -> {
+                boolean closed = c.screen == null;
+                boolean serverClosed = p2.containerMenu == p2.inventoryMenu;
+                boolean p1Same = p1InventoryDigest(mc).equals(scrP1Before);
+                boolean p1Free = mc.screen == null;
+                boolean ok = closed && serverClosed && p1Same && p1Free && ContextSwitcher.violations() == 0;
+                scrOk &= ok;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO cerrar con B y aislamiento: pantalla de P2 cerrada={}, contenedor cerrado en el servidor={}, inventario de P1 sin cambios={}, "
+                                + "pantalla de P1 null={}, fallos de restauracion={} -> {}",
+                        closed, serverClosed, p1Same, p1Free, ContextSwitcher.violations(), ok ? "OK" : "FALLO");
+                ConsolePad.LOGGER.info("[autotest] RESULTADO pantallas de P2 en conjunto -> {}", scrOk ? "OK" : "FALLO");
+                mc.getSingleplayerServer().execute(() -> p2.setGameMode(scrPrevMode));
+                SecondaryTick.scriptActive = false;
+                simP2(0);
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -678,14 +798,15 @@ public final class AutoTest {
             case 4 -> mouseTest(mc);
             case 5 -> hudTest(mc);
             case 6 -> actionsTest(mc);
-            case 7 -> aspectTest(mc, "pequena");
-            case 8 -> resizeWindow(mc);
-            case 9 -> aspectTest(mc, "1920x1080");
-            case 10 -> pauseTest(mc);
-            case 11 -> fovTest(mc);
-            case 12 -> fpsPhase(mc, false);
-            case 13 -> fpsPhase(mc, true);
-            case 14 -> leaveTest(mc);
+            case 7 -> screensTest(mc);
+            case 8 -> aspectTest(mc, "pequena");
+            case 9 -> resizeWindow(mc);
+            case 10 -> aspectTest(mc, "1920x1080");
+            case 11 -> pauseTest(mc);
+            case 12 -> fovTest(mc);
+            case 13 -> fpsPhase(mc, false);
+            case 14 -> fpsPhase(mc, true);
+            case 15 -> leaveTest(mc);
             default -> { }
         }
     }

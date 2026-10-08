@@ -20,13 +20,16 @@ public final class SplitHud {
 
     public static void render(Gui gui, GuiGraphics graphics, DeltaTracker deltaTracker) {
         PlayerContext p2 = SplitRender.activeContext();
+        Minecraft mc = Minecraft.getInstance();
+        SplitView.p1HalfScreen = p2 != null;
         if (p2 == null) {
+            fitP1Screen(mc, graphics.guiWidth(), graphics.guiHeight());
             gui.render(graphics, deltaTracker);
             return;
         }
-        Minecraft mc = Minecraft.getInstance();
         int full = graphics.guiWidth(); // sin sustituir todavia: ancho real de la ventana
         int half = full / 2;
+        fitP1Screen(mc, half, graphics.guiHeight());
         try {
             SplitView.guiWidth = half;
             SplitDiag.hudOwner = "P1";
@@ -52,6 +55,7 @@ public final class SplitHud {
                     invoker.consolepad$renderExperienceLevel(graphics, deltaTracker);
                     invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
                     invoker.consolepad$renderEffects(graphics, deltaTracker);
+                    SecondaryScreens.render(mc, p2, graphics, deltaTracker.getGameTimeDeltaPartialTick(false));
                 }));
             } finally {
                 gui.leftHeight = p1Left;
@@ -63,6 +67,12 @@ public final class SplitHud {
             SplitDiag.hudOwner = "-";
             SplitDiag.hudExpected = null;
         }
+    }
+
+    /** La pantalla de P1 ocupa su region (mitad izquierda con P2, ventana entera sin P2). */
+    private static void fitP1Screen(Minecraft mc, int width, int height) {
+        var screen = mc.screen;
+        if (screen != null && (screen.width != width || screen.height != height)) screen.resize(mc, width, height);
     }
 
     /** Tick del nombre del objeto seleccionado de P2 (Gui.tick lo hace solo con el jugador de Minecraft = P1). Dentro del contexto de P2. */

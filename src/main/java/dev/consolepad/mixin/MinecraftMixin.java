@@ -2,6 +2,7 @@ package dev.consolepad.mixin;
 
 import dev.consolepad.split.ContextSwitcher;
 import dev.consolepad.split.SecondaryPlayers;
+import dev.consolepad.split.SecondaryScreens;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -33,7 +34,10 @@ public abstract class MinecraftMixin {
 
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void consolepad$secondarySetScreen(Screen screen, CallbackInfo ci) {
-        if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+        if (ContextSwitcher.isSecondaryActive()) {
+            ci.cancel();
+            SecondaryScreens.set(screen); // la pantalla es de P2: sin soltar el raton ni las teclas de P1
+        }
     }
 
     /** "Usar" anima la mano del jugador que usa el objeto (la de P2 es propia, no la de GameRenderer). */

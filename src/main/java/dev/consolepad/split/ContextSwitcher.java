@@ -39,6 +39,11 @@ public final class ContextSwitcher {
 
     private static PlayerContext current;
 
+    /** Contexto activo (null fuera de un contexto extra). */
+    public static PlayerContext current() {
+        return active ? current : null;
+    }
+
     public static void run(PlayerContext ctx, Runnable body) {
         Minecraft mc = Minecraft.getInstance();
         if (active) { // anidado (p. ej. paquetes dentro de un bundle): ya estamos en el contexto
@@ -55,6 +60,7 @@ public final class ContextSwitcher {
         int p1Miss = inv.consolepad$getMissTime();
         int p1Delay = inv.consolepad$getRightClickDelay();
         GameRendererAccessor gr = (GameRendererAccessor) mc.gameRenderer;
+        net.minecraft.client.gui.screens.Screen p1Screen = mc.screen;
         OptionsAccessor opts = (OptionsAccessor) mc.options;
         net.minecraft.client.CameraType p1CameraType = opts.consolepad$getCameraType();
         float p1Fov = gr.consolepad$getFov();
@@ -70,6 +76,7 @@ public final class ContextSwitcher {
         mc.crosshairPickEntity = ctx.crosshairPickEntity;
         inv.consolepad$setMissTime(ctx.missTime);
         inv.consolepad$setRightClickDelay(ctx.rightClickDelay);
+        mc.screen = ctx.screen;
         opts.consolepad$setCameraType(ctx.cameraType);
         gr.consolepad$setFov(ctx.fov);
         gr.consolepad$setOldFov(ctx.oldFov);
@@ -85,6 +92,8 @@ public final class ContextSwitcher {
             ctx.crosshairPickEntity = mc.crosshairPickEntity;
             ctx.missTime = inv.consolepad$getMissTime();
             ctx.rightClickDelay = inv.consolepad$getRightClickDelay();
+            ctx.screen = mc.screen;
+            mc.screen = p1Screen;
             ctx.cameraType = opts.consolepad$getCameraType();
             opts.consolepad$setCameraType(p1CameraType);
             ctx.fov = gr.consolepad$getFov();

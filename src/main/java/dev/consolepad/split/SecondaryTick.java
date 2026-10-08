@@ -35,6 +35,7 @@ public final class SecondaryTick {
     private static java.util.EnumSet<PadAction> prevDown = java.util.EnumSet.noneOf(PadAction.class);
     private static java.util.EnumSet<PadAction> pressedNow = java.util.EnumSet.noneOf(PadAction.class);
     private static boolean sprintLatch, sneakLatch;
+    private static int deadTicks;
 
     private static final float TICK_SECONDS = 0.05f;
     private static final int MAX_LOGGED_ERRORS = 5;
@@ -95,6 +96,11 @@ public final class SecondaryTick {
             }
         }
 
+        if (ctx.screen != null) { // con un menu abierto P2 no se mueve ni actua en el mundo (su mando maneja el cursor)
+            forward = left = lookX = lookY = 0f;
+            jump = attack = use = lb = rb = false;
+            downSet.clear();
+        }
         java.util.EnumSet<PadAction> pressed = java.util.EnumSet.copyOf(downSet);
         pressed.removeAll(prevDown);
         prevDown = downSet;
@@ -114,6 +120,12 @@ public final class SecondaryTick {
         LocalPlayer player = mc.player;
         MinecraftInvoker inv = (MinecraftInvoker) mc;
 
+        if (player.getHealth() <= 0f || player.isDeadOrDying()) { // sin pantalla de muerte para P2: reaparece solo
+            if (++deadTicks == 60) player.respawn();
+        } else {
+            deadTicks = 0;
+        }
+        if (mc.screen != null) mc.screen.tick();
         if (!(player.input instanceof PadInput)) player.input = new PadInput();
         PadInput input = (PadInput) player.input;
         input.rawForward = forward;
@@ -194,8 +206,9 @@ public final class SecondaryTick {
                     input.shiftKeyDown = sneakLatch;
                 }
                 case INVENTORY -> {
-                    dbgInventoryRequests++; // la pantalla de inventario de P2 llega con el paso 4c
-                    if (PadManager.PADLOG) ConsolePad.LOGGER.info("[padlog] P2 pide el inventario (pantalla pendiente, paso 4c)");
+                    dbgInventoryRequests++;
+                    if (mc.gameMode.isServerControlledInventory()) player.sendOpenInventory();
+                    else mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(player));
                 }
                 default -> { }
             }
