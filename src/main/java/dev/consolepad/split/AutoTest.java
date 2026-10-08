@@ -960,6 +960,247 @@ public final class AutoTest {
         }
     }
 
+    private static int mtPhase;
+    private static boolean mtOk = true;
+    private static net.minecraft.world.level.GameType mtPrev1, mtPrev2;
+    private static long mtFpsSum;
+    private static int mtFpsN;
+
+    private static void mtVerdict(String name, boolean ok) {
+        mtOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static ServerPlayer serverExtra(Minecraft mc, int slot) {
+        return mc.getSingleplayerServer() == null ? null
+                : mc.getSingleplayerServer().getPlayerList().getPlayerByName(SecondaryPlayers.secondaryName(mc, slot));
+    }
+
+    private static boolean extraReady(Minecraft mc, int slot) {
+        PlayerContext c = SecondaryPlayers.context(slot);
+        ServerPlayer sp = serverExtra(mc, slot);
+        return c != null && c.player != null && c.level != null && sp != null && sp.onGround() && c.level.hasChunkAt(c.player.blockPosition());
+    }
+
+    /** Las regiones cubren la ventana entera sin solaparse (area total = ventana, todas dentro de ella, sin interseccion). */
+    private static boolean regionsTileWindow(Minecraft mc, java.util.List<PlayerContext> extras) {
+        int W = mc.getWindow().getWidth(), H = mc.getWindow().getHeight();
+        java.util.List<int[]> r = new java.util.ArrayList<>();
+        r.add(SplitView.p1Px.clone());
+        for (PlayerContext c : extras) r.add(new int[] {c.px, c.py, c.pw, c.ph});
+        long area = 0;
+        for (int[] a : r) {
+            if (a[0] < 0 || a[1] < 0 || a[0] + a[2] > W || a[1] + a[3] > H || a[2] <= 0 || a[3] <= 0) return false;
+            area += (long) a[2] * a[3];
+        }
+        for (int i = 0; i < r.size(); i++) {
+            for (int j = i + 1; j < r.size(); j++) {
+                int[] a = r.get(i), b = r.get(j);
+                boolean overlap = a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+                if (overlap) return false;
+            }
+        }
+        return area == (long) W * H;
+    }
+
+    /** Graba aspecto y HUD durante unos ticks (llamado con ticks == 1) y los evalua (ticks == 12) para n jugadores. */
+    private static void mtRecordStart() {
+        SplitView.enabled = true;
+        SplitDiag.clear();
+        SplitDiag.recording = true;
+        SplitDiag.hudClear();
+        SplitDiag.hudRecording = true;
+    }
+
+    private static void mtEvaluate(Minecraft mc, int n) {
+        SplitDiag.recording = false;
+        SplitDiag.hudRecording = false;
+        java.util.List<PlayerContext> extras = SplitRender.activeContexts();
+        boolean count = extras.size() == n - 1;
+        int bad = SplitDiag.check(n + "j", 0.01);
+        java.util.Set<String> passes = new java.util.TreeSet<>();
+        for (SplitDiag.Sample sm : SplitDiag.samples()) passes.add(sm.pass());
+        boolean allPasses = passes.size() == n;
+        boolean tile = regionsTileWindow(mc, extras);
+        StringBuilder regs = new StringBuilder("P1=" + java.util.Arrays.toString(SplitView.p1Px));
+        for (PlayerContext c : extras) regs.append(' ').append(c.label()).append('=').append(java.util.Arrays.toString(new int[] {c.px, c.py, c.pw, c.ph}));
+        mtVerdict(n + " jugadores: aspecto y regiones: pasadas=" + passes + " (" + n + "), muestras fuera de tolerancia=" + bad + ", regiones cubren la ventana sin solapes=" + tile
+                + " [" + regs + "]", count && allPasses && bad == 0 && tile);
+        var seen = SplitDiag.hudSeen();
+        StringBuilder missing = new StringBuilder();
+        for (int i = 1; i <= n; i++) {
+            var layers = seen.getOrDefault("P" + i, new java.util.TreeMap<>());
+            for (String l : HUD_LAYERS) if (!layers.containsKey(l)) missing.append('P').append(i).append(':').append(l).append(' ');
+        }
+        mtVerdict(n + " jugadores: HUD por jugador: capas que faltan=[" + missing.toString().trim() + "], capas con datos del jugador equivocado=" + SplitDiag.hudWrong()
+                + " " + SplitDiag.hudWrongWhat(), missing.length() == 0 && SplitDiag.hudWrong() == 0);
+    }
+
+    private static void mtOpenInventory(Minecraft mc, PlayerContext c) {
+        ContextSwitcher.run(c, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(c.player)));
+    }
+
+    private static void mtCheckInventoryFits(Minecraft mc, PlayerContext c) {
+        boolean open = c.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
+        int lw = SplitLayout.logicalWidth(mc, c), lh = SplitLayout.logicalHeight(mc, c);
+        boolean sized = open && c.screen.width == lw && c.screen.height == lh;
+        boolean fits = false;
+        if (open) {
+            var scr = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) c.screen;
+            fits = scr.getGuiLeft() >= 0 && scr.getGuiTop() >= 0 && scr.getGuiLeft() + 176 <= lw && scr.getGuiTop() + 166 <= lh;
+        }
+        mtVerdict(c.label() + ": inventario en su region (" + c.gw + "x" + c.gh + " unidades, escala " + String.format(java.util.Locale.ROOT, "%.2f", c.screenScale)
+                + ", logico " + lw + "x" + lh + "): abierto=" + open + ", tamano logico=" + sized + ", cabe entero=" + fits, open && sized && fits);
+        ContextSwitcher.run(c, () -> {
+            if (mc.screen != null) mc.screen.onClose();
+        });
+    }
+
+    /**
+     * Paso 4f: 3 y 4 jugadores. Con P3 (mitad + dos cuartos) y con P4 (cuadrantes): aspecto por region, las regiones cubren la
+     * ventana sin solaparse, HUD completo por jugador, el inventario de cada extra cabe en su region, FPS; despues P4 y P3 salen
+     * y se vuelve a 2 jugadores.
+     */
+    private static void multiTest(Minecraft mc) {
+        ServerPlayer p1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+        switch (mtPhase) {
+            case 0 -> {
+                ServerPlayer p2 = serverP2(mc);
+                mtPrev1 = p1.gameMode.getGameModeForPlayer();
+                mtPrev2 = p2.gameMode.getGameModeForPlayer();
+                mc.getSingleplayerServer().execute(() -> {
+                    p1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                    p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                });
+                SecondaryPlayers.join(mc, 2);
+                mtPhase = 1;
+                ticks = 0;
+            }
+            case 1 -> {
+                if (ticks < 100 && !(ticks > 20 && extraReady(mc, 2))) return;
+                if (!extraReady(mc, 2)) {
+                    if (ticks < 1500) return;
+                    mtVerdict("P3 entro en la partida", false);
+                    mtPhase = 100;
+                    return;
+                }
+                mc.getSingleplayerServer().execute(() -> serverExtra(mc, 2).setGameMode(net.minecraft.world.level.GameType.SURVIVAL));
+                mtPhase = 2;
+                ticks = 0;
+            }
+            case 2 -> {
+                if (ticks == 20) mtRecordStart();
+                if (ticks == 32) {
+                    mtEvaluate(mc, 3);
+                    mtOpenInventory(mc, SecondaryPlayers.context(2));
+                    mtPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (ticks == 15) {
+                    mtCheckInventoryFits(mc, SecondaryPlayers.context(2));
+                    SecondaryPlayers.join(mc, 3);
+                    mtPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                if (ticks < 100 && !(ticks > 20 && extraReady(mc, 3))) return;
+                if (!extraReady(mc, 3)) {
+                    if (ticks < 1500) return;
+                    mtVerdict("P4 entro en la partida", false);
+                    mtPhase = 100;
+                    return;
+                }
+                mc.getSingleplayerServer().execute(() -> serverExtra(mc, 3).setGameMode(net.minecraft.world.level.GameType.SURVIVAL));
+                mtPhase = 5;
+                ticks = 0;
+            }
+            case 5 -> {
+                if (ticks == 20) mtRecordStart();
+                if (ticks == 32) {
+                    mtEvaluate(mc, 4);
+                    mtOpenInventory(mc, SecondaryPlayers.context(1));
+                    mtOpenInventory(mc, SecondaryPlayers.context(2));
+                    mtOpenInventory(mc, SecondaryPlayers.context(3));
+                    mtPhase = 6;
+                    ticks = 0;
+                }
+            }
+            case 6 -> {
+                if (ticks == 15) {
+                    screenshotName = "split-four-screens.png";
+                    screenshotPending = true;
+                }
+                if (ticks == 20) {
+                    mtCheckInventoryFits(mc, SecondaryPlayers.context(1));
+                    mtCheckInventoryFits(mc, SecondaryPlayers.context(2));
+                    mtCheckInventoryFits(mc, SecondaryPlayers.context(3));
+                    mc.options.renderDistance().set(8);
+                    mc.options.enableVsync().set(false);
+                    mc.options.framerateLimit().set(260);
+                    mtPhase = 7;
+                    ticks = 0;
+                    mtFpsSum = 0;
+                    mtFpsN = 0;
+                }
+            }
+            case 7 -> {
+                if (ticks > 60 && ticks % 10 == 0) {
+                    mtFpsSum += mc.getFps();
+                    mtFpsN++;
+                }
+                if (ticks >= 160) {
+                    ConsolePad.LOGGER.info("[autotest] FPS con 4 jugadores (854x480 aprox., distancia 8): media {}", mtFpsN == 0 ? 0 : mtFpsSum / mtFpsN);
+                    SecondaryPlayers.leave(mc, 3);
+                    mtPhase = 8;
+                    ticks = 0;
+                }
+            }
+            case 8 -> {
+                boolean gone = !SecondaryPlayers.isActive(3) && serverExtra(mc, 3) == null;
+                if (!gone && ticks < 400) return;
+                mtVerdict("P4 sale: fuera=" + gone + ", jugadores dibujados=" + (1 + SplitRender.activeContexts().size()) + " (3)", gone && SplitRender.activeContexts().size() == 2);
+                mtFpsSum = 0;
+                mtFpsN = 0;
+                mtPhase = 9;
+                ticks = 0;
+            }
+            case 9 -> {
+                if (ticks > 60 && ticks % 10 == 0) {
+                    mtFpsSum += mc.getFps();
+                    mtFpsN++;
+                }
+                if (ticks >= 160) {
+                    ConsolePad.LOGGER.info("[autotest] FPS con 3 jugadores (distancia 8): media {}", mtFpsN == 0 ? 0 : mtFpsSum / mtFpsN);
+                    SecondaryPlayers.leave(mc, 2);
+                    mtPhase = 10;
+                    ticks = 0;
+                }
+            }
+            case 10 -> {
+                boolean gone = !SecondaryPlayers.isActive(2) && serverExtra(mc, 2) == null;
+                if (!gone && ticks < 400) return;
+                boolean p2Still = SecondaryPlayers.isActive(1) && serverP2(mc) != null;
+                mtVerdict("P3 sale: fuera=" + gone + ", P2 sigue dentro=" + p2Still + ", jugadores dibujados=" + (1 + SplitRender.activeContexts().size()) + " (2)",
+                        gone && p2Still && SplitRender.activeContexts().size() == 1);
+                mtPhase = 100;
+            }
+            case 100 -> {
+                ConsolePad.LOGGER.info("[autotest] RESULTADO 3 y 4 jugadores (4f) en conjunto -> {}", mtOk ? "OK" : "FALLO");
+                ServerPlayer p2 = serverP2(mc);
+                mc.getSingleplayerServer().execute(() -> {
+                    p1.setGameMode(mtPrev1);
+                    if (p2 != null) p2.setGameMode(mtPrev2);
+                });
+                mtPhase = 101;
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -1127,14 +1368,15 @@ public final class AutoTest {
             case 8 -> screens2Test(mc);
             case 9 -> pauseMenuTest(mc);
             case 10 -> joinLeaveTest(mc);
-            case 11 -> aspectTest(mc, "pequena");
-            case 12 -> resizeWindow(mc);
-            case 13 -> aspectTest(mc, "1920x1080");
-            case 14 -> pauseTest(mc);
-            case 15 -> fovTest(mc);
-            case 16 -> fpsPhase(mc, false);
-            case 17 -> fpsPhase(mc, true);
-            case 18 -> leaveTest(mc);
+            case 11 -> multiTest(mc);
+            case 12 -> aspectTest(mc, "pequena");
+            case 13 -> resizeWindow(mc);
+            case 14 -> aspectTest(mc, "1920x1080");
+            case 15 -> pauseTest(mc);
+            case 16 -> fovTest(mc);
+            case 17 -> fpsPhase(mc, false);
+            case 18 -> fpsPhase(mc, true);
+            case 19 -> leaveTest(mc);
             default -> { }
         }
     }
