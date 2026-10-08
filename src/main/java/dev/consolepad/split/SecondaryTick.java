@@ -108,6 +108,7 @@ public final class SecondaryTick {
         ((dev.consolepad.mixin.GameRendererAccessor) mc.gameRenderer).consolepad$tickFov(); // FOV propio de P2 (camara = P2)
         PlayerContext self = SecondaryPlayers.context();
         if (self != null && self.hand != null) self.hand.tick(); // mano propia de P2 (lee minecraft.player = P2)
+        if (self != null) SplitHud.tickToolHighlight(self); // nombre del objeto seleccionado de P2
 
         if (lookX != 0f || lookY != 0f) {
             float k = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;

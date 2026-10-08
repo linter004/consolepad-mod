@@ -23,7 +23,9 @@
     "GuiGraphicsMixin",
     "LevelRendererMixin",
     "ItemInHandRendererAccessor",
-    "GameRendererAccessor"
+    "GameRendererAccessor",
+    "GuiStateAccessor",
+    "GuiDiagMixin"
   ],
   "injectors": {
     "defaultRequire": 1

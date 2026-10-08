@@ -220,6 +220,7 @@ public final class AutoTest {
         if (ticks > 20 && ticks < 75) mc.player.setSprinting(true);
     }
 
+    private static net.minecraft.world.Difficulty prevDifficulty;
     private static int leaveSub;
     private static java.nio.file.Path leaveFile;
     private static long leaveFileTime0;
@@ -278,7 +279,9 @@ public final class AutoTest {
             }
             case 4 -> {
                 if (ticks < 40) return;
-                ConsolePad.LOGGER.info("[autotest] P1 sale del mundo");
+                var srv = mc.getSingleplayerServer();
+                if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
+                ConsolePad.LOGGER.info("[autotest] P1 sale del mundo (dificultad restaurada a {})", prevDifficulty);
                 mc.level.disconnect(); // como PauseScreen.onDisconnect: cierra la conexion de P1 y el servidor se detiene
                 mc.disconnect();
                 leaveSub = 5;
@@ -302,6 +305,91 @@ public final class AutoTest {
             return java.nio.file.Files.exists(p) ? java.nio.file.Files.getLastModifiedTime(p).toMillis() : -1;
         } catch (java.io.IOException e) {
             return -1;
+        }
+    }
+
+    private static net.minecraft.world.level.GameType hudPrevMode1, hudPrevMode2;
+    private static final java.util.List<String> HUD_LAYERS = java.util.List.of("mira", "hotbar", "barra de experiencia", "vida",
+            "armadura", "comida", "burbujas", "nivel de experiencia", "nombre del objeto", "efectos");
+
+    /**
+     * Paso 4a: HUD completo de cada jugador. Pone a P2 vida 8, comida 10, aire 100, peto de hierro, 5 niveles, un efecto y otro
+     * objeto que P1 (supervivencia para los dos). Graba, por capa y por mitad, el jugador cuyos datos usa y el ancho de su
+     * region; todas las capas deben salir en las dos mitades, con datos del jugador de esa mitad. Tambien comprueba que el
+     * estado propio del HUD (ultima vida, objeto resaltado) no se mezcla.
+     */
+    private static void hudTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        if (ticks == 1) {
+            ServerPlayer p2 = serverP2(mc);
+            ServerPlayer p1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+            hudPrevMode1 = p1.gameMode.getGameModeForPlayer();
+            hudPrevMode2 = p2.gameMode.getGameModeForPlayer();
+            mc.getSingleplayerServer().execute(() -> {
+                for (ServerPlayer p : new ServerPlayer[] {p1, p2}) {
+                    p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                    p.setAirSupply(100);
+                }
+                p1.getInventory().setItem(p1.getInventory().selected, new ItemStack(Items.DIAMOND_PICKAXE));
+                p2.getInventory().setItem(p2.getInventory().selected, new ItemStack(Items.IRON_AXE));
+                p2.setHealth(8f);
+                p2.getFoodData().setFoodLevel(10);
+                p2.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+                p2.giveExperienceLevels(5);
+                p2.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SPEED, 6000));
+            });
+        }
+        if (ticks == 20) {
+            SplitView.enabled = true;
+            SplitDiag.hudClear();
+            SplitDiag.hudRecording = true;
+        }
+        if (ticks == 24) {
+            screenshotName = "split-hud.png";
+            screenshotPending = true;
+        }
+        if (ticks == 30) {
+            SplitDiag.hudRecording = false;
+            // Fuera de la prueba: modo de juego, vida y efectos como estaban (en supervivencia de noche los mobs matan a los jugadores).
+            ServerPlayer s2 = serverP2(mc);
+            ServerPlayer s1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+            mc.getSingleplayerServer().execute(() -> {
+                s1.setGameMode(hudPrevMode1);
+                s2.setGameMode(hudPrevMode2);
+                for (ServerPlayer p : new ServerPlayer[] {s1, s2}) {
+                    p.setHealth(p.getMaxHealth());
+                    p.getFoodData().setFoodLevel(20);
+                    p.setAirSupply(p.getMaxAirSupply());
+                    p.removeAllEffects();
+                }
+            });
+            var seen = SplitDiag.hudSeen();
+            boolean ok = SplitDiag.hudWrong() == 0;
+            StringBuilder missing = new StringBuilder();
+            for (String owner : new String[] {"P1", "P2"}) {
+                var layers = seen.getOrDefault(owner, new java.util.TreeMap<>());
+                for (String l : HUD_LAYERS) {
+                    if (!layers.containsKey(l)) {
+                        ok = false;
+                        missing.append(owner).append(':').append(l).append(' ');
+                    }
+                }
+            }
+            int w1 = seen.getOrDefault("P1", new java.util.TreeMap<>()).getOrDefault("hotbar", -1);
+            int w2 = seen.getOrDefault("P2", new java.util.TreeMap<>()).getOrDefault("hotbar", -1);
+            var gs = (dev.consolepad.mixin.GuiStateAccessor) mc.gui;
+            boolean state = c.hud.lastHealth > 0 && c.hud.lastHealth < 20 && gs.consolepad$getLastHealth() == 20
+                    && c.hud.lastToolHighlight.is(Items.IRON_AXE) && gs.consolepad$getLastToolHighlight().is(Items.DIAMOND_PICKAXE)
+                    && c.hud.toolHighlightTimer > 0;
+            ok &= state && w1 > 0 && w2 > 0;
+            ConsolePad.LOGGER.info("[autotest] RESULTADO HUD por jugador: capas dibujadas P1={} P2={} (de {}); capas con datos del jugador equivocado={} {}; "
+                            + "capas que faltan: [{}]; ancho de interfaz de la region (hotbar) P1={} P2={}; "
+                            + "estado propio: P2 ultima vida={} (<20, la suya; empezo en 8 y regenera en pacifico) y objeto resaltado={} (hacha, timer {}); P1 ultima vida={} (20) y objeto resaltado={} (pico) -> {}",
+                    seen.getOrDefault("P1", new java.util.TreeMap<>()).size(), seen.getOrDefault("P2", new java.util.TreeMap<>()).size(),
+                    HUD_LAYERS.size(), SplitDiag.hudWrong(), SplitDiag.hudWrongWhat(), missing.toString().trim(), w1, w2,
+                    c.hud.lastHealth, c.hud.lastToolHighlight.getItem(), c.hud.toolHighlightTimer,
+                    gs.consolepad$getLastHealth(), gs.consolepad$getLastToolHighlight().getItem(), ok ? "OK" : "FALLO");
+            next();
         }
     }
 
@@ -339,11 +427,11 @@ public final class AutoTest {
                     && moved >= 0.75 * control && serverTicks >= 35 && clientTicks >= 35;
             ConsolePad.LOGGER.info("[autotest] RESULTADO pausa: pantalla de pausa={} ({}), mc.isPaused={}, servidor en pausa={}, "
                             + "P2 control {} bloques (>=3), en pausa {} (>=75% del control), ticks de servidor {} y de cliente {} (>=35), "
-                            + "choque horizontal P2={} -> {}",
+                            + "choque horizontal P2={}, vida de P2={} -> {}",
                     pauseScreen, mc.screen == null ? "null" : mc.screen.getClass().getSimpleName(), mc.isPaused(),
                     mc.getSingleplayerServer().isPaused(), String.format(java.util.Locale.ROOT, "%.2f", control),
                     String.format(java.util.Locale.ROOT, "%.2f", moved), serverTicks, clientTicks,
-                    p2.horizontalCollision, ok ? "OK" : "FALLO");
+                    p2.horizontalCollision, p2.getHealth(), ok ? "OK" : "FALLO");
             SecondaryTick.scriptActive = false;
             SecondaryTick.scriptForward = 0f;
             mc.setScreen(null);
@@ -436,6 +524,10 @@ public final class AutoTest {
         if (WORLD == null) return;
         Minecraft mc = Minecraft.getInstance();
         ticks++;
+        // Si un mundo guardado trae a alguien muerto (los mobs de la noche), reaparece: la pantalla de muerte bloquearia la prueba.
+        if (mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.player != null && ticks % 20 == 0) mc.player.respawn();
+        PlayerContext dead = SecondaryPlayers.context();
+        if (dead != null && dead.player != null && dead.player.getHealth() <= 0f && ticks % 20 == 0) dead.player.respawn();
         switch (state) {
             case 0 -> {
                 if (mc.screen instanceof TitleScreen && ticks > 60) {
@@ -447,6 +539,14 @@ public final class AutoTest {
             case 1 -> {
                 if (mc.player != null && mc.level != null && mc.screen == null && ticks > 200) {
                     ConsolePad.LOGGER.info("[autotest] mundo cargado; metiendo a P2");
+                    // Prueba determinista: de dia y en pacifico (los mobs de la noche matan a los jugadores en supervivencia).
+                    // La dificultad se restaura al final (leaveTest); la hora del dia solo se adelanta.
+                    var server = mc.getSingleplayerServer();
+                    prevDifficulty = server.getWorldData().getDifficulty();
+                    server.execute(() -> {
+                        server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
+                        server.overworld().setDayTime(1000L);
+                    });
                     SecondaryPlayers.join(mc);
                     next();
                 }
@@ -454,14 +554,15 @@ public final class AutoTest {
             case 2 -> teleportAway(mc);
             case 3 -> hotbarTest(mc);
             case 4 -> mouseTest(mc);
-            case 5 -> aspectTest(mc, "pequena");
-            case 6 -> resizeWindow(mc);
-            case 7 -> aspectTest(mc, "1920x1080");
-            case 8 -> pauseTest(mc);
-            case 9 -> fovTest(mc);
-            case 10 -> fpsPhase(mc, false);
-            case 11 -> fpsPhase(mc, true);
-            case 12 -> leaveTest(mc);
+            case 5 -> hudTest(mc);
+            case 6 -> aspectTest(mc, "pequena");
+            case 7 -> resizeWindow(mc);
+            case 8 -> aspectTest(mc, "1920x1080");
+            case 9 -> pauseTest(mc);
+            case 10 -> fovTest(mc);
+            case 11 -> fpsPhase(mc, false);
+            case 12 -> fpsPhase(mc, true);
+            case 13 -> leaveTest(mc);
             default -> { }
         }
     }

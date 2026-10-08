@@ -28,6 +28,41 @@ public final class SplitDiag {
         }
     }
 
+    // --- HUD: por capa dibujada, el jugador cuyos datos usa y el ancho de interfaz de su region ---
+    public static volatile boolean hudRecording;
+    public static volatile String hudOwner = "-";
+    public static volatile net.minecraft.world.entity.player.Player hudExpected;
+    private static final java.util.Map<String, java.util.TreeMap<String, Integer>> hudSeen = new java.util.TreeMap<>();
+    private static int hudWrong;
+    private static String hudWrongWhat = "";
+
+    public static synchronized void hudClear() {
+        hudSeen.clear();
+        hudWrong = 0;
+        hudWrongWhat = "";
+    }
+
+    public static synchronized void onHudLayer(String layer, net.minecraft.world.entity.player.Player player, int guiWidth) {
+        if (!hudRecording || hudExpected == null) return;
+        hudSeen.computeIfAbsent(hudOwner, k -> new java.util.TreeMap<>()).put(layer, guiWidth);
+        if (player != hudExpected) {
+            hudWrong++;
+            hudWrongWhat += hudOwner + ":" + layer + " ";
+        }
+    }
+
+    public static synchronized java.util.Map<String, java.util.TreeMap<String, Integer>> hudSeen() {
+        return new java.util.TreeMap<>(hudSeen);
+    }
+
+    public static synchronized int hudWrong() {
+        return hudWrong;
+    }
+
+    public static synchronized String hudWrongWhat() {
+        return hudWrongWhat;
+    }
+
     private static final List<Sample> samples = new ArrayList<>();
     private static String currentPass = "-";
     private static int regionW, regionH;

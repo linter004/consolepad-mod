@@ -14,4 +14,20 @@ public interface GuiInvoker {
 
     @Invoker("renderHotbar")
     void consolepad$renderHotbar(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("maybeRenderExperienceBar")
+    void consolepad$renderExperienceBar(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    /** Vida, armadura, comida y burbujas (solo si el modo de juego puede recibir dano). */
+    @Invoker("maybeRenderPlayerHealth")
+    void consolepad$renderPlayerHealth(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("renderExperienceLevel")
+    void consolepad$renderExperienceLevel(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("maybeRenderSelectedItemName")
+    void consolepad$renderSelectedItemName(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    @Invoker("renderEffects")
+    void consolepad$renderEffects(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
 }
