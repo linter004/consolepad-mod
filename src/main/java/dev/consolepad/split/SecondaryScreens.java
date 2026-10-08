@@ -32,7 +32,7 @@ public final class SecondaryScreens {
         PlayerContext ctx = ContextSwitcher.current();
         if (ctx == null) return;
         Minecraft mc = Minecraft.getInstance();
-        if (screen != null && !(screen instanceof AbstractContainerScreen<?>)) return;
+        if (screen != null && !(screen instanceof AbstractContainerScreen<?>) && !(screen instanceof P2PauseScreen)) return;
         Screen old = mc.screen;
         if (old != null && old != screen) old.removed();
         mc.screen = screen;
@@ -102,6 +102,7 @@ public final class SecondaryScreens {
                 else if (ctx.buttonDown[1]) screen.mouseDragged(nx, ny, 1, dx, dy);
                 else screen.mouseMoved(nx, ny);
             }
+            dpad(ctx, screen, s, dt);
             // Clics: pulsar y soltar por separado, para poder arrastrar.
             click(screen, ctx, s, PadState.A, 0);
             click(screen, ctx, s, PadState.X, 1);
@@ -127,6 +128,84 @@ public final class SecondaryScreens {
                 screen.onClose();
             }
         });
+    }
+
+    private static final int[] DPAD = {PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};
+
+    /** D-pad: el cursor salta al hueco (contenedores) o boton (menus) mas cercano en esa direccion; con repeticion al mantener. */
+    private static void dpad(PlayerContext ctx, Screen screen, PadState s, float dt) {
+        for (int i = 0; i < DPAD.length; i++) {
+            boolean fire = false;
+            if (s.pressed(DPAD[i])) {
+                ctx.dpadActive[i] = true;
+                ctx.dpadHeld[i] = 0f;
+                ctx.dpadNext[i] = 0.35f;
+                fire = true;
+            } else if (ctx.dpadActive[i] && s.isDown(DPAD[i])) {
+                ctx.dpadHeld[i] += dt;
+                if (ctx.dpadHeld[i] >= ctx.dpadNext[i]) {
+                    ctx.dpadNext[i] += 0.12f;
+                    fire = true;
+                }
+            } else {
+                ctx.dpadActive[i] = false;
+            }
+            if (fire) jump(ctx, screen, i);
+        }
+    }
+
+    /** Centros (x, y, ancho, alto) de lo que se puede apuntar en la pantalla: slots activos o botones activos. */
+    private static java.util.List<double[]> targets(Screen screen) {
+        java.util.List<double[]> out = new java.util.ArrayList<>();
+        if (screen instanceof AbstractContainerScreen<?> c) {
+            for (Slot sl : c.getMenu().slots) {
+                if (sl.isActive()) out.add(new double[] {c.getGuiLeft() + sl.x + 8, c.getGuiTop() + sl.y + 8, 16, 16});
+            }
+        } else {
+            for (var child : screen.children()) {
+                if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible) {
+                    out.add(new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, w.getWidth(), w.getHeight()});
+                }
+            }
+        }
+        return out;
+    }
+
+    /** dir: 0 arriba, 1 abajo, 2 izquierda, 3 derecha. */
+    private static void jump(PlayerContext ctx, Screen screen, int dir) {
+        java.util.List<double[]> all = targets(screen);
+        double[] current = null;
+        for (double[] t : all) {
+            if (Math.abs(ctx.cursorX - t[0]) <= t[2] / 2 && Math.abs(ctx.cursorY - t[1]) <= t[3] / 2) current = t;
+        }
+        double ox = current != null ? current[0] : ctx.cursorX, oy = current != null ? current[1] : ctx.cursorY;
+        double[] best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (double[] t : all) {
+            if (t == current) continue;
+            double dx = t[0] - ox, dy = t[1] - oy, score;
+            if (current == null) {
+                score = dx * dx + dy * dy;
+            } else {
+                double primary = switch (dir) {
+                    case 0 -> -dy;
+                    case 1 -> dy;
+                    case 2 -> -dx;
+                    default -> dx;
+                };
+                if (primary < 1.0) continue;
+                score = primary + 2.0 * (dir < 2 ? Math.abs(dx) : Math.abs(dy));
+            }
+            if (score < bestScore) {
+                bestScore = score;
+                best = t;
+            }
+        }
+        if (best != null) {
+            ctx.cursorX = best[0];
+            ctx.cursorY = best[1];
+            screen.mouseMoved(best[0], best[1]);
+        }
     }
 
     private static void click(Screen screen, PlayerContext ctx, PadState s, int padButton, int mouseButton) {

@@ -205,6 +205,7 @@ public final class SecondaryTick {
                     sneakLatch = !sneakLatch;
                     input.shiftKeyDown = sneakLatch;
                 }
+                case PAUSE -> mc.setScreen(new P2PauseScreen());
                 case INVENTORY -> {
                     dbgInventoryRequests++;
                     if (mc.gameMode.isServerControlledInventory()) player.sendOpenInventory();

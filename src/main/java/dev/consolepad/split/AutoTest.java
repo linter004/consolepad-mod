@@ -812,6 +812,103 @@ public final class AutoTest {
         }
     }
 
+    private static Vec3 pmStart;
+    private static long pmServerTime0, pmClientTime0;
+    private static boolean pmOk = true;
+
+    private static void pmVerdict(String name, boolean ok) {
+        pmOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /**
+     * Paso 4d: menu de pausa por jugador. La pausa de P1 (PauseScreen) se encaja en su mitad; P2 abre su propio menu con PAUSE:
+     * no pausa el mundo, P2 no se mueve mientras esta en el menu, "Volver" lo cierra con el cursor de su mando y "Salir" saca solo a P2
+     * (P1 sigue en el mundo). Despues P2 vuelve a entrar para el resto de pruebas.
+     */
+    private static void pauseMenuTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        switch (ticks) {
+            case 1 -> {
+                SecondaryTick.scriptActive = true;
+                SecondaryTick.scriptForward = 0f;
+            }
+            case 5 -> press(PadAction.PAUSE);
+            case 7 -> release();
+            case 15 -> {
+                int full = mc.getWindow().getGuiScaledWidth();
+                boolean p2Menu = c.screen instanceof P2PauseScreen && c.screen.width == full - full / 2;
+                pmVerdict("menu de pausa de P2 abierto en su mitad: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName())
+                        + ", pantalla de P1=" + mc.screen, p2Menu && mc.screen == null);
+                mc.pauseGame(false); // pausa de P1 a la vez
+                pmStart = p2.position();
+                pmServerTime0 = mc.getSingleplayerServer().overworld().getGameTime();
+                pmClientTime0 = mc.level.getGameTime();
+                SecondaryTick.scriptForward = 1f; // si P2 no estuviera en el menu, andaria
+            }
+            case 25 -> {
+                int full = mc.getWindow().getGuiScaledWidth();
+                boolean p1Pause = mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen && mc.screen.width == full / 2;
+                pmVerdict("pausa de P1 en su mitad: " + (mc.screen == null ? "null" : mc.screen.getClass().getSimpleName()) + " ancho "
+                        + (mc.screen == null ? -1 : mc.screen.width) + " (mitad " + (full / 2) + ")", p1Pause);
+                screenshotName = "split-pause-menus.png";
+                screenshotPending = true;
+            }
+            case 40 -> mc.setScreen(null);
+            case 70 -> {
+                double moved = p2.position().distanceTo(pmStart);
+                long st = mc.getSingleplayerServer().overworld().getGameTime() - pmServerTime0;
+                long ct = mc.level.getGameTime() - pmClientTime0;
+                boolean ok = moved < 0.5 && st >= 40 && ct >= 40 && !mc.isPaused();
+                pmVerdict("con los dos menus abiertos: P2 se movio " + String.format(java.util.Locale.ROOT, "%.2f", moved) + " bloques (<0.5), ticks de servidor " + st
+                        + " y de cliente " + ct + " (>=40), mc.isPaused=" + mc.isPaused(), ok);
+                int[] r = ((P2PauseScreen) c.screen).resumeCenter();
+                c.cursorX = r[0];
+                c.cursorY = r[1];
+            }
+            case 75 -> simP2(1 << PadState.A);
+            case 81 -> simP2(0);
+            case 90 -> {
+                pmVerdict("\"Volver\" con el cursor de P2 cierra su menu: pantalla de P2 null=" + (c.screen == null), c.screen == null);
+                pmStart = p2.position();
+            }
+            case 120 -> {
+                double moved = p2.position().distanceTo(pmStart);
+                pmVerdict("P2 vuelve a moverse al cerrar el menu: " + String.format(java.util.Locale.ROOT, "%.2f", moved) + " bloques (>=2)", moved >= 2.0);
+                SecondaryTick.scriptForward = 0f;
+                press(PadAction.PAUSE);
+            }
+            case 122 -> release();
+            case 135 -> {
+                if (c.screen instanceof P2PauseScreen menu) {
+                    int[] q = menu.quitCenter();
+                    c.cursorX = q[0];
+                    c.cursorY = q[1];
+                }
+            }
+            case 140 -> simP2(1 << PadState.A);
+            case 146 -> simP2(0);
+            case 175 -> {
+                boolean gone = !SecondaryPlayers.isActive() && serverP2(mc) == null;
+                boolean p1ok = mc.player != null && mc.level != null && mc.screen == null && mc.getSingleplayerServer() != null;
+                pmVerdict("\"Salir\" saca solo a P2: P2 fuera=" + gone + ", P1 sigue en el mundo=" + p1ok, gone && p1ok);
+                SecondaryPlayers.join(mc);
+            }
+            default -> {
+                if (ticks > 175 && c != null && c.player != null && c.level != null && serverP2(mc) != null && ticks > 400) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO menus de pausa 4d en conjunto -> {}", pmOk ? "OK" : "FALLO");
+                    SecondaryTick.scriptActive = false;
+                    simP2(0);
+                    next();
+                } else if (ticks > 1400) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO menus de pausa 4d: P2 no volvio a entrar -> FALLO");
+                    next();
+                }
+            }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -977,14 +1074,15 @@ public final class AutoTest {
             case 6 -> actionsTest(mc);
             case 7 -> screensTest(mc);
             case 8 -> screens2Test(mc);
-            case 9 -> aspectTest(mc, "pequena");
-            case 10 -> resizeWindow(mc);
-            case 11 -> aspectTest(mc, "1920x1080");
-            case 12 -> pauseTest(mc);
-            case 13 -> fovTest(mc);
-            case 14 -> fpsPhase(mc, false);
-            case 15 -> fpsPhase(mc, true);
-            case 16 -> leaveTest(mc);
+            case 9 -> pauseMenuTest(mc);
+            case 10 -> aspectTest(mc, "pequena");
+            case 11 -> resizeWindow(mc);
+            case 12 -> aspectTest(mc, "1920x1080");
+            case 13 -> pauseTest(mc);
+            case 14 -> fovTest(mc);
+            case 15 -> fpsPhase(mc, false);
+            case 16 -> fpsPhase(mc, true);
+            case 17 -> leaveTest(mc);
             default -> { }
         }
     }

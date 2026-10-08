@@ -28,6 +28,8 @@ public final class PlayerContext {
     public net.minecraft.client.gui.screens.Screen screen;
     public double cursorX, cursorY;
     public final boolean[] buttonDown = new boolean[2];
+    public final boolean[] dpadActive = new boolean[4];
+    public final float[] dpadHeld = new float[4], dpadNext = new float[4];
     /** Perspectiva (F5) de este jugador: Minecraft la guarda en Options, que es global. */
     public net.minecraft.client.CameraType cameraType = net.minecraft.client.CameraType.FIRST_PERSON;
 
