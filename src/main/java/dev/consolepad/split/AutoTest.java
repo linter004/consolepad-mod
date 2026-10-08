@@ -3,11 +3,17 @@ package dev.consolepad.split;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadState;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -87,6 +93,68 @@ public final class AutoTest {
             screenshotPending = true;
         }
         if (ticks >= 45) next();
+    }
+
+    private static boolean mSwing1, mSwing2, mDestroy1, mDestroy2;
+    private static int mStartAttack0, mContinue0;
+    private static BlockPos mPos1, mPos2;
+    private static BlockState mState1, mState2;
+
+    /**
+     * Tarea 1: clic izquierdo del RATON de P1 (KeyMapping.click + set sobre options.keyAttack, como MouseHandler.onPress).
+     * Mide por jugador: swing, rotura iniciada y bloque apuntado; P2 no debe iniciar ni continuar ataque. Tambien mide de quien
+     * es la mano dibujada en cada mitad (P1 y P2 llevan objetos distintos: espada y palo).
+     */
+    private static void mouseTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        net.minecraft.client.KeyMapping key = mc.options.keyAttack;
+        if (ticks == 1) {
+            ServerPlayer p2 = serverP2(mc);
+            ServerPlayer p1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+            mc.getSingleplayerServer().execute(() -> {
+                p1.getInventory().setItem(p1.getInventory().selected, new ItemStack(Items.DIAMOND_SWORD));
+                p2.getInventory().setItem(p2.getInventory().selected, new ItemStack(Items.STICK));
+            });
+            mc.player.setXRot(90f);
+            c.player.setXRot(90f);
+        }
+        if (ticks == 40) {
+            mc.player.setXRot(90f);
+            c.player.setXRot(90f);
+            mSwing1 = mSwing2 = mDestroy1 = mDestroy2 = false;
+            mStartAttack0 = SecondaryTick.dbgStartAttack;
+            mContinue0 = SecondaryTick.dbgContinueTrue;
+            mPos1 = mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult b1 ? b1.getBlockPos() : null;
+            mPos2 = c.hitResult instanceof net.minecraft.world.phys.BlockHitResult b2 ? b2.getBlockPos() : null;
+            mState1 = mPos1 == null ? null : mc.level.getBlockState(mPos1);
+            mState2 = mPos2 == null ? null : c.level.getBlockState(mPos2);
+            KeyMapping.click(key.getKey());
+            KeyMapping.set(key.getKey(), true);
+        }
+        if (ticks > 40 && ticks <= 100) {
+            mSwing1 |= mc.player.swinging;
+            mSwing2 |= c.player.swinging;
+            mDestroy1 |= mc.gameMode.isDestroying();
+            mDestroy2 |= c.gameMode.isDestroying();
+        }
+        if (ticks == 100) KeyMapping.set(key.getKey(), false);
+        if (ticks == 115) {
+            int startP2 = SecondaryTick.dbgStartAttack - mStartAttack0;
+            int contP2 = SecondaryTick.dbgContinueTrue - mContinue0;
+            boolean changed2 = mPos2 != null && !c.level.getBlockState(mPos2).equals(mState2);
+            boolean changed1 = mPos1 != null && !mc.level.getBlockState(mPos1).equals(mState1);
+            boolean ok = startP2 == 0 && contP2 == 0 && !mSwing2 && !mDestroy2 && !changed2 && mSwing1;
+            Item d1 = SplitRender.dbgHandDrawnP1, d2 = SplitRender.dbgHandDrawnP2;
+            Item o1 = SplitRender.dbgHandOwnP1, o2 = SplitRender.dbgHandOwnP2;
+            ConsolePad.LOGGER.info("[autotest] RESULTADO clic de raton de P1: P1[swing={} destruyendo={} bloque cambiado={} ({})] "
+                            + "P2[inicios de ataque={} continuaciones={} swing={} destruyendo={} bloque cambiado={} ({})] -> {}",
+                    mSwing1, mDestroy1, changed1, mPos1, startP2, contP2, mSwing2, mDestroy2, changed2, mPos2, ok ? "OK" : "FALLO");
+            ConsolePad.LOGGER.info("[autotest] RESULTADO mano dibujada: mitad izquierda dibuja {} (P1 lleva {}) -> {}; "
+                            + "mitad derecha dibuja {} (P2 lleva {}) -> {}",
+                    d1, o1, d1 == o1 ? "de P1, OK" : "NO ES DE P1", d2, o2, d2 == o2 ? "de P2, OK" : "NO ES DE P2 (pendiente, tarea 4a)");
+            mc.setScreen(null);
+            next();
+        }
     }
 
     private static int aspectBad;
@@ -238,12 +306,13 @@ public final class AutoTest {
             }
             case 2 -> teleportAway(mc);
             case 3 -> hotbarTest(mc);
-            case 4 -> aspectTest(mc, "pequena");
-            case 5 -> resizeWindow(mc);
-            case 6 -> aspectTest(mc, "1920x1080");
-            case 7 -> pauseTest(mc);
-            case 8 -> fpsPhase(mc, false);
-            case 9 -> fpsPhase(mc, true);
+            case 4 -> mouseTest(mc);
+            case 5 -> aspectTest(mc, "pequena");
+            case 6 -> resizeWindow(mc);
+            case 7 -> aspectTest(mc, "1920x1080");
+            case 8 -> pauseTest(mc);
+            case 9 -> fpsPhase(mc, false);
+            case 10 -> fpsPhase(mc, true);
             default -> { }
         }
     }

@@ -6,7 +6,9 @@ import dev.consolepad.ConsolePad;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import dev.consolepad.mixin.ItemInHandRendererAccessor;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.world.item.Item;
 
 /**
  * Fase 3, paso 4: dibuja el mundo una vez por jugador, cada uno en su mitad de la ventana (P1 izquierda, P2 derecha).
@@ -16,6 +18,8 @@ import net.minecraft.client.renderer.GameRenderer;
  */
 public final class SplitRender {
     private static boolean loggedFirst;
+    /** Diagnostico: objeto que dibuja la mano en cada pasada (ItemInHandRenderer es unico y solo lo ticka P1) y objeto real del jugador de esa pasada. */
+    public static volatile Item dbgHandDrawnP1, dbgHandDrawnP2, dbgHandOwnP1, dbgHandOwnP2;
 
     private SplitRender() {}
 
@@ -86,6 +90,14 @@ public final class SplitRender {
             }
         } finally {
             SplitDiag.endPass();
+            Item drawn = ((ItemInHandRendererAccessor) mc.gameRenderer.itemInHandRenderer).consolepad$getMainHandItem().getItem();
+            if (ctx != null) {
+                dbgHandDrawnP2 = drawn;
+                dbgHandOwnP2 = ctx.player.getMainHandItem().getItem();
+            } else {
+                dbgHandDrawnP1 = drawn;
+                dbgHandOwnP1 = mc.player.getMainHandItem().getItem();
+            }
         }
     }
 }
