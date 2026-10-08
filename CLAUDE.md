@@ -38,3 +38,12 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **`build` no valida mixins.** Tras tocar mixins, lanzar `runClient` y revisar el log. Avisar de qué mixins solo se validan con una acción en el juego (entrar en un mundo, abrir un contenedor).
 - **Ajustes guardados mandan sobre los valores por defecto.** Al cambiar un valor por defecto de `PadSettings`, actualizar también `run/config/consolepad/slot*.json` con el juego cerrado. Cerrar el juego a la fuerza evita que lo sobrescriba al salir.
 - **Coste:** el gasto principal es esperar el arranque de `runClient` (unos 30 s si ya está descargado). Usar un Monitor corto con `grep` del log y pararlo al terminar.
+
+### Reglas aprendidas de la pantalla dividida (entradas 10 a 41 de `routing-log.md`, 2026-10-08)
+
+- **Un fallo del autotest suele ser del test, no del mod.** De ~12 fallos, 7 fueron del test (criterios fijos sin control, `Level.getBlockEntity` fuera del hilo del servidor, supervivencia de noche, esperas de carga). Antes de tocar el mod, medir con una linea de log temporal.
+- **Los fallos reales los destapo el autotest, no `build`:** guarda de teclas que no cubria `ToggleKeyMapping`, proxy que solo reenviaba `handle*` (titulos de P2 llegaban a P1), Start+Back abria el menu de P2, P2 activo con el mundo descargado. Cada hallazgo de aislamiento se cierra con una medida numerica por jugador.
+- **Aislar por jugador:** estado global que se intercambia en `ContextSwitcher` (pantalla, camara, FOV) o en `SplitHud` (estado de `Gui`); los campos privados se tocan con accessors de mixin, no con `setCameraType` ni `setScreen` de vanilla (efectos secundarios sobre P1).
+- **El autotest es determinista si fija dia y dificultad pacifica y respawnea a quien muera;** restaura la dificultad al salir. `tools/run-autotest.sh` hace copia y restaura `run/config/consolepad`; la salida va a un archivo y se lee con `grep`.
+- **Las pruebas largas (>10 min) se lanzan en segundo plano** (`run_in_background`); el limite de una llamada en primer plano es 10 min.
+- **Cuando fixer-opus no esta registrado en la sesion,** usar un agente general con `model: opus` y apuntarlo a `.claude/agents/fixer-opus.md`; y comprobar su resultado repitiendo el autotest, no solo leer su informe.

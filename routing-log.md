@@ -1,5 +1,25 @@
 # Routing log
 
+## Estado actual (para continuar en una sesion nueva solo con este archivo y los commits)
+
+Pantalla dividida local de 2 a 4 jugadores **funcionando de principio a fin** (2026-10-08). Plan base: `docs/splitscreen-plan.md`; estado y pendientes: `docs/splitscreen-roadmap.md`.
+- **Como probar:** `tools/run-autotest.sh <archivo-de-salida>` (JAVA_HOME=C:/Users/<usuario>/.jdks/jbr-21.0.11; ~8 min; no tocar la ventana; cierra el juego a la fuerza y restaura `run/config/consolepad`). Filtrar con `grep -a "RESULTADO"`; todo debe acabar en `-> OK` y `run/logs/latest.log` sin `ERROR`/`Exception` (salvo el timeout de `sessionserver.mojang.com`). El autotest fija dia y dificultad pacifica mientras corre y restaura la dificultad al salir.
+- **Codigo:** `src/main/java/dev/consolepad/split/` (`SecondaryPlayers`, `PlayerContext`, `ContextSwitcher`, `SecondaryTick`, `SecondaryScreens`, `SplitLayout`, `SplitRender`, `SplitHud`, `SplitNotices`, `P2PauseScreen`, `AutoTest`) y los mixins en `.../mixin/`.
+- **Reglas que cuestan caro olvidar:** (1) todo manejador de paquete de un extra se ejecuta en su contexto (el proxy reenvia por tipo de argumento, no por nombre); (2) hay que tocar `KeyMapping` Y `ToggleKeyMapping` en la guarda de teclas; (3) `Level.getBlockEntity` devuelve null fuera del hilo del servidor; (4) tras cambiar mixins `build` no basta: lanzar el autotest; (5) en supervivencia de noche los mobs matan a los jugadores de la prueba.
+- **Subagentes:** `.claude/agents/fixer-opus.md` (Opus medio) solo para arreglar algo que ya fallo una vez; en la sesion donde se creo el tipo no estaba registrado y se uso un agente generico con `model: opus`.
+
+### Lo que debe probar el usuario con mandos reales
+1. **Dos mandos:** Start+Back en el mando 2 mete a P2; comprobar que P1 y P2 se mueven, miran, saltan, atacan y usan cada uno con su mando, y que el ratón/teclado solo mueve a P1.
+2. **Salir:** mantener Start+Back 2 s en el mando 2 saca a P2; una pulsación corta no.
+3. **Inventario de P2:** botón Y (inventario): stick izquierdo = cursor, A = coger/soltar, X = clic derecho, Y = mover rápido, stick derecho = scroll, B/Start = cerrar; D-pad = saltar de hueco en hueco (sin medir).
+4. **Pausa de P2:** Start abre su menú (Volver / Campo de visión / Sensibilidad / Salir); el mundo no se debe parar; la pausa de P1 (Esc) tampoco lo para.
+5. **Mano y HUD:** cada mitad debe mostrar su propia mano, objeto, vida, comida, armadura, experiencia y nombre del objeto; correr con P1 no debe cambiar el campo de visión de P2.
+6. **3 y 4 mandos:** Start+Back en los mandos 3 y 4; comprobar la partición (3 = mitad + dos cuartos, 4 = cuadrantes) y que el inventario de cada uno cabe en su zona. Con 4 jugadores el inventario de P1 se sale de su cuadrante (pendiente conocido).
+7. **Fluidez:** FPS con 2, 3 y 4 jugadores en tu equipo (en la prueba, a 854×480 y distancia 8: ≈1600, ≈765 y ≈408) y redimensionar la ventana con la partida abierta.
+8. **Avisos:** un mensaje enviado solo a un extra (por ejemplo `/tell Dev_2 hola`) debe verse en su zona y no en la de P1.
+9. **El "atacan los dos" que viste jugando** no se reproduce por software: si vuelve, lanzar con `CONSOLEPAD_PADLOG=1` y mirar `[padlog]`.
+10. **Mundo de pruebas:** el autotest ha matado a veces a los jugadores del mundo "New World" y los ha hecho reaparecer; si falta algun objeto de ese mundo, estará donde murieron.
+
 | Fecha | Tarea | Nivel que la resolvió | Intentos | Coste estimado |
 |-------|-------|-----------------------|----------|----------------|
 | 2026-10-07 | Fase 1 ConsolePad: limpiar plantilla NeoGradle y compilar con ModDevGradle (`./gradlew build`) | Sonnet 5.5, esfuerzo medio | 1 (sin errores de compilación) | Bajo (~15 llamadas a herramientas; el grueso del tiempo fue descargar Gradle/MC) |
