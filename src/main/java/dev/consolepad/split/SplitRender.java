@@ -3,62 +3,74 @@ package dev.consolepad.split;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.consolepad.ConsolePad;
+import dev.consolepad.mixin.ItemInHandRendererAccessor;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import dev.consolepad.mixin.ItemInHandRendererAccessor;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.world.item.Item;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Fase 3, paso 4: dibuja el mundo una vez por jugador, cada uno en su mitad de la ventana (P1 izquierda, P2 derecha).
- * Cada pasada fija viewport y scissor (el clear de FogRenderer no debe borrar la otra mitad) y la proyeccion toma el
- * aspecto de su region (GameRendererMixin). P2 se dibuja primero y P1 el ultimo, asi la camara y el resto de estado de
- * GameRenderer que usa el codigo posterior (sonido, manos, outline) quedan como los de P1.
+ * Dibuja el mundo una vez por jugador, cada uno en su region de la ventana (SplitLayout: 2 = mitades, 3 = mitad y dos cuartos,
+ * 4 = cuadrantes). Cada pasada fija viewport y scissor (el clear de FogRenderer no debe borrar las otras regiones) y la
+ * proyeccion toma el aspecto de su region (GameRendererMixin). Los extra se dibujan primero y P1 el ultimo, asi la camara y
+ * el resto de estado de GameRenderer que usa el codigo posterior (sonido, manos, outline) quedan como los de P1.
  */
 public final class SplitRender {
     private static boolean loggedFirst;
-    /** Diagnostico: objeto que dibuja la mano en cada pasada (ItemInHandRenderer es unico y solo lo ticka P1) y objeto real del jugador de esa pasada. */
+    /** Diagnostico (solo P2): objeto que dibuja la mano en cada pasada y objeto real del jugador de esa pasada. */
     public static volatile Item dbgHandDrawnP1, dbgHandDrawnP2, dbgHandOwnP1, dbgHandOwnP2;
 
     private SplitRender() {}
 
-    /** Contexto de P2 si la pantalla dividida esta activa y P2 esta listo para dibujarse; si no, null. */
-    public static PlayerContext activeContext() {
-        PlayerContext p2 = SecondaryPlayers.context();
-        if (!SplitView.enabled || p2 == null || p2.player == null || p2.level == null || p2.gameMode == null
-                || !(p2.renderer instanceof SplitLevelRenderer)) {
-            return null;
+    private static boolean ready(PlayerContext c) {
+        return c != null && c.player != null && c.level != null && c.gameMode != null && c.renderer instanceof SplitLevelRenderer;
+    }
+
+    /** Jugadores extra listos para dibujarse con la pantalla dividida activa, en orden de slot. */
+    public static List<PlayerContext> activeContexts() {
+        List<PlayerContext> out = new ArrayList<>(SecondaryPlayers.MAX_EXTRA);
+        if (!SplitView.enabled) return out;
+        for (PlayerContext c : SecondaryPlayers.contexts()) {
+            if (ready(c)) out.add(c);
         }
-        return p2;
+        return out;
     }
 
     public static void renderLevels(GameRenderer renderer, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
-        PlayerContext p2 = activeContext();
-        if (p2 == null) {
+        List<PlayerContext> extras = activeContexts();
+        if (extras.isEmpty()) {
             renderer.renderLevel(deltaTracker);
             return;
         }
-        SplitLevelRenderer r2 = (SplitLevelRenderer) p2.renderer;
-        if (!r2.isLive()) {
-            r2.goLive(p2.level);
-            ConsolePad.LOGGER.info("[split] renderer de P2 activo");
+        for (PlayerContext c : extras) {
+            SplitLevelRenderer r = (SplitLevelRenderer) c.renderer;
+            if (!r.isLive()) {
+                r.goLive(c.level);
+                ConsolePad.LOGGER.info("[split] renderer de {} activo", c.label());
+            }
         }
+        SplitLayout.update(mc, extras);
 
         Window window = mc.getWindow();
         int w = window.getWidth();
         int h = window.getHeight();
-        int half = w / 2;
         ClientLevel p1Level = mc.level;
         if (!loggedFirst) {
             loggedFirst = true;
-            ConsolePad.LOGGER.info("[split] primer frame dividido: ventana {}x{}, P1 {}x{} (izquierda), P2 {}x{} (derecha)",
-                    w, h, half, h, w - half, h);
+            ConsolePad.LOGGER.info("[split] primer frame dividido: ventana {}x{}, {} jugadores", w, h, 1 + extras.size());
         }
         try {
-            pass(mc, renderer, deltaTracker, p2, half, 0, w - half, h);
-            pass(mc, renderer, deltaTracker, null, 0, 0, half, h);
+            for (int i = extras.size() - 1; i >= 0; i--) {
+                PlayerContext c = extras.get(i);
+                pass(mc, renderer, deltaTracker, c, c.px, c.py, c.pw, c.ph);
+            }
+            int[] p = SplitView.p1Px;
+            pass(mc, renderer, deltaTracker, null, p[0], p[1], p[2], p[3]);
         } finally {
             RenderSystem.disableScissor();
             RenderSystem.viewport(0, 0, w, h);
@@ -77,7 +89,7 @@ public final class SplitRender {
         SplitView.y = y;
         SplitView.width = w;
         SplitView.height = h;
-        SplitDiag.beginPass(ctx != null ? "P2" : "P1", w, h);
+        SplitDiag.beginPass(ctx != null ? ctx.label() : "P1", w, h);
         ClientLevel level = ctx != null ? ctx.level : mc.level;
         // Los dispatchers de entidades y bloques son compartidos: apuntan al nivel del jugador que se dibuja.
         mc.getEntityRenderDispatcher().setLevel(level);
@@ -90,14 +102,16 @@ public final class SplitRender {
             }
         } finally {
             SplitDiag.endPass();
-            net.minecraft.client.renderer.ItemInHandRenderer handUsed = ctx != null && ctx.hand != null ? ctx.hand : mc.gameRenderer.itemInHandRenderer;
-            Item drawn = ((ItemInHandRendererAccessor) handUsed).consolepad$getMainHandItem().getItem();
-            if (ctx != null) {
-                dbgHandDrawnP2 = drawn;
-                dbgHandOwnP2 = ctx.player.getMainHandItem().getItem();
-            } else {
-                dbgHandDrawnP1 = drawn;
-                dbgHandOwnP1 = mc.player.getMainHandItem().getItem();
+            if (ctx == null || ctx.slotIndex == 1) {
+                net.minecraft.client.renderer.ItemInHandRenderer handUsed = ctx != null && ctx.hand != null ? ctx.hand : mc.gameRenderer.itemInHandRenderer;
+                Item drawn = ((ItemInHandRendererAccessor) handUsed).consolepad$getMainHandItem().getItem();
+                if (ctx != null) {
+                    dbgHandDrawnP2 = drawn;
+                    dbgHandOwnP2 = ctx.player.getMainHandItem().getItem();
+                } else {
+                    dbgHandDrawnP1 = drawn;
+                    dbgHandOwnP1 = mc.player.getMainHandItem().getItem();
+                }
             }
         }
     }

@@ -23,7 +23,6 @@ import java.util.Map;
  */
 public final class SecondaryScreens {
     private static final float[] TMP = new float[2];
-    private static float scrollAcc;
 
     private SecondaryScreens() {}
 
@@ -39,7 +38,8 @@ public final class SecondaryScreens {
         ctx.screen = screen;
         if (screen != null) {
             screen.added();
-            int w = regionWidth(mc), h = mc.getWindow().getGuiScaledHeight();
+            if (ctx.gw <= 0) SplitLayout.update(mc, SplitRender.activeContexts()); // aun sin region: primera vez que se necesita
+            int w = SplitLayout.logicalWidth(mc, ctx), h = SplitLayout.logicalHeight(mc, ctx);
             ctx.cursorX = w / 2.0;
             ctx.cursorY = h / 2.0;
             ctx.buttonDown[0] = ctx.buttonDown[1] = false;
@@ -47,41 +47,48 @@ public final class SecondaryScreens {
         }
     }
 
-    /** Ancho de GUI de la mitad derecha. */
+    /** Ancho logico de las pantallas de P2 (para las pruebas). */
     public static int regionWidth(Minecraft mc) {
-        int full = mc.getWindow().getGuiScaledWidth();
-        return full - full / 2;
+        PlayerContext c = SecondaryPlayers.context();
+        return c == null ? mc.getWindow().getGuiScaledWidth() / 2 : SplitLayout.logicalWidth(mc, c);
     }
 
     /** Dibuja la pantalla de P2 y su cursor. Dentro del contexto de P2 y con la pose ya trasladada a su mitad. */
     public static void render(Minecraft mc, PlayerContext ctx, GuiGraphics graphics, float partialTick, net.minecraft.client.multiplayer.ClientLevel p1Level) {
         Screen screen = mc.screen;
         if (screen == null) return;
-        mc.getEntityRenderDispatcher().setLevel(ctx.level); // el maniqui del inventario es una entidad de P2
-        int w = regionWidth(mc), h = graphics.guiHeight();
+        int w = SplitLayout.logicalWidth(mc, ctx), h = SplitLayout.logicalHeight(mc, ctx);
         if (screen.width != w || screen.height != h) screen.resize(mc, w, h);
+        mc.getEntityRenderDispatcher().setLevel(ctx.level); // el maniqui del inventario es una entidad de este jugador
+        int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
+        graphics.pose().pushPose();
+        graphics.pose().scale(ctx.screenScale, ctx.screenScale, 1f); // la pantalla se dibuja a escala para que quepa en su region
+        SplitView.guiWidth = w;
+        SplitView.guiHeight = h;
         try {
             screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 500);
+            int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
+            for (int r = 0; r < 10; r++) { // flecha: contorno negro y relleno blanco
+                int width = Math.min(r / 2 + 2, 6);
+                graphics.fill(cx, cy + r, cx + width + 1, cy + r + 1, 0xFF000000);
+            }
+            for (int r = 1; r < 9; r++) {
+                int width = Math.min(r / 2 + 1, 5);
+                graphics.fill(cx + 1, cy + r, cx + width, cy + r + 1, 0xFFFFFFFF);
+            }
+            graphics.pose().popPose();
         } finally {
+            SplitView.guiWidth = oldW;
+            SplitView.guiHeight = oldH;
+            graphics.pose().popPose();
             mc.getEntityRenderDispatcher().setLevel(p1Level);
         }
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 500);
-        int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
-        for (int r = 0; r < 10; r++) { // flecha: contorno negro y relleno blanco
-            int width = Math.min(r / 2 + 2, 6);
-            graphics.fill(cx, cy + r, cx + width + 1, cy + r + 1, 0xFF000000);
-        }
-        for (int r = 1; r < 9; r++) {
-            int width = Math.min(r / 2 + 1, 5);
-            graphics.fill(cx + 1, cy + r, cx + width, cy + r + 1, 0xFFFFFFFF);
-        }
-        graphics.pose().popPose();
     }
 
     /** Entrada de P2 con una pantalla abierta, una vez por fotograma: stick izq = cursor, A/X = clic izq/der, Y = mover rapido, stick der = scroll, B/inventario = cerrar. */
-    public static void frame(Minecraft mc, PadManager.Slot slot, float dt) {
-        PlayerContext ctx = SecondaryPlayers.context();
+    public static void frame(Minecraft mc, PadManager.Slot slot, float dt, PlayerContext ctx) {
         if (ctx == null || ctx.player == null || ctx.screen == null || slot.device == null) return;
         PadState s = slot.device.state;
         PadSettings cfg = slot.settings;
@@ -91,7 +98,7 @@ public final class SecondaryScreens {
             // Cursor.
             PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, TMP);
             if (TMP[0] != 0f || TMP[1] != 0f) {
-                double speed = cfg.cursorSpeed / mc.getWindow().getGuiScale(); // pixeles/s -> unidades de GUI/s
+                double speed = cfg.cursorSpeed / mc.getWindow().getGuiScale() / ctx.screenScale; // pixeles/s -> unidades logicas/s
                 if (screen instanceof AbstractContainerScreen<?> c && c.getSlotUnderMouse() != null) speed *= cfg.cursorSlotFactor;
                 double nx = Math.max(0, Math.min(screen.width - 1, ctx.cursorX + TMP[0] * speed * dt));
                 double ny = Math.max(0, Math.min(screen.height - 1, ctx.cursorY + TMP[1] * speed * dt));
@@ -112,10 +119,10 @@ public final class SecondaryScreens {
             }
             // Scroll con el stick derecho.
             PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, 1.0f, TMP);
-            scrollAcc += -TMP[1] * cfg.scrollSpeed * dt;
-            int steps = (int) scrollAcc;
+            ctx.scrollAcc += -TMP[1] * cfg.scrollSpeed * dt;
+            int steps = (int) ctx.scrollAcc;
             if (steps != 0) {
-                scrollAcc -= steps;
+                ctx.scrollAcc -= steps;
                 screen.mouseScrolled(ctx.cursorX, ctx.cursorY, 0.0, steps);
             }
             // Cerrar: B, Start o la tecla de inventario de su mando.

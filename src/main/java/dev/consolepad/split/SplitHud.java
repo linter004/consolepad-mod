@@ -19,52 +19,63 @@ public final class SplitHud {
     private SplitHud() {}
 
     public static void render(Gui gui, GuiGraphics graphics, DeltaTracker deltaTracker) {
-        PlayerContext p2 = SplitRender.activeContext();
         Minecraft mc = Minecraft.getInstance();
-        SplitView.p1HalfScreen = p2 != null;
-        if (p2 == null) {
+        java.util.List<PlayerContext> extras = SplitRender.activeContexts();
+        SplitView.p1HalfScreen = !extras.isEmpty();
+        if (extras.isEmpty()) {
             fitP1Screen(mc, graphics.guiWidth(), graphics.guiHeight());
             gui.render(graphics, deltaTracker);
             return;
         }
-        int full = graphics.guiWidth(); // sin sustituir todavia: ancho real de la ventana
-        int half = full / 2;
-        fitP1Screen(mc, half, graphics.guiHeight());
+        SplitLayout.update(mc, extras);
+        int[] r1 = SplitView.p1Gui;
+        GuiInvoker invoker = (GuiInvoker) gui;
+        final net.minecraft.client.multiplayer.ClientLevel p1Level = mc.level;
+        final float partial = deltaTracker.getGameTimeDeltaPartialTick(false);
         try {
-            SplitView.guiWidth = half;
+            fitP1Screen(mc, r1[2], r1[3]);
+            SplitView.guiWidth = r1[2];
+            SplitView.guiHeight = r1[3];
             SplitDiag.hudOwner = "P1";
             SplitDiag.hudExpected = mc.player;
-            gui.render(graphics, deltaTracker);
+            gui.render(graphics, deltaTracker); // region de P1: origen (0, 0)
 
             PoseStack pose = graphics.pose();
-            pose.pushPose();
             int p1Left = gui.leftHeight, p1Right = gui.rightHeight;
             try {
-                pose.translate(half, 0, 0);
-                SplitView.guiWidth = full - half;
-                SplitDiag.hudOwner = "P2";
-                SplitDiag.hudExpected = p2.player;
-                GuiInvoker invoker = (GuiInvoker) gui;
-                final net.minecraft.client.multiplayer.ClientLevel p1Level = mc.level;
-                ContextSwitcher.run(p2, () -> withState(gui, p2.hud, () -> {
-                    gui.leftHeight = 39; // Gui.render() los reinicia al empezar cada HUD
-                    gui.rightHeight = 39;
-                    invoker.consolepad$renderCrosshair(graphics, deltaTracker);
-                    invoker.consolepad$renderHotbar(graphics, deltaTracker);
-                    invoker.consolepad$renderExperienceBar(graphics, deltaTracker);
-                    invoker.consolepad$renderPlayerHealth(graphics, deltaTracker);
-                    invoker.consolepad$renderExperienceLevel(graphics, deltaTracker);
-                    invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
-                    invoker.consolepad$renderEffects(graphics, deltaTracker);
-                    SecondaryScreens.render(mc, p2, graphics, deltaTracker.getGameTimeDeltaPartialTick(false), p1Level);
-                }));
+                for (PlayerContext p : extras) {
+                    pose.pushPose();
+                    try {
+                        pose.translate(p.gx, p.gy, 0);
+                        SplitView.guiWidth = p.gw;
+                        SplitView.guiHeight = p.gh;
+                        SplitDiag.hudOwner = p.label();
+                        SplitDiag.hudExpected = p.player;
+                        ContextSwitcher.run(p, () -> {
+                            withState(gui, p.hud, () -> {
+                                gui.leftHeight = 39; // Gui.render() los reinicia al empezar cada HUD
+                                gui.rightHeight = 39;
+                                invoker.consolepad$renderCrosshair(graphics, deltaTracker);
+                                invoker.consolepad$renderHotbar(graphics, deltaTracker);
+                                invoker.consolepad$renderExperienceBar(graphics, deltaTracker);
+                                invoker.consolepad$renderPlayerHealth(graphics, deltaTracker);
+                                invoker.consolepad$renderExperienceLevel(graphics, deltaTracker);
+                                invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
+                                invoker.consolepad$renderEffects(graphics, deltaTracker);
+                            });
+                            SecondaryScreens.render(mc, p, graphics, partial, p1Level);
+                        });
+                    } finally {
+                        pose.popPose();
+                    }
+                }
             } finally {
                 gui.leftHeight = p1Left;
                 gui.rightHeight = p1Right;
-                pose.popPose();
             }
         } finally {
             SplitView.guiWidth = 0;
+            SplitView.guiHeight = 0;
             SplitDiag.hudOwner = "-";
             SplitDiag.hudExpected = null;
         }

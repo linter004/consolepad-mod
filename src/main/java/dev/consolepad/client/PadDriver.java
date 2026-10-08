@@ -62,8 +62,8 @@ public final class PadDriver {
     }
 
     private static final float LEAVE_HOLD_SECONDS = 2.0f;
-    private float joinHold;
-    private boolean joinLatch;
+    private final float[] joinHold = new float[SecondaryPlayers.MAX_EXTRA + 1];
+    private final boolean[] joinLatch = new boolean[SecondaryPlayers.MAX_EXTRA + 1];
 
     public void onFrame(RenderFrameEvent.Pre event) {
         Minecraft mc = Minecraft.getInstance();
@@ -72,29 +72,33 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
-        // Start+Back en el mando del slot 1: pulsar = entra el jugador local extra; mantener 2 s con el jugador dentro = sale.
-        PadManager.Device dev1 = pads.slot(1).device;
-        if (dev1 != null) {
-            PadState s1 = dev1.state;
-            boolean both = s1.isDown(PadState.START) && s1.isDown(PadState.BACK);
+        // Start+Back en el mando de un slot 1..3: pulsar = entra ese jugador local extra; mantener 2 s con el jugador dentro = sale.
+        for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
+            PadManager.Device devI = pads.slot(i).device;
+            if (devI == null) {
+                joinHold[i] = 0f;
+                continue;
+            }
+            PadState si = devI.state;
+            boolean both = si.isDown(PadState.START) && si.isDown(PadState.BACK);
             if (!both) {
-                joinHold = 0f;
-                joinLatch = false; // hay que soltar los botones antes de que cuenten otra vez
-            } else if (!SecondaryPlayers.isActive()) {
-                if (!joinLatch && ((s1.pressed(PadState.START)) || (s1.pressed(PadState.BACK)))) {
-                    SecondaryPlayers.join(mc);
-                    joinLatch = true;
+                joinHold[i] = 0f;
+                joinLatch[i] = false; // hay que soltar los botones antes de que cuenten otra vez
+            } else if (!SecondaryPlayers.isActive(i)) {
+                if (!joinLatch[i] && (si.pressed(PadState.START) || si.pressed(PadState.BACK))) {
+                    SecondaryPlayers.join(mc, i);
+                    joinLatch[i] = true;
                 }
-            } else if (!joinLatch) {
-                joinHold += dt;
-                if (joinHold >= LEAVE_HOLD_SECONDS) {
-                    SecondaryPlayers.leave(mc);
-                    joinLatch = true;
-                    joinHold = 0f;
+            } else if (!joinLatch[i]) {
+                joinHold[i] += dt;
+                if (joinHold[i] >= LEAVE_HOLD_SECONDS) {
+                    SecondaryPlayers.leave(mc, i);
+                    joinLatch[i] = true;
+                    joinHold[i] = 0f;
                 }
             }
         }
-        SecondaryScreens.frame(mc, pads.slot(1), dt);
+        for (var extra : SecondaryPlayers.contexts()) SecondaryScreens.frame(mc, pads.slot(extra.slotIndex), dt, extra);
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
         if (dev == null || !mc.isWindowActive()) {
@@ -156,9 +160,10 @@ public final class PadDriver {
         double y = mc.mouseHandler.ypos();
         PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, tmp);
         if (tmp[0] != 0f || tmp[1] != 0f) {
-            int regionW = SplitView.p1HalfScreen ? mc.getWindow().getScreenWidth() / 2 : mc.getWindow().getScreenWidth();
-            double maxX = Math.max(0, regionW - 1); // con P2, el cursor de P1 se queda en su mitad
-            double maxY = Math.max(0, mc.getWindow().getScreenHeight() - 1);
+            int regionW = SplitView.p1HalfScreen ? SplitView.p1Px[2] : mc.getWindow().getScreenWidth();
+            int regionH = SplitView.p1HalfScreen ? SplitView.p1Px[3] : mc.getWindow().getScreenHeight();
+            double maxX = Math.max(0, regionW - 1); // con extras, el cursor de P1 se queda en su region (arriba a la izquierda)
+            double maxY = Math.max(0, regionH - 1);
             float speed = cfg.cursorSpeed;
             if (mc.screen instanceof AbstractContainerScreen<?> c && c.getSlotUnderMouse() != null) {
                 speed *= cfg.cursorSlotFactor; // precision al apuntar sobre un slot

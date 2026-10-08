@@ -55,6 +55,6 @@ public abstract class MinecraftMixin {
     @Redirect(method = "runTick",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;isPublished()Z"))
     private boolean consolepad$noGlobalPause(IntegratedServer server) {
-        return SecondaryPlayers.isActive() || server.isPublished();
+        return SecondaryPlayers.anyActive() || server.isPublished();
     }
 }

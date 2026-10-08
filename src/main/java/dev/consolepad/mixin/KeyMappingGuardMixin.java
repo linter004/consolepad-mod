@@ -1,7 +1,6 @@
 package dev.consolepad.mixin;
 
 import dev.consolepad.split.ContextSwitcher;
-import dev.consolepad.split.SecondaryTick;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,6 +20,7 @@ public abstract class KeyMappingGuardMixin {
         if (!ContextSwitcher.isSecondaryActive()) return;
         // Solo el sprint de P2 (conmutador de su mando) llega a LocalPlayer.aiStep; el resto de teclas son de P1.
         KeyMapping self = (KeyMapping) (Object) this;
-        cir.setReturnValue(self == Minecraft.getInstance().options.keySprint && SecondaryTick.sprintHeld);
+        dev.consolepad.split.PlayerContext cur = ContextSwitcher.current();
+        cir.setReturnValue(self == Minecraft.getInstance().options.keySprint && cur != null && cur.input.sprintHeld);
     }
 }

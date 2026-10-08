@@ -15,4 +15,10 @@ public abstract class GuiGraphicsMixin {
         int w = SplitView.guiWidth;
         if (w > 0) cir.setReturnValue(w);
     }
+
+    @Inject(method = "guiHeight", at = @At("HEAD"), cancellable = true)
+    private void consolepad$regionHeight(CallbackInfoReturnable<Integer> cir) {
+        int h = SplitView.guiHeight;
+        if (h > 0) cir.setReturnValue(h);
+    }
 }

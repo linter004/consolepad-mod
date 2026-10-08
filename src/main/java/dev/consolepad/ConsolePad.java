@@ -35,25 +35,34 @@ public class ConsolePad {
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> {
             SecondaryPlayers.tick();
-            SecondaryTick.tick(driver.pads().slot(1));
+            for (var extra : SecondaryPlayers.contexts()) SecondaryTick.tick(driver.pads().slot(extra.slotIndex), extra);
             AutoTest.tick();
         });
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e) -> SecondaryPlayers.shutdown());
-        NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> ContextSwitcher.watchdog(SecondaryPlayers.context()));
+        NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> {
+            for (var extra : SecondaryPlayers.contexts()) ContextSwitcher.watchdog(extra);
+        });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Post e) -> AutoTest.frameEnd());
         NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent e) -> SplitDiag.onStage(e));
-        NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) -> e.getDispatcher().register(
-                Commands.literal("consolepad").then(Commands.literal("join2").executes(ctx -> {
-                    SecondaryPlayers.join(Minecraft.getInstance());
+        NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) -> {
+            var root = Commands.literal("consolepad");
+            for (int slot = 1; slot <= SecondaryPlayers.MAX_EXTRA; slot++) {
+                final int s = slot;
+                root.then(Commands.literal("join" + (slot + 1)).executes(ctx -> {
+                    SecondaryPlayers.join(Minecraft.getInstance(), s);
                     return Command.SINGLE_SUCCESS;
-                })).then(Commands.literal("leave2").executes(ctx -> {
-                    SecondaryPlayers.leave(Minecraft.getInstance());
+                }));
+                root.then(Commands.literal("leave" + (slot + 1)).executes(ctx -> {
+                    SecondaryPlayers.leave(Minecraft.getInstance(), s);
                     return Command.SINGLE_SUCCESS;
-                }))));
+                }));
+            }
+            e.getDispatcher().register(root);
+        });
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             Minecraft mc = Minecraft.getInstance();
             String name = e.getEntity().getName().getString();
-            if (!name.equals(SecondaryPlayers.secondaryName(mc))) return;
+            if (!SecondaryPlayers.isSecondaryName(mc, name)) return;
             // Hilo del servidor: lee Minecraft.player en el hilo principal, donde se usa.
             mc.execute(() -> LOGGER.info("Jugador 2 '{}' dentro del servidor. Minecraft.player sigue siendo '{}' (P1: {})",
                     name, mc.player == null ? "null" : mc.player.getName().getString(),
