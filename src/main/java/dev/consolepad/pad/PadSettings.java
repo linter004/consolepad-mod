@@ -15,6 +15,8 @@ public final class PadSettings {
     /** Campo de vision de este jugador (grados); 0 = el de las opciones del juego. */
     public int fov = 0;
     public float triggerThreshold = 0.5f;
+    /** Escala de interfaz de este jugador con la pantalla dividida: 0 = automatica (la que elegiria Minecraft para su region), 1 a 4 = fija. */
+    public int guiScale = 0;
     /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
     public float cursorSpeed = 550f;
     public float cursorDeadzone = 0.2f;

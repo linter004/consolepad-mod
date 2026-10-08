@@ -26,4 +26,12 @@ public abstract class ChatGuardsMixin {
             dev.consolepad.split.SplitNotices.logP1(message);
         }
     }
+
+    /** Con la pantalla dividida el chat de P1 no puede ser mas ancho que su region (320 unidades se saldrian a la region de otro jugador). */
+    @Inject(method = "getWidth()I", at = @At("RETURN"), cancellable = true)
+    private void consolepad$regionWidth(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> cir) {
+        if (!dev.consolepad.split.SplitView.p1HalfScreen || ContextSwitcher.isSecondaryActive()) return;
+        int cap = Math.max(60, dev.consolepad.split.SplitView.p1HudW - 12);
+        if (cir.getReturnValueI() > cap) cir.setReturnValue(cap);
+    }
 }

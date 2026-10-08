@@ -47,3 +47,11 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **El autotest es determinista si fija dia y dificultad pacifica y respawnea a quien muera;** restaura la dificultad al salir. `tools/run-autotest.sh` hace copia y restaura `run/config/consolepad`; la salida va a un archivo y se lee con `grep`.
 - **Las pruebas largas (>10 min) se lanzan en segundo plano** (`run_in_background`); el limite de una llamada en primer plano es 10 min.
 - **Cuando fixer-opus no esta registrado en la sesion,** usar un agente general con `model: opus` y apuntarlo a `.claude/agents/fixer-opus.md`; y comprobar su resultado repitiendo el autotest, no solo leer su informe.
+
+### Reglas aprendidas de la segunda tanda de pantalla dividida (entradas 63 en adelante de `routing-log.md`)
+
+- **Un boton que cierra una pantalla desde el fotograma no debe disparar su accion de juego en el tick siguiente** (Start reabria el menu, B soltaba un objeto): `InputState.closeLatch` y `prevDown` sin vaciar mientras hay pantalla.
+- **`GuiGraphics.enableScissor` ignora la pose**: todo lo que se dibuje trasladado/escalado a una region (maniqui del inventario, listas) necesita el mixin que lo transforma. Cada region se dibuja dentro de su propio `enableScissor`, asi desenfoque, objeto del cursor y tooltips no se salen.
+- **Una prueba que depende de la escala de interfaz global debe fijarla** (en `options.txt` del usuario puede ser 1); el autotest la pone en Automatico y la restaura. Tras cambiar la escala o la orientacion las pantallas se recolocan: el cursor de la prueba hay que volver a ponerlo sobre el boton.
+- **Para repetir solo una prueba**: `CONSOLEPAD_AUTOTEST_CASES=<casillas> tools/run-autotest.sh <salida>`; antes de lanzar, asegurarse de que el juego anterior ha muerto del todo (si no, el mundo sigue bloqueado y el autotest se queda en el titulo).
+- **Los scripts largos con comillas se escriben con la herramienta Write**, no con heredocs de shell (rompen el comando).

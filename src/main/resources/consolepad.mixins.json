@@ -25,6 +25,7 @@
     "ItemInHandRendererAccessor",
     "GameRendererAccessor",
     "MouseHandlerMixin",
+    "DeathScreenAccessor",
     "OptionsAccessor",
     "GuiStateAccessor",
     "GuiDiagMixin"

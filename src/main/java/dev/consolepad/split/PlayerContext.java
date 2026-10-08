@@ -45,13 +45,22 @@ public final class PlayerContext {
     public net.minecraft.network.chat.Component title;
     public int titleTime;
     public volatile int noticesDrawn;
+    /** Ancho (unidades de su HUD) de la linea de avisos mas ancha dibujada: debe caber en su region. */
+    public volatile int noticeMaxWidth;
     /** Estado de la entrada de su mando entre ticks. */
     public final InputState input = new InputState();
     /** Region de la ventana que le toca, en unidades de GUI (origen arriba a la izquierda) y en pixeles (origen abajo a la izquierda); la fija SplitLayout. */
     public int gx, gy, gw, gh;
     public int px, py, pw, ph;
-    /** Escala con la que se dibujan sus pantallas para que quepan en su region (1 = tamano normal). */
+    /** Escala de interfaz elegida para su region (entera, pixeles por unidad de GUI) y su relacion con la de la ventana. */
+    public int guiScaleEff = 1;
+    public float hudRatio = 1f;
+    /** Tamano de su region en unidades de su propia interfaz: lo que ve el HUD (guiWidth/guiHeight). */
+    public int hudW, hudH;
+    /** Relacion (respecto a la escala de la ventana) con la que se dibujan sus pantallas: la de su HUD, reducida si no cabria un inventario. */
     public float screenScale = 1f;
+    /** Tamano logico de sus pantallas (unidades antes de aplicar screenScale). */
+    public int logicalW, logicalH;
     /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
     public final LevelRenderer renderer;
 

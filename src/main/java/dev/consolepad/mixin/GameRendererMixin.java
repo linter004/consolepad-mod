@@ -59,11 +59,13 @@ public abstract class GameRendererMixin {
             at = @At(value = "INVOKE", target = "Lnet/neoforged/neoforge/client/ClientHooks;drawScreen(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;IIF)V"))
     private void consolepad$scaledP1Screen(net.minecraft.client.gui.screens.Screen screen, net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partial) {
         float k = SplitView.p1Scale();
-        if (k >= 1f) {
+        if (!SplitView.p1HalfScreen) {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
             return;
         }
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
+        int[] r = SplitView.p1Gui;
+        graphics.enableScissor(r[0], r[1], r[0] + r[2], r[1] + r[3]); // el objeto del cursor, el fondo difuminado y las ayudas no salen de la region de P1
         graphics.pose().pushPose();
         graphics.pose().scale(k, k, 1f);
         SplitView.guiWidth = screen.width;
@@ -74,6 +76,7 @@ public abstract class GameRendererMixin {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;
             graphics.pose().popPose();
+            graphics.disableScissor();
         }
     }
 
@@ -101,6 +104,12 @@ public abstract class GameRendererMixin {
     private int consolepad$projectionHeight(Window window) {
         int h = SplitView.height;
         return h > 0 ? h : window.getHeight();
+    }
+
+    /** Diagnostico: el desenfoque de fondo de una pantalla se aplica con el scissor de la region de quien lo pide (solo con el autotest grabando). */
+    @Inject(method = "processBlurEffect", at = @At("HEAD"))
+    private void consolepad$diagBlur(float partialTick, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        SplitDiag.onBlur();
     }
 
     /** Diagnostico: anota la matriz de proyeccion que devuelve cada llamada (solo con el autotest grabando). */

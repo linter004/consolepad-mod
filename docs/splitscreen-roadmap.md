@@ -16,6 +16,7 @@ Complementa `docs/splitscreen-plan.md` (diseño y prototipo, pasos 1-7). Primero
 | 4e Entrar con Start+Back y salir manteniéndolo 2 s | [V] simulado, también P3/P4 por atajo; con mando físico [S] |
 | 4f 3 y 4 jugadores: regiones, HUD, inventarios escalados a su región (también el de P1, con el ratón reescalado), FPS | [V] |
 | 4g Avisos propios (chat, barra de acciones, título) y FOV y sensibilidad por jugador desde su menú | [V] |
+| Segunda tanda (2026-10-08): Start/B cierran el menu del propio jugador, desenfoque y objeto del cursor recortados a su region, pantalla de muerte por jugador, chat y avisos en la region de cada uno, escala de interfaz propia (automatica o 1-4), maniqui de P2-P4, menu ampliado (ajustes, controles remapeables, reparto lado a lado/apilado) | [V] `startCloseTest`, `uiClipTest`, `deathTest`, `chatTest`, `scaleTest`, `menusTest`, `mannequinTest` |
 | Aislamiento P1 ↔ extras | [V] clic de ratón, teclas de sprint/agacharse, FOV al correr, títulos, inventario, chat |
 
 FPS (distancia 8, sin vsync, 854×480): 1 jugador ≈ 3300, 2 jugadores ≈ 1600, 3 jugadores ≈ 765, 4 jugadores ≈ 408. El coste es casi proporcional al número de jugadores.

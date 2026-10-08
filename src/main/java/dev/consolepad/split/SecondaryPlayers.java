@@ -139,6 +139,9 @@ public final class SecondaryPlayers {
         Connection c = Connection.connectToLocalServer(address);
         PlayerContext ctx = new PlayerContext(new SplitLevelRenderer(mc), slot);
         ctx.hand = new net.minecraft.client.renderer.ItemInHandRenderer(mc, mc.getEntityRenderDispatcher(), mc.getItemRenderer());
+        // El servidor avisa de que entra a todos menos al que entra: su aviso de entrada es local.
+        ctx.notices.addLast(new PlayerContext.Notice(Component.translatable("multiplayer.player.joined", name).withStyle(net.minecraft.ChatFormatting.YELLOW),
+                mc.level.getGameTime()));
         e.context = ctx;
         e.connection = c; // antes de iniciar el protocolo: ConnectionMixin envuelve el listener de juego
         c.initiateServerboundPlayConnection(address.toString(), 0, new SecondaryHandshakeListener(c, mc));

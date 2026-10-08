@@ -20,6 +20,10 @@ public final class SplitView {
     public static volatile boolean p1HalfScreen;
     /** Escala con la que se dibujan las pantallas de P1 para caber en su region (1 = normal; con 4 jugadores < 1). */
     public static volatile float p1ScreenScale = 1f;
+    /** Tamano de la region de P1 en unidades de su propia interfaz (lo que ve su HUD) y relacion con la escala de la ventana. */
+    public static volatile int p1HudW, p1HudH, p1LogicalW, p1LogicalH;
+    public static volatile int p1GuiScaleEff = 1;
+    public static volatile float p1HudRatio = 1f;
 
     /** Escala de pantalla de P1 que esta en vigor (1 si no hay pantalla dividida). */
     public static float p1Scale() {

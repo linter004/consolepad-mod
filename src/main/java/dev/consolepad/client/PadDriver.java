@@ -111,6 +111,11 @@ public final class PadDriver {
         // Con una pantalla abierta: cursor virtual.
         if (mc.screen != null) {
             releaseAll(mc);
+            if (mc.screen instanceof dev.consolepad.split.PlayerScreen ps && ps.listeningForPad()) { // remapeo de controles
+                int code = SecondaryScreens.firstPressed(s);
+                if (code >= 0) ps.padButton(code);
+                return;
+            }
             screenFrame(mc, s, cfg, dt);
             return;
         }
@@ -208,7 +213,11 @@ public final class PadDriver {
             mouse.consolepad$onScroll(window, 0.0, steps);
         }
 
-        if ((s.pressed(PadState.B) || s.pressed(PadState.START)) && mc.screen.shouldCloseOnEsc()) {
+        boolean closeByPause = false;
+        for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
+            if (e.getValue() == PadAction.PAUSE && s.pressed(e.getKey())) closeByPause = true;
+        }
+        if ((s.pressed(PadState.B) || s.pressed(PadState.START) || closeByPause) && mc.screen.shouldCloseOnEsc()) {
             releaseMouseButtons(mc);
             mc.screen.onClose();
         }
@@ -246,8 +255,9 @@ public final class PadDriver {
     /** Mueve el cursor al centro del slot mas cercano en la direccion pedida (0 arriba, 1 abajo, 2 izq, 3 der). */
     private void jumpToSlot(Minecraft mc, MouseHandlerInvoker mouse, long window,
                             AbstractContainerScreen<?> screen, int dir) {
-        double sx = (double) mc.getWindow().getScreenWidth() / mc.getWindow().getGuiScaledWidth();
-        double sy = (double) mc.getWindow().getScreenHeight() / mc.getWindow().getGuiScaledHeight();
+        float k = SplitView.p1Scale(); // con la pantalla dividida la pantalla de P1 puede dibujarse a otra escala que la ventana
+        double sx = (double) mc.getWindow().getScreenWidth() / (mc.getWindow().getGuiScaledWidth() / k);
+        double sy = (double) mc.getWindow().getScreenHeight() / (mc.getWindow().getGuiScaledHeight() / k);
         double gx = mc.mouseHandler.xpos() / sx;
         double gy = mc.mouseHandler.ypos() / sy;
         Slot current = screen.getSlotUnderMouse();

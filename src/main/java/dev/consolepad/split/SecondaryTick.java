@@ -26,6 +26,9 @@ public final class SecondaryTick {
     public static volatile boolean scriptAttack;
     public static volatile java.util.EnumSet<PadAction> scriptActions = java.util.EnumSet.noneOf(PadAction.class);
 
+    /** Solo el autotest: los jugadores extra reaparecen solos a los 3 s de morir (si no, lo hacen desde su pantalla de muerte). */
+    public static volatile boolean autoRespawn;
+
     // Contadores de diagnostico: cuantas veces ejecuta P2 cada accion.
     public static volatile int dbgStartAttack, dbgContinueTrue, dbgStartUse, dbgJumpTicks, dbgHotbarSteps;
     public static volatile int dbgDrop, dbgSwapHands, dbgPerspective, dbgInventoryRequests;
@@ -133,8 +136,8 @@ public final class SecondaryTick {
         MinecraftInvoker inv = (MinecraftInvoker) mc;
         PlayerContext.InputState st = self.input;
 
-        if (player.getHealth() <= 0f || player.isDeadOrDying()) { // sin pantalla de muerte para los extra: reaparecen solos
-            if (++st.deadTicks == 60) player.respawn();
+        if (player.getHealth() <= 0f || player.isDeadOrDying()) { // su pantalla de muerte (ExtraDeathScreen) deja reaparecer; en el autotest, solos
+            if (autoRespawn && ++st.deadTicks == 60) player.respawn();
         } else {
             st.deadTicks = 0;
         }
@@ -218,7 +221,7 @@ public final class SecondaryTick {
                     st.sneakLatch = !st.sneakLatch;
                     input.shiftKeyDown = st.sneakLatch;
                 }
-                case PAUSE -> mc.setScreen(new P2PauseScreen(self.slotIndex));
+                case PAUSE -> mc.setScreen(new PlayerPauseScreen(self.slotIndex));
                 case INVENTORY -> {
                     dbgInventoryRequests++;
                     if (mc.gameMode.isServerControlledInventory()) player.sendOpenInventory();

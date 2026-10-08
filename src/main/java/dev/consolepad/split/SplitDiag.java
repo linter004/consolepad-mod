@@ -63,6 +63,50 @@ public final class SplitDiag {
         return hudWrongWhat;
     }
 
+    // --- Desenfoque de fondo y objetos dibujados: scissor GL real en el momento de dibujar, y de quien es la pantalla ---
+    public static volatile boolean uiRecording;
+    /** Objeto que se vigila (por ejemplo el del cursor de P1); null = ninguno. */
+    public static volatile net.minecraft.world.item.Item watchItem;
+    public record UiDraw(String owner, String what, int[] scissor, int x, int y) {}
+    private static final List<UiDraw> uiDraws = new ArrayList<>();
+
+    private static String uiOwner() {
+        PlayerContext c = ContextSwitcher.current();
+        return c == null ? "P1" : c.label();
+    }
+
+    public static synchronized void uiClear() {
+        uiDraws.clear();
+    }
+
+    public static synchronized List<UiDraw> uiDraws() {
+        return new ArrayList<>(uiDraws);
+    }
+
+    private static int[] scissorBox() {
+        int[] sc = new int[4];
+        GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, sc);
+        if (!GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) sc = new int[] {-1, -1, -1, -1};
+        return sc;
+    }
+
+    /** GameRenderer.processBlurEffect: el desenfoque se aplica a lo que deje pasar el scissor de ese momento. */
+    public static synchronized void onBlur() {
+        if (!uiRecording) return;
+        uiDraws.add(new UiDraw(uiOwner(), "desenfoque", scissorBox(), 0, 0));
+    }
+
+    /** Cada enableScissor de GuiGraphics: el scissor GL real que queda (recortes de la region, del maniqui del inventario...). */
+    public static synchronized void onScissor() {
+        if (!uiRecording) return;
+        uiDraws.add(new UiDraw(uiOwner(), "scissor", scissorBox(), 0, 0));
+    }
+
+    public static synchronized void onItem(net.minecraft.world.item.ItemStack stack, int x, int y) {
+        if (!uiRecording || watchItem == null || !stack.is(watchItem)) return;
+        uiDraws.add(new UiDraw(uiOwner(), "objeto", scissorBox(), x, y));
+    }
+
     private static final List<Sample> samples = new ArrayList<>();
     private static String currentPass = "-";
     private static int regionW, regionH;

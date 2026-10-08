@@ -26,19 +26,25 @@ public final class SecondaryScreens {
 
     private SecondaryScreens() {}
 
-    /** Solo se admiten pantallas de contenedor (inventario, cofres, mesa, horno...); el resto (muerte, titulo...) se ignora para P2. */
+    /**
+     * Se admiten pantallas de contenedor (inventario, cofres, mesa, horno...) y las propias del mod (menus, controles, muerte); el resto
+     * (titulo, ajustes de vanilla...) se ignora para los extra. La pantalla de muerte de vanilla se cambia por la propia (no desconecta a P1).
+     */
     public static void set(Screen screen) {
         PlayerContext ctx = ContextSwitcher.current();
         if (ctx == null) return;
         Minecraft mc = Minecraft.getInstance();
-        if (screen != null && !(screen instanceof AbstractContainerScreen<?>) && !(screen instanceof P2PauseScreen)) return;
+        if (screen instanceof net.minecraft.client.gui.screens.DeathScreen death) {
+            screen = new ExtraDeathScreen(ctx.slotIndex, ((dev.consolepad.mixin.DeathScreenAccessor) death).consolepad$getCauseOfDeath());
+        }
+        if (screen != null && !(screen instanceof AbstractContainerScreen<?>) && !(screen instanceof PlayerScreen)) return;
         Screen old = mc.screen;
         if (old != null && old != screen) old.removed();
         mc.screen = screen;
         ctx.screen = screen;
         if (screen != null) {
             screen.added();
-            if (ctx.gw <= 0) SplitLayout.update(mc, SplitRender.activeContexts()); // aun sin region: primera vez que se necesita
+            if (ctx.logicalW <= 0) SplitLayout.update(mc, SplitRender.activeContexts()); // aun sin region: primera vez que se necesita
             int w = SplitLayout.logicalWidth(mc, ctx), h = SplitLayout.logicalHeight(mc, ctx);
             ctx.cursorX = w / 2.0;
             ctx.cursorY = h / 2.0;
@@ -95,6 +101,11 @@ public final class SecondaryScreens {
         ContextSwitcher.run(ctx, () -> {
             Screen screen = mc.screen;
             if (screen == null) return;
+            if (screen instanceof PlayerScreen ps && ps.listeningForPad()) { // remapeo: el siguiente boton es el dato, no un clic ni un cierre
+                int code = firstPressed(s);
+                if (code >= 0) ps.padButton(code);
+                return;
+            }
             // Cursor.
             PadMath.radial(s.lx, s.ly, cfg.cursorDeadzone, cfg.cursorExponent, TMP);
             if (TMP[0] != 0f || TMP[1] != 0f) {
@@ -138,6 +149,14 @@ public final class SecondaryScreens {
                 screen.onClose();
             }
         });
+    }
+
+    /** Primer boton del mando pulsado en este fotograma (codigo de PadState), o -1. */
+    public static int firstPressed(PadState s) {
+        for (int code = 0; code <= PadState.RT; code++) {
+            if (s.pressed(code)) return code;
+        }
+        return -1;
     }
 
     private static final int[] DPAD = {PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};

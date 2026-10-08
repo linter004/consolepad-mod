@@ -66,10 +66,24 @@ public final class AutoTest {
     private static String screenshotName = "split-step5.png";
     private static int p1SelBefore, p2SelBefore;
 
+    /** Se ejecuta una vez al final del siguiente fotograma con la imagen de la ventana (fila 0 = arriba). */
+    private static volatile java.util.function.Consumer<com.mojang.blaze3d.platform.NativeImage> pixelProbe;
+
     private AutoTest() {}
 
     /** Al terminar cada frame (RenderFrameEvent.Post): aqui se hace la captura, con el frame ya dibujado. */
     public static void frameEnd() {
+        if (pixelProbe != null) {
+            var probe = pixelProbe;
+            pixelProbe = null;
+            Minecraft mc0 = Minecraft.getInstance();
+            com.mojang.blaze3d.platform.NativeImage img = Screenshot.takeScreenshot(mc0.getMainRenderTarget());
+            try {
+                probe.accept(img);
+            } finally {
+                img.close();
+            }
+        }
         if (!screenshotPending) return;
         screenshotPending = false;
         Minecraft mc = Minecraft.getInstance();
@@ -222,6 +236,7 @@ public final class AutoTest {
     }
 
     private static net.minecraft.world.Difficulty prevDifficulty;
+    private static int prevGuiScale = -1;
     private static int leaveSub;
     private static java.nio.file.Path leaveFile;
     private static long leaveFileTime0;
@@ -282,6 +297,7 @@ public final class AutoTest {
                 if (ticks < 40) return;
                 var srv = mc.getSingleplayerServer();
                 if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
+                if (prevGuiScale >= 0) mc.options.guiScale().set(prevGuiScale);
                 ConsolePad.LOGGER.info("[autotest] P1 sale del mundo (dificultad restaurada a {})", prevDifficulty);
                 mc.level.disconnect(); // como PauseScreen.onDisconnect: cierra la conexion de P1 y el servidor se detiene
                 mc.disconnect();
@@ -684,12 +700,12 @@ public final class AutoTest {
             case 12 -> release();
             case 25 -> {
                 int full = mc.getWindow().getGuiScaledWidth();
-                boolean p1Half = mc.screen != null && mc.screen.width == full / 2;
-                boolean p2Half = c.screen != null && c.screen.width == full - full / 2;
+                boolean p1Half = mc.screen != null && mc.screen.width == SplitView.p1LogicalW;
+                boolean p2Half = c.screen != null && c.screen.width == SecondaryScreens.regionWidth(mc);
                 s2P1Digest = p1InventoryDigest(mc);
                 ConsolePad.LOGGER.info("[autotest] dos pantallas: P1 {} ancho {} (mitad {}), P2 {} ancho {} (mitad {}), p1HalfScreen={}",
-                        mc.screen == null ? "null" : mc.screen.getClass().getSimpleName(), mc.screen == null ? -1 : mc.screen.width, full / 2,
-                        c.screen == null ? "null" : c.screen.getClass().getSimpleName(), c.screen == null ? -1 : c.screen.width, full - full / 2,
+                        mc.screen == null ? "null" : mc.screen.getClass().getSimpleName(), mc.screen == null ? -1 : mc.screen.width, SplitView.p1LogicalW,
+                        c.screen == null ? "null" : c.screen.getClass().getSimpleName(), c.screen == null ? -1 : c.screen.width, SecondaryScreens.regionWidth(mc),
                         SplitView.p1HalfScreen);
                 verdict("dos pantallas a la vez, cada una en su mitad", p1Half && p2Half && SplitView.p1HalfScreen);
                 screenshotName = "split-two-screens.png";
@@ -837,8 +853,7 @@ public final class AutoTest {
             case 5 -> press(PadAction.PAUSE);
             case 7 -> release();
             case 15 -> {
-                int full = mc.getWindow().getGuiScaledWidth();
-                boolean p2Menu = c.screen instanceof P2PauseScreen && c.screen.width == full - full / 2;
+                boolean p2Menu = c.screen instanceof PlayerPauseScreen && c.screen.width == SecondaryScreens.regionWidth(mc);
                 pmVerdict("menu de pausa de P2 abierto en su mitad: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName())
                         + ", pantalla de P1=" + mc.screen, p2Menu && mc.screen == null);
                 mc.pauseGame(false); // pausa de P1 a la vez
@@ -848,10 +863,9 @@ public final class AutoTest {
                 SecondaryTick.scriptForward = 1f; // si P2 no estuviera en el menu, andaria
             }
             case 25 -> {
-                int full = mc.getWindow().getGuiScaledWidth();
-                boolean p1Pause = mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen && mc.screen.width == full / 2;
+                boolean p1Pause = mc.screen instanceof PlayerPauseScreen && mc.screen.width == SplitView.p1LogicalW;
                 pmVerdict("pausa de P1 en su mitad: " + (mc.screen == null ? "null" : mc.screen.getClass().getSimpleName()) + " ancho "
-                        + (mc.screen == null ? -1 : mc.screen.width) + " (mitad " + (full / 2) + ")", p1Pause);
+                        + (mc.screen == null ? -1 : mc.screen.width) + " (su region: " + SplitView.p1LogicalW + ")", p1Pause);
                 screenshotName = "split-pause-menus.png";
                 screenshotPending = true;
             }
@@ -863,7 +877,7 @@ public final class AutoTest {
                 boolean ok = moved < 0.5 && st >= 40 && ct >= 40 && !mc.isPaused();
                 pmVerdict("con los dos menus abiertos: P2 se movio " + String.format(java.util.Locale.ROOT, "%.2f", moved) + " bloques (<0.5), ticks de servidor " + st
                         + " y de cliente " + ct + " (>=40), mc.isPaused=" + mc.isPaused(), ok);
-                int[] r = ((P2PauseScreen) c.screen).resumeCenter();
+                int[] r = ((PlayerPauseScreen) c.screen).resumeCenter();
                 c.cursorX = r[0];
                 c.cursorY = r[1];
             }
@@ -881,7 +895,7 @@ public final class AutoTest {
             }
             case 122 -> release();
             case 135 -> {
-                if (c.screen instanceof P2PauseScreen menu) {
+                if (c.screen instanceof PlayerPauseScreen menu) {
                     int[] q = menu.quitCenter();
                     c.cursorX = q[0];
                     c.cursorY = q[1];
@@ -1049,7 +1063,7 @@ public final class AutoTest {
             var scr = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) mc.screen;
             float k = SplitView.p1ScreenScale;
             int[] r = SplitView.p1Gui;
-            int lw = Math.round(r[2] / k), lh = Math.round(r[3] / k);
+            int lw = SplitView.p1LogicalW, lh = SplitView.p1LogicalH;
             boolean sized = scr.width == lw && scr.height == lh;
             boolean fits = scr.getGuiLeft() >= 0 && scr.getGuiTop() >= 0 && scr.getGuiLeft() + 176 <= lw && scr.getGuiTop() + 166 <= lh;
             mtVerdict("P1: inventario en su cuadrante (" + r[2] + "x" + r[3] + " unidades, escala " + String.format(java.util.Locale.ROOT, "%.2f", k) + ", logico " + lw + "x" + lh
@@ -1307,34 +1321,48 @@ public final class AutoTest {
                 press(PadAction.PAUSE);
             }
             case 54 -> release();
-            case 70 -> {
-                if (c.screen instanceof P2PauseScreen m) {
+            case 66 -> {
+                if (c.screen instanceof PlayerPauseScreen m) {
+                    int[] f = m.settingsCenter();
+                    c.cursorX = f[0];
+                    c.cursorY = f[1];
+                }
+            }
+            case 68 -> simP2(1 << PadState.A);
+            case 74 -> simP2(0);
+            case 80 -> {
+                if (c.screen instanceof PlayerSettingsScreen m) {
                     int[] f = m.fovCenter();
                     c.cursorX = f[0];
                     c.cursorY = f[1];
                 }
             }
-            case 73 -> simP2(1 << PadState.A);
-            case 79 -> simP2(0);
-            case 88 -> {
+            case 83 -> simP2(1 << PadState.A);
+            case 89 -> simP2(0);
+            case 98 -> {
                 ntVerdict("ajuste de FOV de P2 desde su menu: fov de su slot=" + pads1.fov + " (esperado 60), P1=" + pads0.fov + " (0)", pads1.fov == 60 && pads0.fov == 0);
-                if (c.screen instanceof P2PauseScreen m) {
+                if (c.screen instanceof PlayerSettingsScreen m) {
                     int[] f = m.sensCenter();
                     c.cursorX = f[0];
                     c.cursorY = f[1];
                 }
             }
-            case 91 -> simP2(1 << PadState.A);
-            case 97 -> simP2(0);
-            case 106 -> {
+            case 101 -> simP2(1 << PadState.A);
+            case 107 -> simP2(0);
+            case 116 -> {
                 ntVerdict("ajuste de sensibilidad de P2 desde su menu: velocidad de giro=" + pads1.lookSpeed + " (esperado 225), P1=" + pads0.lookSpeed + " (sin cambios)",
                         Math.abs(pads1.lookSpeed - 225f) < 1f && Math.abs(pads0.lookSpeed - ntP1Speed) < 1f);
                 pads1.fov = 0;
                 pads1.lookSpeed = 180f;
                 simP2(1 << PadState.B);
             }
-            case 112 -> simP2(0);
-            case 125 -> {
+            case 122 -> simP2(0);
+            case 128 -> {
+                ntVerdict("B en los ajustes vuelve al menu de P2", c.screen instanceof PlayerPauseScreen);
+                simP2(1 << PadState.B);
+            }
+            case 134 -> simP2(0);
+            case 145 -> {
                 ntVerdict("cerrar el menu de P2 con B tras los ajustes", c.screen == null);
                 ConsolePad.LOGGER.info("[autotest] RESULTADO avisos y ajustes por jugador (4g) en conjunto -> {}", ntOk ? "OK" : "FALLO");
                 SecondaryTick.scriptActive = false;
@@ -1381,7 +1409,7 @@ public final class AutoTest {
     }
 
     private static boolean isPauseMenu(net.minecraft.client.gui.screens.Screen s) {
-        return s instanceof net.minecraft.client.gui.screens.PauseScreen || s instanceof P2PauseScreen;
+        return s instanceof net.minecraft.client.gui.screens.PauseScreen || s instanceof PlayerPauseScreen;
     }
 
     /** Pantallas abiertas de los slots 0..3 como texto ("-" = ninguna). */
@@ -1406,6 +1434,7 @@ public final class AutoTest {
 
     // ---------------------------------------------------------------- Start y B cierran el menu de su jugador
 
+    private static int deathTestPhase;
     private static int scPhase;
     private static boolean scOk = true;
     private static int scDrops0;
@@ -1476,6 +1505,826 @@ public final class AutoTest {
                 if (leaveTo(mc, 2) || ticks > 600) {
                     ConsolePad.LOGGER.info("[autotest] RESULTADO Start y B cierran el menu de su jugador (P1 a P4) en conjunto -> {}", scOk ? "OK" : "FALLO");
                     scPhase = 7;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- ayudas del raton de P1 (coordenadas logicas de su pantalla)
+
+    private static void p1MoveTo(Minecraft mc, double lx, double ly) {
+        var win = mc.getWindow();
+        var mouse = (dev.consolepad.mixin.MouseHandlerInvoker) mc.mouseHandler;
+        float k = SplitView.p1Scale();
+        double sx = lx * k * win.getScreenWidth() / win.getGuiScaledWidth(), sy = ly * k * win.getScreenHeight() / win.getGuiScaledHeight();
+        mouse.consolepad$onMove(win.getWindow(), sx, sy);
+    }
+
+    private static void p1Mouse(Minecraft mc, boolean down) {
+        var mouse = (dev.consolepad.mixin.MouseHandlerInvoker) mc.mouseHandler;
+        mouse.consolepad$onPress(mc.getWindow().getWindow(), org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT,
+                down ? org.lwjgl.glfw.GLFW.GLFW_PRESS : org.lwjgl.glfw.GLFW.GLFW_RELEASE, 0);
+    }
+
+    /** Clic completo de P1 por la ruta real del raton (pulsar ahora; soltar lo hace quien llama unos ticks despues con p1Mouse(false)). */
+    private static void p1ClickAt(Minecraft mc, int[] c) {
+        p1MoveTo(mc, c[0], c[1]);
+        p1Mouse(mc, true);
+    }
+
+    // ---------------------------------------------------------------- escala de interfaz y orientacion del reparto
+
+    private static final int[][] SCA_WINDOWS = {{854, 480}, {1920, 1080}};
+    private static final int[][] SCA_LADDER = {{2, 3, 4}, {4, 3, 2}};
+    private static int scaPhase, scaWin, scaIdx;
+    private static boolean scaOk = true;
+    private static SplitSettings.Orientation scaOrig;
+
+    private static void scaVerdict(String name, boolean ok) {
+        scaOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Escala automatica que elegiria Minecraft para una region (calculo propio de la prueba, independiente de SplitLayout). */
+    private static int autoScaleOf(int pw, int ph) {
+        int s = 1;
+        while (pw / (s + 1) >= 320 && ph / (s + 1) >= 240) s++;
+        return s;
+    }
+
+    /** La forma del reparto (regiones en pixeles con origen abajo a la izquierda) es la que toca para n jugadores y esa orientacion. */
+    private static boolean shapeOk(int n, SplitSettings.Orientation o, int W, int H, java.util.List<int[]> r) {
+        boolean stacked = o == SplitSettings.Orientation.STACKED;
+        int[] a = r.get(0), b = r.get(1);
+        if (n == 2) {
+            return stacked
+                    ? a[2] == W && b[2] == W && a[3] + b[3] == H && a[0] == 0 && b[0] == 0 && b[1] == 0 && a[1] == b[3]
+                    : a[3] == H && b[3] == H && a[2] + b[2] == W && a[0] == 0 && b[0] == a[2] && a[1] == 0 && b[1] == 0;
+        }
+        int[] c = r.get(2);
+        if (n == 3) {
+            return stacked
+                    ? a[2] == W && a[0] == 0 && a[1] == b[3] && a[3] + b[3] == H && b[3] == c[3] && b[0] == 0 && b[1] == 0 && c[1] == 0 && c[0] == b[2] && b[2] + c[2] == W
+                    : a[3] == H && a[0] == 0 && a[1] == 0 && b[0] == a[2] && c[0] == a[2] && b[2] == W - a[2] && c[2] == b[2] && b[3] + c[3] == H && c[1] == 0 && b[1] == c[3];
+        }
+        int[] d = r.get(3);
+        return a[0] == 0 && a[1] == H - a[3] && b[0] == a[2] && b[1] == a[1] && c[0] == 0 && c[1] == 0 && d[0] == c[2] && d[1] == 0
+                && a[2] + b[2] == W && c[2] + d[2] == W && a[3] + c[3] == H && b[3] + d[3] == H;
+    }
+
+    private static void scaOpenScreens(Minecraft mc) {
+        mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+        for (PlayerContext c : SplitRender.activeContexts()) mtOpenInventory(mc, c);
+    }
+
+    private static void scaCloseScreens(Minecraft mc) {
+        mc.setScreen(null);
+        for (PlayerContext c : SplitRender.activeContexts()) {
+            ContextSwitcher.run(c, () -> {
+                if (mc.screen != null) mc.screen.onClose();
+            });
+        }
+    }
+
+    /** Aspecto, forma del reparto, escala de interfaz y HUD de cada region, mas el tamano de las pantallas abiertas. */
+    private static void scaEvaluate(Minecraft mc, String label, int n, SplitSettings.Orientation o) {
+        SplitDiag.recording = false;
+        SplitDiag.hudRecording = false;
+        var win = mc.getWindow();
+        int W = win.getWidth(), H = win.getHeight(), G = (int) win.getGuiScale();
+        java.util.List<PlayerContext> extras = SplitRender.activeContexts();
+        java.util.List<int[]> regions = new java.util.ArrayList<>();
+        regions.add(SplitView.p1Px.clone());
+        for (PlayerContext c : extras) regions.add(new int[] {c.px, c.py, c.pw, c.ph});
+        boolean count = extras.size() == n - 1;
+        boolean shape = count && shapeOk(n, o, W, H, regions);
+        boolean tile = regionsTileWindow(mc, extras);
+        int bad = SplitDiag.check(label, 0.01);
+        java.util.Set<String> passes = new java.util.TreeSet<>();
+        for (SplitDiag.Sample sm : SplitDiag.samples()) passes.add(sm.pass());
+        var seen = SplitDiag.hudSeen();
+        StringBuilder detail = new StringBuilder();
+        boolean hudOk = SplitDiag.hudWrong() == 0;
+        for (int i = 0; i < n && count; i++) {
+            int[] r = regions.get(i);
+            int eff = i == 0 ? SplitView.p1GuiScaleEff : extras.get(i - 1).guiScaleEff;
+            int hudW = i == 0 ? SplitView.p1HudW : extras.get(i - 1).hudW;
+            int hudH = i == 0 ? SplitView.p1HudH : extras.get(i - 1).hudH;
+            int expectEff = autoScaleOf(r[2], r[3]);
+            int hotbarW = seen.getOrDefault("P" + (i + 1), new java.util.TreeMap<>()).getOrDefault("hotbar", -1);
+            boolean this_ok = eff == expectEff && hudW == r[2] / eff && hudH == r[3] / eff && hotbarW == hudW && hudW >= 240 && hudH >= 110 && hudW * eff <= r[2];
+            hudOk &= this_ok;
+            detail.append(" P").append(i + 1).append("[region ").append(r[2]).append('x').append(r[3]).append(" escala ").append(eff).append(" (auto ").append(expectEff)
+                    .append(") interfaz ").append(hudW).append('x').append(hudH).append(" hotbar ").append(hotbarW).append(this_ok ? "" : " <==").append(']');
+        }
+        scaVerdict(label + ": " + n + " jugadores " + o + " ventana " + W + "x" + H + " (escala de ventana " + G + "): regiones OK=" + shape + ", cubren la ventana=" + tile
+                + ", pasadas=" + passes.size() + "/" + n + ", aspecto fuera de tolerancia=" + bad + ", escala e interfaz de cada region:" + detail,
+                count && shape && tile && passes.size() == n && bad == 0 && hudOk);
+        // pantallas abiertas: cada una con el tamano logico de su region actual (se recalculan al cambiar ventana u orientacion)
+        StringBuilder sc = new StringBuilder();
+        boolean screensOk = true;
+        for (int i = 0; i < n && count; i++) {
+            net.minecraft.client.gui.screens.Screen scr = i == 0 ? mc.screen : extras.get(i - 1).screen;
+            int lw = i == 0 ? SplitView.p1LogicalW : extras.get(i - 1).logicalW;
+            int lh = i == 0 ? SplitView.p1LogicalH : extras.get(i - 1).logicalH;
+            boolean ok = scr instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> cs
+                    && scr.width == lw && scr.height == lh && cs.getGuiLeft() >= 0 && cs.getGuiTop() >= 0
+                    && cs.getGuiLeft() + 176 <= lw && cs.getGuiTop() + 166 <= lh;
+            screensOk &= ok;
+            sc.append(" P").append(i + 1).append('=').append(scr == null ? "-" : scr.width + "x" + scr.height).append(" (logico ").append(lw).append('x').append(lh).append(ok ? ")" : ") <==");
+        }
+        scaVerdict(label + ": pantallas abiertas con el tamano de su region:" + sc, count && screensOk);
+    }
+
+    /**
+     * Para cada ventana (854x480 y 1920x1080) y cada numero de jugadores (2, 3, 4), en las dos orientaciones: la forma del reparto, el aspecto
+     * de cada region, la escala de interfaz de cada una (la automatica que elegiria Minecraft para su region), el HUD con ese ancho y el
+     * tamano de las pantallas abiertas; al cambiar la orientacion con las pantallas abiertas todo se recalcula sin esperar a nada.
+     */
+    private static void scaleTest(Minecraft mc) {
+        var window = mc.getWindow();
+        switch (scaPhase) {
+            case 0 -> {
+                scaOrig = SplitSettings.orientation();
+                scaWin = 0;
+                scaIdx = 0;
+                scaPhase = 1;
+                ticks = 0;
+            }
+            case 1 -> { // cambia el tamano de la ventana
+                int[] sz = SCA_WINDOWS[scaWin];
+                if (ticks == 1) org.lwjgl.glfw.GLFW.glfwSetWindowSize(window.getWindow(), sz[0], sz[1]);
+                if (ticks >= 70) {
+                    ConsolePad.LOGGER.info("[autotest] ventana: {}x{} (framebuffer), escala de interfaz {}", window.getWidth(), window.getHeight(), window.getGuiScale());
+                    scaPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // numero de jugadores de este escalon
+                int n = SCA_LADDER[scaWin][scaIdx];
+                int now = 1 + SecondaryPlayers.contexts().size();
+                boolean done = n >= now ? joinTo(mc, n) : leaveTo(mc, n);
+                if (done && ticks > 10) {
+                    scaPhase = 3;
+                    ticks = 0;
+                } else if (ticks > 2400) {
+                    scaVerdict("pasar a " + n + " jugadores", false);
+                    scaPhase = 9;
+                }
+            }
+            case 3 -> {
+                int n = SCA_LADDER[scaWin][scaIdx];
+                String label = SCA_WINDOWS[scaWin][0] + "x" + SCA_WINDOWS[scaWin][1] + "/" + n + "j";
+                switch (ticks) {
+                    case 1 -> {
+                        SplitSettings.setOrientation(SplitSettings.Orientation.SIDE_BY_SIDE);
+                        scaOpenScreens(mc);
+                    }
+                    case 5 -> mtRecordStart();
+                    case 18 -> scaEvaluate(mc, label, n, SplitSettings.Orientation.SIDE_BY_SIDE);
+                    case 19 -> SplitSettings.setOrientation(SplitSettings.Orientation.STACKED); // con las pantallas abiertas
+                    case 23 -> mtRecordStart();
+                    case 36 -> scaEvaluate(mc, label, n, SplitSettings.Orientation.STACKED);
+                    case 37 -> {
+                        scaCloseScreens(mc);
+                        scaIdx++;
+                        if (scaIdx >= SCA_LADDER[scaWin].length) {
+                            scaIdx = 0;
+                            scaWin++;
+                        }
+                        scaPhase = scaWin >= SCA_WINDOWS.length ? 9 : (scaIdx == 0 ? 1 : 2);
+                        ticks = 0;
+                    }
+                    default -> { }
+                }
+            }
+            case 9 -> {
+                SplitSettings.setOrientation(scaOrig);
+                ConsolePad.LOGGER.info("[autotest] RESULTADO escala de interfaz y orientacion del reparto (2, 3 y 4 jugadores, 854x480 y 1920x1080, las dos orientaciones) en conjunto -> {}",
+                        scaOk ? "OK" : "FALLO");
+                scaPhase = 10;
+                next();
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- recorte por region: objeto del cursor y desenfoque de fondo
+
+    private static int ucPhase;
+    private static boolean ucOk = true;
+    private static SplitSettings.Orientation ucOrig;
+
+    private static void ucVerdict(String name, boolean ok) {
+        ucOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static boolean boxInside(int[] box, int[] region, int tol) {
+        return box[0] >= region[0] - tol && box[1] >= region[1] - tol && box[0] + box[2] <= region[0] + region[2] + tol && box[1] + box[3] <= region[1] + region[3] + tol
+                && box[2] >= region[2] - tol && box[3] >= region[3] - tol;
+    }
+
+    /**
+     * Con 3 jugadores y un objeto (ojo de ender) en el cursor de cada uno, colocado lo mas lejos posible de su region (P1 con el raton
+     * en la region de otro jugador): el scissor real al dibujar el objeto y el desenfoque de fondo es el de la region de su jugador.
+     */
+    private static void uiClipTest(Minecraft mc) {
+        var win = mc.getWindow();
+        int G = (int) win.getGuiScale();
+        switch (ucPhase) {
+            case 0 -> {
+                if (ticks == 1) {
+                    ucOrig = SplitSettings.orientation();
+                    SplitSettings.setOrientation(SplitSettings.Orientation.SIDE_BY_SIDE);
+                }
+                if (joinTo(mc, 3) && ticks > 20) {
+                    ucPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // objeto del cursor lo mas lejos posible de la region de su jugador
+                if (ticks == 1) {
+                    scaOpenScreens(mc);
+                } else if (ticks == 6) {
+                    mc.player.containerMenu.setCarried(new ItemStack(Items.ENDER_EYE, 7));
+                    for (PlayerContext c : SplitRender.activeContexts()) {
+                        ContextSwitcher.run(c, () -> mc.player.containerMenu.setCarried(new ItemStack(Items.ENDER_EYE, 3)));
+                        c.cursorX = c.slotIndex == 1 ? 0 : c.screen.width - 1; // P2 contra su borde izquierdo, P3 contra la esquina inferior derecha
+                        c.cursorY = c.slotIndex == 1 ? 20 : c.screen.height - 1;
+                    }
+                    p1MoveTo(mc, SplitView.p1LogicalW * 1.6, SplitView.p1LogicalH * 0.5); // el raton de P1 en la region de otro jugador
+                    SplitDiag.uiClear();
+                    SplitDiag.watchItem = Items.ENDER_EYE;
+                    SplitDiag.uiRecording = true;
+                } else if (ticks == 16) {
+                    SplitDiag.uiRecording = false;
+                    SplitDiag.watchItem = null;
+                    var draws = SplitDiag.uiDraws();
+                    java.util.Map<String, int[]> region = ucRegions();
+                    int tol = 2 * G + 1;
+                    for (String owner : new String[] {"P1", "P2", "P3"}) {
+                        var items = draws.stream().filter(d -> d.owner().equals(owner) && d.what().equals("objeto")).toList();
+                        int[] r = region.get(owner);
+                        boolean itemsIn = !items.isEmpty() && items.stream().allMatch(d -> boxInside(d.scissor(), r, tol));
+                        ucVerdict(owner + ": el objeto del cursor (" + items.size() + " dibujados"
+                                + (items.isEmpty() ? "" : ", scissor " + java.util.Arrays.toString(items.get(0).scissor()) + ", posicion " + items.get(0).x() + "," + items.get(0).y())
+                                + ") se recorta a su region " + java.util.Arrays.toString(r) + " (ventana " + win.getWidth() + "x" + win.getHeight() + ")", itemsIn);
+                    }
+                    mc.player.containerMenu.setCarried(ItemStack.EMPTY);
+                    scaCloseScreens(mc);
+                    ucPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // el desenfoque del menu de pausa de cada jugador solo cubre su region
+                if (ticks == 1) {
+                    mc.setScreen(new PlayerPauseScreen(0));
+                    for (PlayerContext c : SplitRender.activeContexts()) {
+                        ContextSwitcher.run(c, () -> mc.setScreen(new PlayerPauseScreen(c.slotIndex)));
+                    }
+                } else if (ticks == 6) {
+                    SplitDiag.uiClear();
+                    SplitDiag.uiRecording = true;
+                } else if (ticks == 16) {
+                    SplitDiag.uiRecording = false;
+                    var draws = SplitDiag.uiDraws();
+                    java.util.Map<String, int[]> region = ucRegions();
+                    int tol = 2 * G + 1;
+                    for (String owner : new String[] {"P1", "P2", "P3"}) {
+                        var blurs = draws.stream().filter(d -> d.owner().equals(owner) && d.what().equals("desenfoque")).toList();
+                        int[] r = region.get(owner);
+                        boolean blurIn = !blurs.isEmpty() && blurs.stream().allMatch(d -> boxInside(d.scissor(), r, tol) && d.scissor()[2] < win.getWidth());
+                        ucVerdict(owner + ": el desenfoque de su menu de pausa (" + blurs.size() + " veces" + (blurs.isEmpty() ? "" : ", scissor " + java.util.Arrays.toString(blurs.get(0).scissor()))
+                                + ") solo cubre su region " + java.util.Arrays.toString(r) + " (ventana " + win.getWidth() + "x" + win.getHeight() + ")", blurIn);
+                    }
+                    scaCloseScreens(mc);
+                    ucPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (ticks == 1) {
+                    SplitSettings.setOrientation(ucOrig);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO recorte por region (objeto del cursor y desenfoque) en conjunto -> {}", ucOk ? "OK" : "FALLO");
+                }
+                if (leaveTo(mc, 2) || ticks > 600) {
+                    ucPhase = 4;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private static java.util.Map<String, int[]> ucRegions() {
+        java.util.Map<String, int[]> region = new java.util.HashMap<>();
+        region.put("P1", SplitView.p1Px.clone());
+        for (PlayerContext c : SplitRender.activeContexts()) region.put(c.label(), new int[] {c.px, c.py, c.pw, c.ph});
+        return region;
+    }
+
+    // ---------------------------------------------------------------- pantalla de muerte por jugador
+
+    private static boolean dtOk = true;
+    private static int dtPhase;
+
+    private static void dtVerdict(String name, boolean ok) {
+        dtOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static void kill(Minecraft mc, ServerPlayer p) {
+        mc.getSingleplayerServer().execute(p::kill);
+    }
+
+    /** P2 muere: su pantalla de muerte en su region (reaparecer con su mando); P3 muere y sale; P1 muere: la de vanilla en su region. */
+    private static void deathTest(Minecraft mc) {
+        PlayerContext c2 = SecondaryPlayers.context(1);
+        PlayerContext c3 = SecondaryPlayers.context(2);
+        switch (dtPhase) {
+            case 0 -> {
+                deathTestPhase = 1;
+                if (joinTo(mc, 3) && ticks > 20) {
+                    dtPhase = 1;
+                    ticks = 0;
+                    kill(mc, serverExtra(mc, 1));
+                }
+            }
+            case 1 -> { // P2 muerto
+                if (ticks == 50) {
+                    boolean screen = c2.screen instanceof ExtraDeathScreen && c2.screen.width == c2.logicalW && c2.screen.height == c2.logicalH;
+                    dtVerdict("P2 muere: su pantalla de muerte (" + (c2.screen == null ? "ninguna" : c2.screen.getClass().getSimpleName()) + ") en su region ("
+                            + (c2.screen == null ? "-" : c2.screen.width + "x" + c2.screen.height) + " de " + c2.logicalW + "x" + c2.logicalH + "), la de P1=" + mc.screen
+                            + ", la de P3=" + c3.screen + ", P2 muerto=" + c2.player.isDeadOrDying() + ", reaparicion automatica=" + SecondaryTick.autoRespawn,
+                            screen && mc.screen == null && c3.screen == null && c2.player.isDeadOrDying() && !SecondaryTick.autoRespawn);
+                    if (c2.screen instanceof ExtraDeathScreen d) {
+                        int[] rc = d.respawnCenter();
+                        c2.cursorX = rc[0];
+                        c2.cursorY = rc[1];
+                    }
+                }
+                if (ticks == 53) simP2(1 << PadState.A);
+                if (ticks == 59) simP2(0);
+                if (ticks == 100) {
+                    boolean alive = !c2.player.isDeadOrDying() && serverExtra(mc, 1) != null && serverExtra(mc, 1).isAlive();
+                    dtVerdict("Reaparecer con el cursor de P2: vivo=" + alive + ", su pantalla=" + c2.screen + ", P1 sin pantalla=" + (mc.screen == null) + ", P3 sin pantalla=" + (c3.screen == null),
+                            alive && c2.screen == null && mc.screen == null && c3.screen == null);
+                    kill(mc, serverExtra(mc, 2));
+                    dtPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // P3 muere y usa "Salir de la partida"
+                if (ticks == 50) {
+                    dtVerdict("P3 muere: su pantalla de muerte en su region (" + (c3.screen == null ? "ninguna" : c3.screen.getClass().getSimpleName()) + "), la de P2=" + c2.screen,
+                            c3.screen instanceof ExtraDeathScreen && c2.screen == null && mc.screen == null);
+                    if (c3.screen instanceof ExtraDeathScreen d) {
+                        int[] qc = d.quitCenter();
+                        c3.cursorX = qc[0];
+                        c3.cursorY = qc[1];
+                    }
+                }
+                if (ticks == 53) simSlot(2, 1 << PadState.A);
+                if (ticks == 59) simSlot(2, 0);
+                if (ticks == 120) {
+                    boolean gone = !SecondaryPlayers.isActive(2) && serverExtra(mc, 2) == null;
+                    dtVerdict("Salir de la partida desde la muerte de P3: P3 fuera=" + gone + ", P2 dentro=" + SecondaryPlayers.isActive(1) + ", P1 sigue en el mundo=" + (mc.player != null && mc.level != null),
+                            gone && SecondaryPlayers.isActive(1) && mc.player != null);
+                    ServerPlayer sp1 = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+                    kill(mc, sp1);
+                    dtPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // P1 muere: la pantalla de vanilla en su region
+                if (ticks == 50) {
+                    boolean death = mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.screen.width == SplitView.p1LogicalW && mc.screen.height == SplitView.p1LogicalH;
+                    dtVerdict("P1 muere: pantalla de muerte (" + (mc.screen == null ? "ninguna" : mc.screen.getClass().getSimpleName()) + ") en su region ("
+                            + (mc.screen == null ? "-" : mc.screen.width + "x" + mc.screen.height) + " de " + SplitView.p1LogicalW + "x" + SplitView.p1LogicalH + "), la de P2=" + c2.screen,
+                            death && c2.screen == null);
+                    if (mc.screen != null) {
+                        for (var child : mc.screen.children()) {
+                            if (child instanceof net.minecraft.client.gui.components.Button b) { // el primero es "Reaparecer"
+                                p1ClickAt(mc, new int[] {b.getX() + b.getWidth() / 2, b.getY() + b.getHeight() / 2});
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (ticks == 56) p1Mouse(mc, false);
+                if (ticks == 110) {
+                    boolean alive = mc.player != null && !mc.player.isDeadOrDying() && mc.screen == null;
+                    dtVerdict("Reaparecer con el raton en la pantalla de muerte de P1: vivo=" + alive + ", pantalla=" + mc.screen, alive);
+                    dtPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                deathTestPhase = 0;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO pantalla de muerte por jugador en conjunto -> {}", dtOk ? "OK" : "FALLO");
+                dtPhase = 5;
+                next();
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- chat y avisos en la region de cada jugador
+
+    private static boolean ctOk = true;
+    private static int ctPhase;
+
+    private static void ctVerdict(String name, boolean ok) {
+        ctOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static boolean hasNotice(PlayerContext c, String part) {
+        return c.notices.stream().anyMatch(n -> n.text().getString().contains(part));
+    }
+
+    private static final String LONG_TEXT = "este es un mensaje muy largo del servidor que no cabe en una sola linea de una region pequena de la pantalla dividida y por eso se parte en varias lineas";
+
+    /** Los avisos del servidor llegan a todos (P1 en su chat, cada extra en su region), un aviso largo se parte al ancho de la region y el chat de P1 no la desborda. */
+    private static void chatTest(Minecraft mc) {
+        PlayerContext c2 = SecondaryPlayers.context(1);
+        var server = mc.getSingleplayerServer();
+        switch (ctPhase) {
+            case 0 -> {
+                if (ticks == 1) {
+                    SplitNotices.p1Log.clear();
+                    SecondaryPlayers.join(mc, 2);
+                    pads.attachVirtual(2);
+                }
+                if (ticks > 30 && extraReady(mc, 2)) {
+                    ctPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                PlayerContext c3 = SecondaryPlayers.context(2);
+                if (ticks == 20) {
+                    String n3 = SecondaryPlayers.secondaryName(mc, 2);
+                    boolean p1 = SplitNotices.p1Log.stream().anyMatch(m -> m.contains(n3) && m.contains("joined"));
+                    ctVerdict("\"" + n3 + " joined the game\" llega a P1 (" + p1 + "), a P2 (" + hasNotice(c2, "joined the game") + ") y al propio P3 (" + hasNotice(c3, "joined the game") + ")",
+                            p1 && hasNotice(c2, n3) && hasNotice(c3, n3));
+                    server.execute(() -> {
+                        server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("aviso para todos"), false);
+                        server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal(LONG_TEXT), false);
+                    });
+                }
+                if (ticks == 45) {
+                    boolean p1 = SplitNotices.p1Log.stream().anyMatch(m -> m.contains("aviso para todos"));
+                    ctVerdict("un aviso del servidor llega a todos: P1=" + p1 + ", P2=" + hasNotice(c2, "aviso para todos") + ", P3=" + hasNotice(c3, "aviso para todos"),
+                            p1 && hasNotice(c2, "aviso para todos") && hasNotice(c3, "aviso para todos"));
+                    int w2 = c2.noticeMaxWidth, w3 = c3.noticeMaxWidth;
+                    ctVerdict("el aviso largo se parte al ancho de la region: linea mas ancha P2=" + w2 + " (region " + c2.hudW + "), P3=" + w3 + " (region " + c3.hudW + "), lineas dibujadas P2="
+                            + c2.noticesDrawn, w2 > 0 && w2 <= c2.hudW && w3 <= c3.hudW && c2.noticesDrawn >= 3);
+                    int cap = mc.gui.getChat().getWidth();
+                    ctVerdict("el chat de P1 no es mas ancho que su region: ancho " + cap + " (region " + SplitView.p1HudW + ")", cap > 0 && cap <= SplitView.p1HudW);
+                    mc.setScreen(new net.minecraft.client.gui.screens.ChatScreen(""));
+                }
+                if (ticks == 60) {
+                    boolean fits = mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen && mc.screen.width == SplitView.p1LogicalW && mc.screen.height == SplitView.p1LogicalH;
+                    ctVerdict("la pantalla del chat de P1 ocupa su region: " + (mc.screen == null ? "-" : mc.screen.width + "x" + mc.screen.height) + " de " + SplitView.p1LogicalW + "x" + SplitView.p1LogicalH, fits);
+                    mc.setScreen(null);
+                    ctPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if (ticks == 1) ConsolePad.LOGGER.info("[autotest] RESULTADO chat y avisos por region en conjunto -> {}", ctOk ? "OK" : "FALLO");
+                if (leaveTo(mc, 2) || ticks > 600) {
+                    ctPhase = 3;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- menu ampliado: ajustes, reparto y remapeo de controles
+
+    private static boolean mnOk = true;
+    private static int mnPhase;
+    private static SplitSettings.Orientation mnOrig;
+    private static float mnDead0;
+    private static int mnJump0, mnSwap0;
+
+    private static void mnVerdict(String name, boolean ok) {
+        mnOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static void mnCursor(PlayerContext c, int[] at) {
+        c.cursorX = at[0];
+        c.cursorY = at[1];
+    }
+
+    /** Pulsacion del boton A de P2 en el tick t0 (suelta 6 ticks despues). */
+    private static void mnClick2(int t, int t0) {
+        if (t == t0) simP2(1 << PadState.A);
+        if (t == t0 + 6) simP2(0);
+    }
+
+    private static void menusTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        var s0 = ConsolePad.PADS.slot(0).settings;
+        var s1 = ConsolePad.PADS.slot(1).settings;
+        int t = ticks;
+        switch (mnPhase) {
+            case 0 -> { // ajustes de P2 desde su menu
+                if (t == 1) {
+                    mnOrig = SplitSettings.orientation();
+                    SplitSettings.setOrientation(SplitSettings.Orientation.SIDE_BY_SIDE);
+                    s1.guiScale = 0;
+                    mnDead0 = s1.moveDeadzone;
+                    SecondaryTick.scriptActive = true;
+                    SecondaryTick.scriptForward = 0f;
+                    press(PadAction.PAUSE);
+                }
+                if (t == 3) release();
+                if (t == 20) {
+                    mnVerdict("Start abre el menu ampliado de P2: " + (c.screen == null ? "ninguno" : c.screen.getClass().getSimpleName()), c.screen instanceof PlayerPauseScreen);
+                    if (c.screen instanceof PlayerPauseScreen m) mnCursor(c, m.settingsCenter());
+                }
+                mnClick2(t, 23);
+                if (t == 40) {
+                    boolean ok = c.screen instanceof PlayerSettingsScreen;
+                    mnVerdict("\"Ajustes del jugador\" abre sus ajustes: " + (c.screen == null ? "ninguno" : c.screen.getClass().getSimpleName()), ok);
+                    if (c.screen instanceof PlayerSettingsScreen m) mnCursor(c, m.guiScaleCenter());
+                }
+                for (int clickAt : new int[] {43, 53, 63}) { // automatica -> 1 -> 2 -> 3; al cambiar la escala la pantalla se recoloca, el cursor se vuelve a poner encima
+                    if (t == clickAt - 1 && c.screen instanceof PlayerSettingsScreen m) mnCursor(c, m.guiScaleCenter());
+                    mnClick2(t, clickAt);
+                }
+                if (t == 80) {
+                    int expectW = c.pw / 3;
+                    mnVerdict("escala de interfaz de P2 a 3 desde su menu: ajuste=" + s1.guiScale + ", escala en vigor=" + c.guiScaleEff + ", interfaz " + c.hudW + " (esperado " + expectW
+                            + "), P1 sin cambios (ajuste " + s0.guiScale + ", escala " + SplitView.p1GuiScaleEff + ")",
+                            s1.guiScale == 3 && c.guiScaleEff == 3 && c.hudW == expectW && s0.guiScale == 0);
+                    if (c.screen instanceof PlayerSettingsScreen m) mnCursor(c, m.moveDeadCenter());
+                }
+                mnClick2(t, 83);
+                if (t == 98) {
+                    mnVerdict("zona muerta del movimiento de P2: " + mnDead0 + " -> " + s1.moveDeadzone + " (cambia), P1 " + s0.moveDeadzone, Math.abs(s1.moveDeadzone - mnDead0) > 0.01f);
+                    simP2(1 << PadState.B);
+                }
+                if (t == 104) simP2(0);
+                if (t == 115) {
+                    var onDisk = dev.consolepad.pad.PadSettingsStore.load(1, new dev.consolepad.pad.PadSettings());
+                    mnVerdict("B en los ajustes vuelve al menu y guarda en slot1.json: pantalla=" + (c.screen == null ? "-" : c.screen.getClass().getSimpleName()) + ", escala guardada=" + onDisk.guiScale,
+                            c.screen instanceof PlayerPauseScreen && onDisk.guiScale == 3);
+                    if (c.screen instanceof PlayerPauseScreen m) mnCursor(c, m.layoutCenter());
+                }
+                mnClick2(t, 118);
+                if (t == 135) {
+                    var rr = new java.util.ArrayList<int[]>();
+                    rr.add(SplitView.p1Px.clone());
+                    rr.add(new int[] {c.px, c.py, c.pw, c.ph});
+                    var win = mc.getWindow();
+                    boolean toggled = SplitSettings.orientation() == SplitSettings.Orientation.STACKED && shapeOk(2, SplitSettings.Orientation.STACKED, win.getWidth(), win.getHeight(), rr);
+                    boolean menuFits = c.screen != null && c.screen.width == c.logicalW && c.screen.height == c.logicalH;
+                    boolean saved = false;
+                    try {
+                        saved = java.nio.file.Files.readString(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve("consolepad").resolve("split.json")).contains("STACKED");
+                    } catch (java.io.IOException e) {
+                        // se informa abajo
+                    }
+                    mnVerdict("\"Reparto\" desde el menu de P2: apilado=" + toggled + ", su menu abierto se reajusta a su nueva region (" + (c.screen == null ? "-" : c.screen.width + "x" + c.screen.height)
+                            + " de " + c.logicalW + "x" + c.logicalH + ")=" + menuFits + ", guardado en split.json=" + saved, toggled && menuFits && saved);
+                    if (c.screen instanceof PlayerPauseScreen m) mnCursor(c, m.layoutCenter());
+                }
+                mnClick2(t, 138);
+                if (t == 155) {
+                    mnVerdict("\"Reparto\" otra vez: vuelve a lado a lado (" + SplitSettings.orientation() + ")", SplitSettings.orientation() == SplitSettings.Orientation.SIDE_BY_SIDE);
+                    s1.guiScale = 0;
+                    s1.moveDeadzone = mnDead0;
+                }
+                if (t == 157 && c.screen instanceof PlayerPauseScreen m) mnCursor(c, m.controlsCenter()); // despues de recolocarse con la escala automatica
+                mnClick2(t, 158);
+                if (t == 175) {
+                    mnVerdict("\"Controles\" abre el remapeo de P2: " + (c.screen == null ? "ninguno" : c.screen.getClass().getSimpleName()), c.screen instanceof PlayerControlsScreen);
+                    if (c.screen instanceof PlayerControlsScreen m) mnCursor(c, m.rowCenter(PadAction.JUMP));
+                    mnPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // remapeo: conflicto + intercambio
+                PlayerControlsScreen cs = c.screen instanceof PlayerControlsScreen m ? m : null;
+                mnClick2(t, 3); // fila "Saltar"
+                if (t == 15) {
+                    mnVerdict("elegir la accion Saltar: escuchando=" + (cs == null ? "-" : cs.listeningAction()) + ", pantalla pide el boton=" + (cs != null && cs.listeningForPad()), cs != null && cs.listeningAction() == PadAction.JUMP && cs.listeningForPad());
+                    simP2(1 << PadState.X); // X ya es "Cambiar de mano"
+                }
+                if (t == 21) simP2(0);
+                if (t == 30) {
+                    String w = cs == null ? "<sin pantalla>" : cs.warning().getString();
+                    boolean unchanged = s1.bindings.get(PadState.A) == PadAction.JUMP && s1.bindings.get(PadState.X) == PadAction.SWAP_HANDS;
+                    mnVerdict("boton ya en uso: aviso \"" + w + "\", sin cambios todavia=" + unchanged, w.contains("ya usa") && unchanged && cs != null && cs.listeningForPad());
+                    simP2(1 << PadState.X); // otra vez: intercambiar
+                }
+                if (t == 36) simP2(0);
+                if (t == 45) {
+                    var onDisk = dev.consolepad.pad.PadSettingsStore.load(1, new dev.consolepad.pad.PadSettings());
+                    boolean swapped = s1.bindings.get(PadState.X) == PadAction.JUMP && s1.bindings.get(PadState.A) == PadAction.SWAP_HANDS;
+                    mnVerdict("intercambio: X=" + s1.bindings.get(PadState.X) + " (Saltar), A=" + s1.bindings.get(PadState.A) + " (Cambiar de mano), P1 intacto (A=" + s0.bindings.get(PadState.A)
+                            + ", X=" + s0.bindings.get(PadState.X) + "), guardado en slot1.json: X=" + onDisk.bindings.get(PadState.X) + ", escuchando=" + (cs != null && cs.listeningForPad()),
+                            swapped && cs != null && !cs.listeningForPad() && s0.bindings.get(PadState.A) == PadAction.JUMP && s0.bindings.get(PadState.X) == PadAction.SWAP_HANDS
+                                    && onDisk.bindings.get(PadState.X) == PadAction.JUMP);
+                    simP2(1 << PadState.B); // vuelve al menu
+                }
+                if (t == 51) simP2(0);
+                if (t == 60) simP2(1 << PadState.B); // cierra el menu
+                if (t == 66) simP2(0);
+                if (t == 80) {
+                    mnVerdict("tras remapear se cierran los menus", c.screen == null);
+                    SecondaryTick.scriptActive = false; // el mando de P2 manda otra vez
+                    mnJump0 = SecondaryTick.dbgJumpTicks;
+                    mnSwap0 = SecondaryTick.dbgSwapHands;
+                    simP2(1 << PadState.X);
+                }
+                if (t == 90) {
+                    simP2(0);
+                    boolean jumped = SecondaryTick.dbgJumpTicks - mnJump0 >= 3;
+                    mnVerdict("X salta con el mando de P2 tras remapear: ticks de salto +" + (SecondaryTick.dbgJumpTicks - mnJump0), jumped);
+                    simP2(1 << PadState.A);
+                }
+                if (t == 100) {
+                    simP2(0);
+                    mnVerdict("A cambia de mano con el mando de P2 tras remapear: cambios de mano +" + (SecondaryTick.dbgSwapHands - mnSwap0), SecondaryTick.dbgSwapHands - mnSwap0 >= 1);
+                    SecondaryTick.scriptActive = true;
+                    SecondaryTick.scriptForward = 0f;
+                    press(PadAction.PAUSE);
+                }
+                if (t == 103) release();
+                if (t == 120 && c.screen instanceof PlayerPauseScreen m) mnCursor(c, m.controlsCenter());
+                mnClick2(t, 123);
+                if (t == 140) {
+                    if (c.screen instanceof PlayerControlsScreen m) mnCursor(c, m.rowCenter(PadAction.DROP));
+                }
+                mnClick2(t, 143); // fila "Soltar" (en B)
+                if (t == 155) {
+                    simP2(1 << PadState.DPAD_LEFT); // boton libre
+                }
+                if (t == 161) simP2(0);
+                if (t == 170) {
+                    boolean free = s1.bindings.get(PadState.DPAD_LEFT) == PadAction.DROP && !s1.bindings.containsKey(PadState.B);
+                    mnVerdict("boton libre: Cruceta izquierda=" + s1.bindings.get(PadState.DPAD_LEFT) + " (Soltar), B sin accion=" + !s1.bindings.containsKey(PadState.B) + ", aviso=\"" + (cs == null ? "-" : cs.warning().getString()) + "\"",
+                            free && cs != null && !cs.warning().getString().contains("ya usa"));
+                    if (cs != null) mnCursor(c, cs.rowCenter(PadAction.ATTACK));
+                }
+                mnClick2(t, 173); // "Atacar" y no se pulsa nada: se cancela solo
+                if (t == 185) mnVerdict("esperando un boton", cs != null && cs.listeningForPad());
+                if (t == 290) {
+                    mnVerdict("sin pulsar nada la escucha se cancela sola", cs != null && !cs.listeningForPad() && cs.listeningAction() == null);
+                    if (cs != null) mnCursor(c, cs.resetCenter());
+                }
+                mnClick2(t, 293);
+                if (t == 310) {
+                    var onDisk = dev.consolepad.pad.PadSettingsStore.load(1, new dev.consolepad.pad.PadSettings());
+                    boolean def = s1.bindings.equals(dev.consolepad.pad.PadSettings.defaultBindings()) && onDisk.bindings.equals(dev.consolepad.pad.PadSettings.defaultBindings());
+                    mnVerdict("Restablecer devuelve los controles de fabrica (en memoria y en slot1.json)=" + def, def);
+                    simP2(1 << PadState.B);
+                }
+                if (t == 316) simP2(0);
+                if (t == 325) simP2(1 << PadState.B);
+                if (t == 331) simP2(0);
+                if (t == 345) {
+                    mnVerdict("menus de P2 cerrados", c.screen == null);
+                    SecondaryTick.scriptActive = false;
+                    mnPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // P1: menu ampliado con el raton y remapeo con su mando
+                if (t == 1) simSlot(0, 1 << PadState.START);
+                if (t == 8) simSlot(0, 0);
+                if (t == 20) {
+                    mnVerdict("Start abre el menu ampliado de P1: " + (mc.screen == null ? "ninguno" : mc.screen.getClass().getSimpleName()) + " (anchura " + (mc.screen == null ? -1 : mc.screen.width)
+                            + " de " + SplitView.p1LogicalW + ")", mc.screen instanceof PlayerPauseScreen && mc.screen.width == SplitView.p1LogicalW);
+                    if (mc.screen instanceof PlayerPauseScreen m) p1ClickAt(mc, m.controlsCenter());
+                }
+                if (t == 26) p1Mouse(mc, false);
+                if (t == 40) {
+                    mnVerdict("P1: \"Controles\" con el raton: " + (mc.screen == null ? "ninguno" : mc.screen.getClass().getSimpleName()), mc.screen instanceof PlayerControlsScreen);
+                    if (mc.screen instanceof PlayerControlsScreen m) p1ClickAt(mc, m.rowCenter(PadAction.JUMP));
+                }
+                if (t == 46) p1Mouse(mc, false);
+                if (t == 55) {
+                    boolean listening = mc.screen instanceof PlayerControlsScreen m && m.listeningForPad();
+                    mnVerdict("P1: Saltar espera un boton de su mando=" + listening, listening);
+                    simSlot(0, 1 << PadState.DPAD_LEFT); // boton libre
+                }
+                if (t == 62) simSlot(0, 0);
+                if (t == 75) {
+                    boolean ok = s0.bindings.get(PadState.DPAD_LEFT) == PadAction.JUMP && s1.bindings.get(PadState.A) == PadAction.JUMP;
+                    mnVerdict("P1 remapea Saltar a Cruceta izquierda con su mando: " + s0.bindings.get(PadState.DPAD_LEFT) + "; A de P1=" + s0.bindings.get(PadState.A) + "; P2 intacto (A=" + s1.bindings.get(PadState.A) + ")",
+                            ok && s0.bindings.get(PadState.A) == null);
+                    if (mc.screen instanceof PlayerControlsScreen m) p1ClickAt(mc, m.resetCenter());
+                }
+                if (t == 81) p1Mouse(mc, false);
+                if (t == 95) {
+                    mnVerdict("P1: Restablecer deja los controles de fabrica=" + s0.bindings.equals(dev.consolepad.pad.PadSettings.defaultBindings()), s0.bindings.equals(dev.consolepad.pad.PadSettings.defaultBindings()));
+                    simSlot(0, 1 << PadState.B);
+                }
+                if (t == 101) simSlot(0, 0);
+                if (t == 110) simSlot(0, 1 << PadState.START);
+                if (t == 117) simSlot(0, 0);
+                if (t == 135) {
+                    mnVerdict("Start cierra el menu de P1 desde el menu ampliado (dos pantallas encadenadas): " + (mc.screen == null ? "ninguna" : mc.screen.getClass().getSimpleName()), mc.screen == null);
+                    mnPhase = 9;
+                    ticks = 0;
+                }
+            }
+            case 9 -> {
+                SplitSettings.setOrientation(mnOrig);
+                s1.guiScale = 0;
+                SecondaryTick.scriptActive = false;
+                simP2(0);
+                ConsolePad.LOGGER.info("[autotest] RESULTADO menu ampliado (ajustes, reparto y controles) en conjunto -> {}", mnOk ? "OK" : "FALLO");
+                mnPhase = 10;
+                next();
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- maniqui del jugador en el inventario de cada jugador
+
+    private static boolean mqOk = true;
+    private static int mqPhase;
+
+    private static void mqVerdict(String name, boolean ok) {
+        mqOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Colores distintos dentro de un recuadro dado en el scissor GL (origen abajo a la izquierda) sobre la imagen (fila 0 arriba). */
+    private static int distinctColors(com.mojang.blaze3d.platform.NativeImage img, int[] box) {
+        java.util.Set<Integer> colors = new java.util.HashSet<>();
+        int top = img.getHeight() - (box[1] + box[3]);
+        for (int y = Math.max(0, top); y < Math.min(img.getHeight(), top + box[3]); y++) {
+            for (int x = Math.max(0, box[0]); x < Math.min(img.getWidth(), box[0] + box[2]); x++) {
+                colors.add(img.getPixelRGBA(x, y) & 0xFFFFFF);
+            }
+        }
+        return colors.size();
+    }
+
+    /**
+     * El maniqui del jugador en su inventario (P1 a P4): su recorte cae dentro de su region con un tamano razonable y, mirando los pixeles de
+     * ese recuadro en la imagen final, hay colores de un modelo dibujado (no el fondo plano). La causa del maniqui vacio era el recorte:
+     * enableScissor no mira la pose y el de P2-P4 caia en la region de P1.
+     */
+    private static void mannequinTest(Minecraft mc) {
+        switch (mqPhase) {
+            case 0 -> {
+                if (joinTo(mc, 4) && ticks > 20) {
+                    mqPhase = 1;
+                    ticks = 0;
+                    scaOpenScreens(mc);
+                }
+            }
+            case 1 -> {
+                if (ticks == 10) {
+                    SplitDiag.uiClear();
+                    SplitDiag.uiRecording = true;
+                }
+                if (ticks == 14) {
+                    SplitDiag.uiRecording = false;
+                    pixelProbe = img -> {
+                        var draws = SplitDiag.uiDraws();
+                        java.util.Map<String, int[]> region = ucRegions();
+                        int base = -1;
+                        for (String owner : new String[] {"P1", "P2", "P3", "P4"}) {
+                            int[] r = region.get(owner);
+                            int[] best = null;
+                            for (var d : draws) {
+                                int[] b = d.scissor();
+                                if (!d.owner().equals(owner) || !d.what().equals("scissor") || b[2] <= 0 || b[3] <= 0) continue;
+                                boolean small = b[2] < r[2] - 10 && b[3] < r[3] - 10;
+                                if (small && b[0] >= r[0] - 2 && b[1] >= r[1] - 2 && b[0] + b[2] <= r[0] + r[2] + 2 && b[1] + b[3] <= r[1] + r[3] + 2) best = b;
+                            }
+                            int colors = best == null ? 0 : distinctColors(img, best);
+                            if (owner.equals("P1")) base = colors;
+                            boolean ok = best != null && colors >= 15 && (owner.equals("P1") || colors >= base * 0.4);
+                            mqVerdict(owner + ": maniqui del inventario: recorte " + (best == null ? "no encontrado en su region" : java.util.Arrays.toString(best) + " dentro de " + java.util.Arrays.toString(r))
+                                    + ", colores distintos en el recuadro=" + colors + " (P1=" + base + ", minimo 15 y 40 % del de P1)", ok);
+                        }
+                        scaCloseScreens(mc);
+                        mqPhase = 2;
+                        ticks = 0;
+                    };
+                }
+            }
+            case 2 -> {
+                if (ticks == 1) ConsolePad.LOGGER.info("[autotest] RESULTADO maniqui del jugador en el inventario de P1 a P4 en conjunto -> {}", mqOk ? "OK" : "FALLO");
+                if (leaveTo(mc, 2) || ticks > 600) {
+                    mqPhase = 3;
                     next();
                 }
             }
@@ -1567,7 +2416,7 @@ public final class AutoTest {
                     }
                     case 112 -> release();
                     case 130 -> {
-                        if (c.screen instanceof P2PauseScreen m) {
+                        if (c.screen instanceof PlayerPauseScreen m) {
                             int[] r = m.resumeCenter();
                             c.cursorX = r[0];
                             c.cursorY = r[1];
@@ -1576,20 +2425,20 @@ public final class AutoTest {
                     case 133 -> simP2(1 << PadState.DPAD_DOWN);
                     case 137 -> simP2(0);
                     case 145 -> {
-                        int[] f = ((P2PauseScreen) c.screen).fovCenter();
-                        ptVerdict("D-pad abajo en el menu de P2: de Volver a Campo de vision", cursorAt(c, f[0], f[1]));
+                        int[] f = ((PlayerPauseScreen) c.screen).settingsCenter();
+                        ptVerdict("D-pad abajo en el menu de P2: de Volver a Ajustes del jugador", cursorAt(c, f[0], f[1]));
                     }
                     case 147 -> simP2(1 << PadState.DPAD_DOWN);
                     case 151 -> simP2(0);
                     case 160 -> {
-                        int[] q = ((P2PauseScreen) c.screen).sensCenter();
-                        ptVerdict("D-pad abajo en el menu de P2: de Campo de vision a Sensibilidad", cursorAt(c, q[0], q[1]));
+                        int[] q = ((PlayerPauseScreen) c.screen).controlsCenter();
+                        ptVerdict("D-pad abajo en el menu de P2: de Ajustes del jugador a Controles", cursorAt(c, q[0], q[1]));
                     }
                     case 162 -> simP2(1 << PadState.DPAD_UP);
                     case 166 -> simP2(0);
                     case 175 -> {
-                        int[] f = ((P2PauseScreen) c.screen).fovCenter();
-                        ptVerdict("D-pad arriba en el menu de P2: de Sensibilidad a Campo de vision", cursorAt(c, f[0], f[1]));
+                        int[] f = ((PlayerPauseScreen) c.screen).settingsCenter();
+                        ptVerdict("D-pad arriba en el menu de P2: de Controles a Ajustes del jugador", cursorAt(c, f[0], f[1]));
                         simP2(1 << PadState.B);
                     }
                     case 181 -> simP2(0);
@@ -1787,12 +2636,13 @@ public final class AutoTest {
 
     public static void tick() {
         if (WORLD == null) return;
+        SecondaryTick.autoRespawn = deathTestPhase == 0; // las pruebas dejan reaparecer solos a los extra, salvo la de la pantalla de muerte
         Minecraft mc = Minecraft.getInstance();
         ticks++;
         // Si un mundo guardado trae a alguien muerto (los mobs de la noche), reaparece: la pantalla de muerte bloquearia la prueba.
-        if (mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.player != null && ticks % 20 == 0) mc.player.respawn();
+        if (deathTestPhase == 0 && mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.player != null && ticks % 20 == 0) mc.player.respawn();
         PlayerContext dead = SecondaryPlayers.context();
-        if (dead != null && dead.player != null && dead.player.getHealth() <= 0f && ticks % 20 == 0) dead.player.respawn();
+        if (deathTestPhase == 0 && dead != null && dead.player != null && dead.player.getHealth() <= 0f && ticks % 20 == 0) dead.player.respawn();
         switch (state) {
             case 0 -> {
                 if (mc.screen instanceof TitleScreen && ticks > 60) {
@@ -1808,6 +2658,8 @@ public final class AutoTest {
                     // La dificultad se restaura al final (leaveTest); la hora del dia solo se adelanta.
                     var server = mc.getSingleplayerServer();
                     prevDifficulty = server.getWorldData().getDifficulty();
+                    prevGuiScale = mc.options.guiScale().get();
+                    mc.options.guiScale().set(0); // escala de interfaz automatica, como al instalar el juego (la del usuario puede ser fija)
                     server.execute(() -> {
                         server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
                         server.overworld().setDayTime(1000L);
@@ -1836,6 +2688,12 @@ public final class AutoTest {
             case 19 -> fpsPhase(mc, false);
             case 20 -> fpsPhase(mc, true);
             case 22 -> startCloseTest(mc);
+            case 23 -> scaleTest(mc);
+            case 24 -> uiClipTest(mc);
+            case 25 -> deathTest(mc);
+            case 26 -> chatTest(mc);
+            case 27 -> menusTest(mc);
+            case 28 -> mannequinTest(mc);
             case 40 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 40) next(); // casilla libre entre las pruebas y la salida

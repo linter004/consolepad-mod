@@ -16,6 +16,8 @@ import net.minecraft.world.item.ItemStack;
  * bossbars, marcador, depuracion y superposiciones de camara. Los menus y pantallas siguen a ventana completa.
  */
 public final class SplitHud {
+    private static int lastChatWidth;
+
     private SplitHud() {}
 
     public static void render(Gui gui, GuiGraphics graphics, DeltaTracker deltaTracker) {
@@ -29,29 +31,44 @@ public final class SplitHud {
         }
         SplitLayout.update(mc, extras);
         int[] r1 = SplitView.p1Gui;
+        if (SplitView.p1HudW != lastChatWidth) { // el chat se parte en lineas al ancho de la region: volver a partirlo si cambia
+            lastChatWidth = SplitView.p1HudW;
+            mc.gui.getChat().rescaleChat();
+        }
         GuiInvoker invoker = (GuiInvoker) gui;
         final net.minecraft.client.multiplayer.ClientLevel p1Level = mc.level;
         final float partial = deltaTracker.getGameTimeDeltaPartialTick(false);
         try {
-            fitP1Screen(mc, Math.round(r1[2] / SplitView.p1ScreenScale), Math.round(r1[3] / SplitView.p1ScreenScale));
-            SplitView.guiWidth = r1[2];
-            SplitView.guiHeight = r1[3];
+            fitP1Screen(mc, SplitView.p1LogicalW, SplitView.p1LogicalH);
+            SplitView.guiWidth = SplitView.p1HudW;
+            SplitView.guiHeight = SplitView.p1HudH;
             SplitDiag.hudOwner = "P1";
             SplitDiag.hudExpected = mc.player;
-            gui.render(graphics, deltaTracker); // region de P1: origen (0, 0)
+            graphics.enableScissor(r1[0], r1[1], r1[0] + r1[2], r1[1] + r1[3]); // nada de P1 se sale de su region (objeto del cursor, chat...)
+            graphics.pose().pushPose();
+            graphics.pose().scale(SplitView.p1HudRatio, SplitView.p1HudRatio, 1f); // escala de interfaz propia de P1
+            try {
+                gui.render(graphics, deltaTracker); // region de P1: origen (0, 0)
+            } finally {
+                graphics.pose().popPose();
+                graphics.disableScissor();
+            }
 
             PoseStack pose = graphics.pose();
             int p1Left = gui.leftHeight, p1Right = gui.rightHeight;
             try {
                 for (PlayerContext p : extras) {
                     pose.pushPose();
+                    graphics.enableScissor(p.gx, p.gy, p.gx + p.gw, p.gy + p.gh);
                     try {
                         pose.translate(p.gx, p.gy, 0);
-                        SplitView.guiWidth = p.gw;
-                        SplitView.guiHeight = p.gh;
+                        SplitView.guiWidth = p.hudW;
+                        SplitView.guiHeight = p.hudH;
                         SplitDiag.hudOwner = p.label();
                         SplitDiag.hudExpected = p.player;
                         ContextSwitcher.run(p, () -> {
+                            pose.pushPose();
+                            pose.scale(p.hudRatio, p.hudRatio, 1f); // escala de interfaz propia de este jugador
                             withState(gui, p.hud, () -> {
                                 gui.leftHeight = 39; // Gui.render() los reinicia al empezar cada HUD
                                 gui.rightHeight = 39;
@@ -64,9 +81,11 @@ public final class SplitHud {
                                 invoker.consolepad$renderEffects(graphics, deltaTracker);
                             });
                             SplitNotices.render(mc, p, graphics);
+                            pose.popPose();
                             SecondaryScreens.render(mc, p, graphics, partial, p1Level);
                         });
                     } finally {
+                        graphics.disableScissor();
                         pose.popPose();
                     }
                 }
