@@ -220,6 +220,91 @@ public final class AutoTest {
         if (ticks > 20 && ticks < 75) mc.player.setSprinting(true);
     }
 
+    private static int leaveSub;
+    private static java.nio.file.Path leaveFile;
+    private static long leaveFileTime0;
+    private static SplitLevelRenderer leaveRenderer;
+
+    /**
+     * Paso 7: P2 recibe 7 diamantes en el servidor, sale (cierra su conexion), se comprueba la limpieza y su playerdata,
+     * vuelve a entrar y debe conservar el inventario; por ultimo P1 sale del mundo y no debe quedar nada de P2.
+     */
+    private static void leaveTest(Minecraft mc) {
+        switch (leaveSub) {
+            case 0 -> {
+                ServerPlayer p2 = serverP2(mc);
+                leaveFile = mc.getSingleplayerServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.PLAYER_DATA_DIR)
+                        .resolve(p2.getUUID() + ".dat");
+                mc.getSingleplayerServer().execute(() -> p2.getInventory().setItem(20, new ItemStack(Items.DIAMOND, 7)));
+                leaveSub = 1;
+                ticks = 0;
+            }
+            case 1 -> {
+                if (ticks < 40) return;
+                leaveFileTime0 = fileTime(leaveFile);
+                leaveRenderer = (SplitLevelRenderer) SecondaryPlayers.context().renderer;
+                SecondaryPlayers.leave(mc);
+                leaveSub = 2;
+                ticks = 0;
+            }
+            case 2 -> {
+                if ((SecondaryPlayers.isActive() || serverP2(mc) != null) && ticks < 200) return;
+                boolean ctxNull = SecondaryPlayers.context() == null;
+                boolean gone = serverP2(mc) == null;
+                boolean released = !leaveRenderer.isLive();
+                long t1 = fileTime(leaveFile);
+                boolean saved = t1 > 0 && t1 >= leaveFileTime0;
+                boolean p1ok = mc.player != null && mc.level != null && !mc.player.getName().getString().equals(SecondaryPlayers.secondaryName(mc));
+                boolean ok = !SecondaryPlayers.isActive() && ctxNull && gone && released && saved && p1ok && ContextSwitcher.violations() == 0;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO salida de P2: conexion cerrada={} contexto liberado={} fuera del servidor={} "
+                                + "renderer liberado={} playerdata existe y guardado={} (marca {} -> {}) P1 intacto={} fallos de restauracion={} -> {}",
+                        !SecondaryPlayers.isActive(), ctxNull, gone, released, saved, leaveFileTime0, t1, p1ok,
+                        ContextSwitcher.violations(), ok ? "OK" : "FALLO");
+                SecondaryPlayers.join(mc);
+                leaveSub = 3;
+                ticks = 0;
+            }
+            case 3 -> {
+                PlayerContext c = SecondaryPlayers.context();
+                ServerPlayer p2 = serverP2(mc);
+                if ((c == null || c.player == null || c.level == null || p2 == null || ticks < 100) && ticks < 400) return;
+                ItemStack server = p2 == null ? ItemStack.EMPTY : p2.getInventory().getItem(20);
+                ItemStack client = c == null || c.player == null ? ItemStack.EMPTY : c.player.getInventory().getItem(20);
+                boolean ok = server.is(Items.DIAMOND) && server.getCount() == 7 && client.is(Items.DIAMOND) && client.getCount() == 7;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO reentrada de P2: inventario slot 20 en servidor = {} x{}, en cliente = {} x{} (esperado 7 diamantes) -> {}",
+                        server.getItem(), server.getCount(), client.getItem(), client.getCount(), ok ? "OK" : "FALLO");
+                leaveSub = 4;
+                ticks = 0;
+            }
+            case 4 -> {
+                if (ticks < 40) return;
+                ConsolePad.LOGGER.info("[autotest] P1 sale del mundo");
+                mc.level.disconnect(); // como PauseScreen.onDisconnect: cierra la conexion de P1 y el servidor se detiene
+                mc.disconnect();
+                leaveSub = 5;
+                ticks = 0;
+            }
+            case 5 -> {
+                boolean idle = mc.getSingleplayerServer() == null && !SecondaryPlayers.isActive() && SecondaryPlayers.context() == null;
+                if (!idle && ticks < 600) return;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO salir del mundo: servidor cerrado={} P2 activo={} contexto de P2 presente={} fallos de restauracion={} -> {}",
+                        mc.getSingleplayerServer() == null, SecondaryPlayers.isActive(), SecondaryPlayers.context() != null,
+                        ContextSwitcher.violations(), idle ? "OK" : "FALLO");
+                ConsolePad.LOGGER.info("[autotest] terminado");
+                next();
+            }
+            default -> { }
+        }
+    }
+
+    private static long fileTime(java.nio.file.Path p) {
+        try {
+            return java.nio.file.Files.exists(p) ? java.nio.file.Files.getLastModifiedTime(p).toMillis() : -1;
+        } catch (java.io.IOException e) {
+            return -1;
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -335,7 +420,6 @@ public final class AutoTest {
                     mc.levelRenderer.getSectionStatistics(), p2Stats);
             phaseStarted = false;
             next();
-            if (split) ConsolePad.LOGGER.info("[autotest] terminado");
         }
     }
 
@@ -377,6 +461,7 @@ public final class AutoTest {
             case 9 -> fovTest(mc);
             case 10 -> fpsPhase(mc, false);
             case 11 -> fpsPhase(mc, true);
+            case 12 -> leaveTest(mc);
             default -> { }
         }
     }

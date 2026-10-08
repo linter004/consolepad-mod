@@ -39,6 +39,13 @@ public final class SecondaryTick {
 
     private SecondaryTick() {}
 
+    /** P2 sale: ningun boton queda "pulsado" para la proxima vez que entre. */
+    public static void reset() {
+        prevAttack = prevUse = prevLb = prevRb = false;
+        scriptActive = false;
+        scriptForward = 0f;
+    }
+
     /** Una vez por tick de cliente, despues del tick de P1. */
     public static void tick(PadManager.Slot slot) {
         PlayerContext ctx = SecondaryPlayers.context();

@@ -78,6 +78,32 @@ public final class SecondaryPlayers {
         c.send(new ServerboundHelloPacket(name, profile.getId()));
     }
 
+    /**
+     * P2 sale de la partida: cierra su conexion. El servidor lo quita y guarda su playerdata; la limpieza local
+     * (renderer, contexto, estado de entrada) la hace {@link #forget} cuando el cierre llega al listener.
+     */
+    public static void leave(Minecraft mc) {
+        Connection c = connection;
+        if (c == null) {
+            ConsolePad.LOGGER.info("Jugador 2: no esta dentro");
+            return;
+        }
+        ConsolePad.LOGGER.info("Jugador 2: saliendo");
+        c.disconnect(Component.translatable("multiplayer.status.quitting"));
+    }
+
+    /**
+     * P1 sale del mundo (evento LoggingOut): P2 se cierra y se libera ya, sin esperar a que llegue la desconexion del
+     * servidor. Si no, su tick seguiria corriendo con el mundo descargado (config de NeoForge ya sin cargar).
+     */
+    public static void shutdown() {
+        Connection c = connection;
+        if (c == null) return;
+        ConsolePad.LOGGER.info("Jugador 2: P1 sale del mundo, se libera P2");
+        c.disconnect(Component.translatable("multiplayer.status.quitting"));
+        forget(c);
+    }
+
     /** Llamado por ConnectionMixin al instalar el listener de juego de la conexion extra. */
     public static PacketListener wrapGameListener(Connection c, ClientPacketListener real) {
         PlayerContext ctx = context;
@@ -122,15 +148,28 @@ public final class SecondaryPlayers {
         connection = null;
         PlayerContext ctx = context;
         context = null;
+        SecondaryTick.reset();
+        SplitView.width = 0;
+        SplitView.height = 0;
         if (ctx != null) {
-            Minecraft.getInstance().execute(() -> {
+            Runnable release = () -> {
                 try {
                     if (ctx.renderer instanceof SplitLevelRenderer r) r.release();
                     else ctx.renderer.close();
                 } catch (RuntimeException e) {
                     ConsolePad.LOGGER.warn("[split] no se pudo cerrar el renderer latente de P2: {}", e.toString());
                 }
-            });
+                ctx.player = null;
+                ctx.level = null;
+                ctx.gameMode = null;
+                ctx.cameraEntity = null;
+                ctx.hitResult = null;
+                ctx.crosshairPickEntity = null;
+                ConsolePad.LOGGER.info("[split] P2 liberado (renderer, nivel y jugador soltados)");
+            };
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.isSameThread()) release.run();
+            else mc.execute(release);
         }
     }
 
