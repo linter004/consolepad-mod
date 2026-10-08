@@ -83,11 +83,6 @@ public final class SecondaryTick {
             }
         }
 
-        if (ctx.screen != null) { // con un menu abierto P2 no se mueve ni actua en el mundo (su mando maneja el cursor)
-            forward = left = lookX = lookY = 0f;
-            jump = attack = use = lb = rb = false;
-            downSet.clear();
-        }
         if (slot.device != null && !scripted) {
             // Start+Back es el atajo de entrar/salir: mientras esta pulsado (y hasta soltar los dos) no dispara las acciones de Start ni de Back
             // (si no, P2 apareceria con el menu de pausa abierto).
@@ -99,10 +94,28 @@ public final class SecondaryTick {
                 }
                 if (!cs.isDown(PadState.START) && !cs.isDown(PadState.BACK)) st.comboLatch = false;
             }
+            // El boton que acaba de cerrar una pantalla (B, Start, Y...) no vuelve a disparar su accion de juego mientras siga pulsado:
+            // la pantalla se cierra en el fotograma y este tick veria ese boton como una pulsacion nueva (soltar un objeto, reabrir el menu).
+            if (st.closeLatch != 0) {
+                for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
+                    if ((st.closeLatch & (1 << e.getKey())) != 0 && cs.isDown(e.getKey())) downSet.remove(e.getValue());
+                }
+                for (int code = 0; code < 32; code++) {
+                    if ((st.closeLatch & (1 << code)) != 0 && !cs.isDown(code)) st.closeLatch &= ~(1 << code);
+                }
+            }
+        }
+        // Con un menu abierto el jugador no se mueve ni actua en el mundo (su mando maneja el cursor), pero lo que tiene pulsado se
+        // recuerda: al cerrar el menu no cuenta como pulsacion nueva.
+        java.util.EnumSet<PadAction> rawDown = java.util.EnumSet.copyOf(downSet);
+        if (ctx.screen != null) {
+            forward = left = lookX = lookY = 0f;
+            jump = attack = use = lb = rb = false;
+            downSet.clear();
         }
         java.util.EnumSet<PadAction> pressed = java.util.EnumSet.copyOf(downSet);
         pressed.removeAll(st.prevDown);
-        st.prevDown = downSet;
+        st.prevDown = rawDown;
         st.pressedNow = pressed;
         final float f = forward, l = left, lx = lookX, ly = lookY;
         final boolean j = jump, a = attack, u = use, bl = lb, br = rb;

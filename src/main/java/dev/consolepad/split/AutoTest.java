@@ -1345,6 +1345,144 @@ public final class AutoTest {
         }
     }
 
+    // ---------------------------------------------------------------- ayudas para pruebas con 3 y 4 jugadores
+
+    /** Mete jugadores hasta tener n en total (mando virtual incluido). Se llama cada tick; true cuando los n estan dentro y listos. */
+    private static boolean joinTo(Minecraft mc, int n) {
+        for (int slot = 1; slot < n; slot++) {
+            pads.attachVirtual(slot);
+            if (!SecondaryPlayers.isActive(slot)) {
+                SecondaryPlayers.join(mc, slot);
+                return false;
+            }
+            if (!extraReady(mc, slot)) return false;
+        }
+        return true;
+    }
+
+    /** Saca jugadores hasta dejar n en total. true cuando los de fuera ya no estan ni en el cliente ni en el servidor. */
+    private static boolean leaveTo(Minecraft mc, int n) {
+        boolean done = true;
+        for (int slot = SecondaryPlayers.MAX_EXTRA; slot >= n; slot--) {
+            if (SecondaryPlayers.isActive(slot)) {
+                SecondaryPlayers.leave(mc, slot);
+                done = false;
+            } else if (serverExtra(mc, slot) != null) {
+                done = false;
+            }
+        }
+        return done;
+    }
+
+    private static net.minecraft.client.gui.screens.Screen screenOf(Minecraft mc, int slot) {
+        if (slot == 0) return mc.screen;
+        PlayerContext c = SecondaryPlayers.context(slot);
+        return c == null ? null : c.screen;
+    }
+
+    private static boolean isPauseMenu(net.minecraft.client.gui.screens.Screen s) {
+        return s instanceof net.minecraft.client.gui.screens.PauseScreen || s instanceof P2PauseScreen;
+    }
+
+    /** Pantallas abiertas de los slots 0..3 como texto ("-" = ninguna). */
+    private static String screensDigest(Minecraft mc) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            var sc = SecondaryPlayers.isActive(i) || i == 0 ? screenOf(mc, i) : null;
+            b.append('P').append(i + 1).append('=').append(sc == null ? "-" : sc.getClass().getSimpleName()).append(' ');
+        }
+        return b.toString().trim();
+    }
+
+    private static boolean onlyOpen(Minecraft mc, int slot, boolean pauseMenu) {
+        for (int i = 0; i < 4; i++) {
+            if (i != slot && SecondaryPlayers.isActive(i) | i == 0) {
+                if (screenOf(mc, i) != null) return false;
+            }
+        }
+        var sc = screenOf(mc, slot);
+        return pauseMenu ? isPauseMenu(sc) : sc == null;
+    }
+
+    // ---------------------------------------------------------------- Start y B cierran el menu de su jugador
+
+    private static int scPhase;
+    private static boolean scOk = true;
+    private static int scDrops0;
+
+    private static void scVerdict(String name, boolean ok) {
+        scOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Una pulsacion de t0 a t1 ticks (mas larga que un tick, como un dedo de verdad). */
+    private static void scPress(int slot, int bit, int t, int from, int to) {
+        if (t == from) simSlot(slot, 1 << bit);
+        if (t == to) simSlot(slot, 0);
+    }
+
+    /**
+     * Cada jugador (P1..P4) abre su menu con Start y solo se abre el suyo; Start lo cierra (y no lo reabre mientras sigue pulsado);
+     * B tambien lo cierra y no suelta ningun objeto. Con dos menus abiertos a la vez, cerrar uno no cierra el otro.
+     */
+    private static void startCloseTest(Minecraft mc) {
+        switch (scPhase) {
+            case 0 -> {
+                if (joinTo(mc, 4)) {
+                    scPhase = 1;
+                    ticks = 0;
+                    scDrops0 = SecondaryTick.dbgDrop;
+                    mc.setScreen(null);
+                }
+            }
+            case 1, 2, 3, 4 -> {
+                int slot = scPhase - 1;
+                String who = "P" + (slot + 1);
+                scPress(slot, PadState.START, ticks, 5, 12);
+                if (ticks == 25) scVerdict("Start abre el menu de pausa de " + who + " y solo el suyo [" + screensDigest(mc) + "]", onlyOpen(mc, slot, true));
+                scPress(slot, PadState.START, ticks, 28, 35);
+                if (ticks == 55) scVerdict("Start cierra el menu de pausa de " + who + " y no lo reabre [" + screensDigest(mc) + "]", onlyOpen(mc, slot, false));
+                scPress(slot, PadState.START, ticks, 58, 65);
+                if (ticks == 80) scVerdict("Start vuelve a abrir el menu de " + who + " [" + screensDigest(mc) + "]", onlyOpen(mc, slot, true));
+                scPress(slot, PadState.B, ticks, 83, 90);
+                if (ticks == 110) {
+                    scVerdict("B cierra el menu de pausa de " + who + " y no lo reabre [" + screensDigest(mc) + "]", onlyOpen(mc, slot, false));
+                    scPhase++;
+                    ticks = 0;
+                }
+            }
+            case 5 -> { // dos menus abiertos a la vez (P2 y P3): Start en P3 cierra solo el de P3
+                scPress(1, PadState.START, ticks, 5, 12);
+                scPress(2, PadState.START, ticks, 15, 22);
+                if (ticks == 40) {
+                    boolean both = isPauseMenu(screenOf(mc, 1)) && isPauseMenu(screenOf(mc, 2)) && screenOf(mc, 0) == null && screenOf(mc, 3) == null;
+                    scVerdict("P2 y P3 abren su menu a la vez [" + screensDigest(mc) + "]", both);
+                }
+                scPress(2, PadState.START, ticks, 45, 52);
+                if (ticks == 70) {
+                    boolean ok = isPauseMenu(screenOf(mc, 1)) && screenOf(mc, 2) == null && screenOf(mc, 0) == null && screenOf(mc, 3) == null;
+                    scVerdict("Start en P3 cierra solo el menu de P3, el de P2 sigue [" + screensDigest(mc) + "]", ok);
+                }
+                scPress(1, PadState.B, ticks, 75, 82);
+                if (ticks == 100) {
+                    scVerdict("B en P2 cierra su menu [" + screensDigest(mc) + "]", screenOf(mc, 1) == null && screenOf(mc, 2) == null);
+                    scVerdict("cerrar menus con B no suelta objetos (soltar ejecutado " + (SecondaryTick.dbgDrop - scDrops0) + " veces)", SecondaryTick.dbgDrop == scDrops0);
+                    scPhase = 6;
+                    ticks = 0;
+                }
+            }
+            case 6 -> {
+                if (ticks == 1) simSlot(0, 0);
+                if (leaveTo(mc, 2) || ticks > 600) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO Start y B cierran el menu de su jugador (P1 a P4) en conjunto -> {}", scOk ? "OK" : "FALLO");
+                    scPhase = 7;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
     private static boolean ptOk = true;
     private static net.minecraft.world.level.GameType ptPrev;
     private static int ptPhase;
@@ -1697,9 +1835,26 @@ public final class AutoTest {
             case 18 -> fovTest(mc);
             case 19 -> fpsPhase(mc, false);
             case 20 -> fpsPhase(mc, true);
-            case 21 -> leaveTest(mc);
-            default -> { }
+            case 22 -> startCloseTest(mc);
+            case 40 -> leaveTest(mc);
+            default -> {
+                if (state > 2 && state < 40) next(); // casilla libre entre las pruebas y la salida
+            }
         }
+    }
+
+    /**
+     * CONSOLEPAD_AUTOTEST_CASES=22,23 ejecuta solo esas pruebas (ademas de la preparacion y la salida): para repetir una sola sin pasar
+     * por todo el autotest. Sin la variable corren todas.
+     */
+    private static final java.util.Set<Integer> ONLY = parseCases();
+
+    private static java.util.Set<Integer> parseCases() {
+        String v = System.getenv("CONSOLEPAD_AUTOTEST_CASES");
+        if (v == null || v.isBlank()) return null;
+        java.util.Set<Integer> out = new java.util.HashSet<>();
+        for (String p : v.split(",")) out.add(Integer.parseInt(p.trim()));
+        return out;
     }
 
     private static void teleportAway(Minecraft mc) {
@@ -1792,6 +1947,7 @@ public final class AutoTest {
 
     private static void next() {
         state++;
+        while (ONLY != null && state >= 3 && state < 40 && !ONLY.contains(state)) state++;
         ticks = 0;
     }
 }

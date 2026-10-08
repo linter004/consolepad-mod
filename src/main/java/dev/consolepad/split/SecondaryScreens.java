@@ -126,12 +126,15 @@ public final class SecondaryScreens {
                 screen.mouseScrolled(ctx.cursorX, ctx.cursorY, 0.0, steps);
             }
             // Cerrar: B, Start o la tecla de inventario de su mando.
-            boolean close = s.pressed(PadState.B) || s.pressed(PadState.START);
+            int closing = 0;
+            if (s.pressed(PadState.B)) closing |= 1 << PadState.B;
+            if (s.pressed(PadState.START)) closing |= 1 << PadState.START;
             for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
-                if (e.getValue() == PadAction.INVENTORY && s.pressed(e.getKey())) close = true;
+                if ((e.getValue() == PadAction.INVENTORY || e.getValue() == PadAction.PAUSE) && s.pressed(e.getKey())) closing |= 1 << e.getKey();
             }
-            if (close && screen.shouldCloseOnEsc()) {
+            if (closing != 0 && screen.shouldCloseOnEsc()) {
                 ctx.buttonDown[0] = ctx.buttonDown[1] = false;
+                ctx.input.closeLatch |= closing; // SecondaryTick no reabre la pantalla ni suelta objetos con el mismo boton
                 screen.onClose();
             }
         });

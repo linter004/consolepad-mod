@@ -77,6 +77,8 @@ public final class PlayerContext {
     public static final class InputState {
         public boolean prevAttack, prevUse, prevLb, prevRb;
         public boolean sprintLatch, sneakLatch, comboLatch;
+        /** Botones (mascara de codigos de PadState) que acaban de cerrar una pantalla: hasta soltarlos no disparan su accion de juego (soltar, inventario, pausa...). */
+        public int closeLatch;
         /** Sprint conmutado: lo lee KeyMappingGuardMixin cuando LocalPlayer.aiStep pregunta por keySprint. */
         public volatile boolean sprintHeld;
         public int deadTicks;
