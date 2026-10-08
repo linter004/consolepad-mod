@@ -1036,6 +1036,38 @@ public final class AutoTest {
                 + " " + SplitDiag.hudWrongWhat(), missing.length() == 0 && SplitDiag.hudWrong() == 0);
     }
 
+    /** P1 con 4 jugadores: su inventario cabe en su cuadrante (escala < 1) y un clic por la ruta real del raton coge el objeto. */
+    private static void mtP1Inventory(Minecraft mc, boolean start) {
+        var win = mc.getWindow();
+        var mouse = (dev.consolepad.mixin.MouseHandlerInvoker) mc.mouseHandler;
+        if (start) {
+            boolean open = mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
+            if (!open) {
+                mtVerdict("P1: inventario abierto en su cuadrante", false);
+                return;
+            }
+            var scr = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) mc.screen;
+            float k = SplitView.p1ScreenScale;
+            int[] r = SplitView.p1Gui;
+            int lw = Math.round(r[2] / k), lh = Math.round(r[3] / k);
+            boolean sized = scr.width == lw && scr.height == lh;
+            boolean fits = scr.getGuiLeft() >= 0 && scr.getGuiTop() >= 0 && scr.getGuiLeft() + 176 <= lw && scr.getGuiTop() + 166 <= lh;
+            mtVerdict("P1: inventario en su cuadrante (" + r[2] + "x" + r[3] + " unidades, escala " + String.format(java.util.Locale.ROOT, "%.2f", k) + ", logico " + lw + "x" + lh
+                    + "): tamano logico=" + sized + ", cabe entero=" + fits, k < 1f && sized && fits);
+            net.minecraft.world.inventory.Slot sl = scr.getMenu().slots.get(20);
+            double gx = (scr.getGuiLeft() + sl.x + 8) * k, gy = (scr.getGuiTop() + sl.y + 8) * k; // unidades de GUI de la ventana
+            double sx = gx * win.getScreenWidth() / win.getGuiScaledWidth(), sy = gy * win.getScreenHeight() / win.getGuiScaledHeight();
+            mouse.consolepad$onMove(win.getWindow(), sx, sy);
+            mouse.consolepad$onPress(win.getWindow(), org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, org.lwjgl.glfw.GLFW.GLFW_PRESS, 0);
+        } else {
+            ItemStack carried = mc.player.containerMenu.getCarried();
+            mouse.consolepad$onPress(win.getWindow(), org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, org.lwjgl.glfw.GLFW.GLFW_RELEASE, 0);
+            mtVerdict("P1: clic real del raton sobre un hueco de su inventario escalado: objeto en el cursor = " + carried.getItem() + " x" + carried.getCount() + " (10 de tierra)",
+                    carried.is(Items.DIRT) && carried.getCount() == 10);
+            mc.setScreen(null);
+        }
+    }
+
     private static void mtOpenInventory(Minecraft mc, PlayerContext c) {
         ContextSwitcher.run(c, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(c.player)));
     }
@@ -1121,6 +1153,11 @@ public final class AutoTest {
                 if (ticks == 20) mtRecordStart();
                 if (ticks == 32) {
                     mtEvaluate(mc, 4);
+                    mc.getSingleplayerServer().execute(() -> {
+                        p1.getInventory().setItem(20, new ItemStack(Items.DIRT, 10));
+                        p1.getInventory().setItem(21, ItemStack.EMPTY);
+                    });
+                    mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player)); // P1 tambien, en su cuadrante
                     mtOpenInventory(mc, SecondaryPlayers.context(1));
                     mtOpenInventory(mc, SecondaryPlayers.context(2));
                     mtOpenInventory(mc, SecondaryPlayers.context(3));
@@ -1137,6 +1174,10 @@ public final class AutoTest {
                     mtCheckInventoryFits(mc, SecondaryPlayers.context(1));
                     mtCheckInventoryFits(mc, SecondaryPlayers.context(2));
                     mtCheckInventoryFits(mc, SecondaryPlayers.context(3));
+                    mtP1Inventory(mc, true);
+                }
+                if (ticks == 26) {
+                    mtP1Inventory(mc, false);
                     mc.options.renderDistance().set(8);
                     mc.options.enableVsync().set(false);
                     mc.options.framerateLimit().set(260);

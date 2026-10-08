@@ -14,7 +14,7 @@ Complementa `docs/splitscreen-plan.md` (diseño y prototipo, pasos 1-7). Primero
 | 4c Inventario, cofre y mesa de crafteo por jugador, en su región, con cursor propio (clic, arrastre, mover rápido, scroll, cerrar) | [V] inventario, cofre, mesa; horno y demás usan la misma ruta [S] |
 | 4d Menú de pausa por jugador sin pausar el mundo; "Salir" saca solo a ese jugador | [V] D-pad de los menús de P2-P4 [S] |
 | 4e Entrar con Start+Back y salir manteniéndolo 2 s | [V] simulado; con mando físico [S]; P3/P4 por atajo [S] (por comando y `join` [V]) |
-| 4f 3 y 4 jugadores: regiones, HUD, inventarios escalados a su región, FPS | [V] |
+| 4f 3 y 4 jugadores: regiones, HUD, inventarios escalados a su región (también el de P1, con el ratón reescalado), FPS | [V] |
 | 4g Avisos propios (chat, barra de acciones, título) y FOV y sensibilidad por jugador desde su menú | [V] |
 | Aislamiento P1 ↔ extras | [V] clic de ratón, teclas de sprint/agacharse, FOV al correr, títulos, inventario, chat |
 
@@ -22,7 +22,6 @@ FPS (distancia 8, sin vsync, 854×480): 1 jugador ≈ 3300, 2 jugadores ≈ 1600
 
 ## 1. Pendientes (con el motivo)
 
-- **Pantalla de P1 con 4 jugadores:** su región mide 213×120 unidades y el inventario vanilla 176×166, así que se sale de su cuadrante. Los inventarios de P2-P4 sí se escalan (0,67). Arreglarlo exige reescalar las coordenadas del ratón de P1 en `MouseHandler` (`onMove/onPress/onScroll`) además de dibujar con escala. Riesgo medio, se deja para después.
 - **Maniquí del jugador en el inventario de P2-P4:** el recuadro sale vacío (el de P1 sí se dibuja). No bloquea; causa sin identificar (probable skin/`PlayerInfo` del jugador extra o estado de render de entidad).
 - **Escribir en el chat con mando:** hace falta un teclado en pantalla; el chat con historial por jugador tampoco existe (hoy: últimos 5 avisos por jugador, sin entrada de texto).
 - **HUD de P2-P4 que sigue siendo solo de P1:** superposiciones de cámara (viñeta, calabaza, portal), cabalgadura (barra de salto, vida del vehículo), bossbars, marcador, depuración y lista de jugadores.

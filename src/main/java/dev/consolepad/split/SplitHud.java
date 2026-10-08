@@ -33,7 +33,7 @@ public final class SplitHud {
         final net.minecraft.client.multiplayer.ClientLevel p1Level = mc.level;
         final float partial = deltaTracker.getGameTimeDeltaPartialTick(false);
         try {
-            fitP1Screen(mc, r1[2], r1[3]);
+            fitP1Screen(mc, Math.round(r1[2] / SplitView.p1ScreenScale), Math.round(r1[3] / SplitView.p1ScreenScale));
             SplitView.guiWidth = r1[2];
             SplitView.guiHeight = r1[3];
             SplitDiag.hudOwner = "P1";

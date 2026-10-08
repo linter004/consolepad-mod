@@ -37,6 +37,7 @@ public final class SplitLayout {
         int H = win.getHeight();
         SplitView.p1Gui = gui[0];
         SplitView.p1Px = new int[] {pix[0][0], H - (pix[0][1] + pix[0][3]), pix[0][2], pix[0][3]};
+        SplitView.p1ScreenScale = Math.min(1f, Math.min(gui[0][3] / MIN_SCREEN_H, gui[0][2] / MIN_SCREEN_W));
         for (int i = 0; i < extras.size(); i++) {
             PlayerContext c = extras.get(i);
             c.gx = gui[i + 1][0];

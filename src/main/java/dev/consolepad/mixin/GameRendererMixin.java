@@ -54,6 +54,29 @@ public abstract class GameRendererMixin {
         return ContextSwitcher.handOr(self.itemInHandRenderer);
     }
 
+    /** La pantalla de P1 se dibuja a la escala de su region (con 4 jugadores < 1) y con la posicion del raton en unidades logicas. */
+    @Redirect(method = "render",
+            at = @At(value = "INVOKE", target = "Lnet/neoforged/neoforge/client/ClientHooks;drawScreen(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;IIF)V"))
+    private void consolepad$scaledP1Screen(net.minecraft.client.gui.screens.Screen screen, net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partial) {
+        float k = SplitView.p1Scale();
+        if (k >= 1f) {
+            net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
+            return;
+        }
+        int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
+        graphics.pose().pushPose();
+        graphics.pose().scale(k, k, 1f);
+        SplitView.guiWidth = screen.width;
+        SplitView.guiHeight = screen.height;
+        try {
+            net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, Math.round(mouseX / k), Math.round(mouseY / k), partial);
+        } finally {
+            SplitView.guiWidth = oldW;
+            SplitView.guiHeight = oldH;
+            graphics.pose().popPose();
+        }
+    }
+
     /** Campo de vision propio de cada jugador: se escala por (FOV del jugador / FOV global); la mano (useFOVSetting = false) no cambia. */
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void consolepad$ownFov(net.minecraft.client.Camera camera, float partialTicks, boolean useFovSetting, CallbackInfoReturnable<Double> cir) {
