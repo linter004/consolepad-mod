@@ -64,3 +64,13 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Un cartel abierto desde una prueba necesita `sign.setAllowedPlayerEditor(uuid)` en el servidor** (lo hace `SignBlock.openTextEdit`, no `ServerPlayer.openTextEdit`). `ServerBossEvent` esta en `net.minecraft.server.level`.
 - **Si en una tanda filtrada todo lo de P1 falla a la vez y lo de los extra no, es el foco de la ventana** (`PadDriver` no hace nada con `!mc.isWindowActive()`): repetir sin tocar ni abrir nada mas.
 - **Un mixin a una clase de Mixin no puede tener campos estaticos publicos usados desde fuera:** los contadores van en `SplitDiag`.
+
+### Reglas aprendidas de la tercera tanda (estado compartido, giro, aviso)
+
+- **Todo estado de `GameRenderer`/`Camera`/`LevelRenderer`/`Minecraft` que se actualice por tick o por fotograma y dependa del jugador debe ser por jugador:** se cambia al entrar en su contexto (`try/finally`) y se actualiza dentro de el. Lista y pendientes en `docs/splitscreen-state-audit.md`; al tocar render o tick de un extra, repasarla.
+- **Las redirecciones de `GETFIELD` de un campo privado (camara, mapa de luz) necesitan un `@Accessor` para leer el valor original sin pasar por la redireccion;** y una interfaz de accessors puede tener metodos `static` para campos estaticos (FogRenderer).
+- **El giro de camara de un extra se aplica por fotograma** (`SecondaryTick.frameLook`, con `dt` real), nunca por tick. Para medir continuidad se muestrea el angulo de la camara que se dibuja en cada fotograma (`AutoTest.sampleLook`).
+- **Una espera sobre el archivo de salida de una tarea en segundo plano se cuelga del texto final, no de que exista:** el script puede haber escrito algo al empezar. Esperar a una linea concreta del log.
+- **Los mandos virtuales de prueba tienen reloj propio en el aviso de unirse:** una prueba que lo mida debe desenchufar y volver a enchufar (`detachVirtual` + `attachVirtual`) para empezar de cero.
+- **El estado del mundo "New World" lo cambia el usuario al jugar** (modo de juego de P1, posicion de P2, tiempo): una prueba que dependa de eso debe fijarlo ella y restaurarlo (supervivencia para el inventario de P1).
+

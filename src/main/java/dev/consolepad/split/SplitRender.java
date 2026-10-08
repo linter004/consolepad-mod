@@ -27,6 +27,41 @@ public final class SplitRender {
     /** Slot del jugador cuyo mundo se esta dibujando (0 = P1, tambien fuera de la pantalla dividida). */
     public static volatile int passSlot;
 
+    /** Estado estatico de FogRenderer por jugador (color y transicion entre biomas): cada pasada carga el suyo y lo guarda al terminar. */
+    private static final class Fog {
+        float r, g, b;
+        int target = -1, previous = -1;
+        long changed = -1L;
+    }
+
+    private static final Fog[] FOG = {new Fog(), new Fog(), new Fog(), new Fog()};
+
+    private static void loadFog(int slot) {
+        Fog f = FOG[slot];
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setRed(f.r);
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setGreen(f.g);
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setBlue(f.b);
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setTarget(f.target);
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setPrevious(f.previous);
+        dev.consolepad.mixin.FogStateAccessor.consolepad$setChanged(f.changed);
+    }
+
+    private static void storeFog(int slot) {
+        Fog f = FOG[slot];
+        f.r = dev.consolepad.mixin.FogStateAccessor.consolepad$getRed();
+        f.g = dev.consolepad.mixin.FogStateAccessor.consolepad$getGreen();
+        f.b = dev.consolepad.mixin.FogStateAccessor.consolepad$getBlue();
+        f.target = dev.consolepad.mixin.FogStateAccessor.consolepad$getTarget();
+        f.previous = dev.consolepad.mixin.FogStateAccessor.consolepad$getPrevious();
+        f.changed = dev.consolepad.mixin.FogStateAccessor.consolepad$getChanged();
+    }
+
+    /** Ultimo estado de niebla guardado de un jugador {r, g, b, objetivo, anterior, instante} (para el autotest). */
+    public static double[] fogState(int slot) {
+        Fog f = FOG[slot];
+        return new double[] {f.r, f.g, f.b, f.target, f.previous, f.changed};
+    }
+
     private SplitRender() {}
 
     private static boolean ready(PlayerContext c) {
@@ -98,6 +133,7 @@ public final class SplitRender {
         // Los dispatchers de entidades y bloques son compartidos: apuntan al nivel del jugador que se dibuja.
         mc.getEntityRenderDispatcher().setLevel(level);
         mc.getBlockEntityRenderDispatcher().setLevel(level);
+        loadFog(passSlot);
         try {
             if (ctx != null) {
                 ContextSwitcher.run(ctx, () -> renderer.renderLevel(deltaTracker));
@@ -105,6 +141,7 @@ public final class SplitRender {
                 renderer.renderLevel(deltaTracker);
             }
         } finally {
+            storeFog(passSlot);
             SplitDiag.endPass();
             passSlot = 0;
             if (ctx == null || ctx.slotIndex == 1) {

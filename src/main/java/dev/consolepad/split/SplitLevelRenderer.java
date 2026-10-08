@@ -74,10 +74,42 @@ public final class SplitLevelRenderer extends LevelRenderer {
         if (live) super.levelEvent(type, pos, data);
     }
 
-    // Las particulas del cliente de P2 no se muestran (el ParticleEngine es de P1); se descartan siempre.
+    /** True mientras tickRain de este jugador crea sus gotas: solo esas particulas locales (lluvia y humo de lluvia) llegan al ParticleEngine compartido. */
+    volatile boolean rainForward;
+    volatile int slot;
+
+    // Las particulas del cliente de un extra no se muestran (el ParticleEngine es de P1 y el servidor ya manda a todos los efectos de bloques y
+    // entidades, que saldrian duplicados); solo se dejan pasar las gotas de su lluvia, que nadie mas genera cerca de el.
     @Override public void addParticle(ParticleOptions options, boolean force, double x, double y, double z,
-                                      double xSpeed, double ySpeed, double zSpeed) { }
+                                      double xSpeed, double ySpeed, double zSpeed) {
+        addParticle(options, force, false, x, y, z, xSpeed, ySpeed, zSpeed);
+    }
 
     @Override public void addParticle(ParticleOptions options, boolean force, boolean decreased, double x, double y, double z,
-                                      double xSpeed, double ySpeed, double zSpeed) { }
+                                      double xSpeed, double ySpeed, double zSpeed) {
+        if (!rainForward) return;
+        if (options.getType() != net.minecraft.core.particles.ParticleTypes.RAIN && options.getType() != net.minecraft.core.particles.ParticleTypes.SMOKE) return;
+        SplitView.particleBypass = true;
+        try {
+            super.addParticle(options, force, decreased, x, y, z, xSpeed, ySpeed, zSpeed);
+            SplitDiag.rainSpawned[slot]++;
+        } finally {
+            SplitView.particleBypass = false;
+        }
+    }
+
+    /** Tick de este renderer (nubes, lluvia, progreso de rotura) y de su lluvia, dentro del contexto de su jugador (camara propia). */
+    void tickWeather(net.minecraft.client.Camera camera, int slotIndex) {
+        if (!live) return;
+        slot = slotIndex;
+        tick();
+        if (camera.isInitialized()) {
+            rainForward = true;
+            try {
+                tickRain(camera);
+            } finally {
+                rainForward = false;
+            }
+        }
+    }
 }

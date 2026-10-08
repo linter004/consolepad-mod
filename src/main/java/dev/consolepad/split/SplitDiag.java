@@ -17,6 +17,11 @@ import java.util.List;
 public final class SplitDiag {
     /** Manos en primera persona dibujadas por jugador (la mano oculta no cuenta). */
     public static final int[] handsDrawn = new int[4];
+    /** Gotas de lluvia creadas por la lluvia de cada jugador (slot) y ticks de su LevelRenderer. */
+    public static final int[] rainSpawned = new int[4];
+    /** Errores al procesar paquetes de jugadores extra (suprimidos en el log) y el ultimo, con los chunks del paquete. */
+    public static volatile int packetErrors;
+    public static volatile String lastPacketError = "";
 
     public static volatile boolean recording;
 

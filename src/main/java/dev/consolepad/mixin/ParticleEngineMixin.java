@@ -15,13 +15,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ParticleEngineMixin {
     @Inject(method = "add(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
     private void consolepad$noAdd(Particle particle, CallbackInfo ci) {
-        if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+        if (ContextSwitcher.isSecondaryActive() && !dev.consolepad.split.SplitView.particleBypass) ci.cancel();
     }
 
     @Inject(method = "createParticle", at = @At("HEAD"), cancellable = true)
     private void consolepad$noCreate(ParticleOptions options, double x, double y, double z, double xs, double ys, double zs,
                                      CallbackInfoReturnable<Particle> cir) {
-        if (ContextSwitcher.isSecondaryActive()) cir.setReturnValue(null);
+        if (ContextSwitcher.isSecondaryActive() && !dev.consolepad.split.SplitView.particleBypass) cir.setReturnValue(null);
     }
 
     @Inject(method = "createTrackingEmitter", at = @At("HEAD"), cancellable = true)

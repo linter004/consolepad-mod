@@ -37,6 +37,16 @@ public final class ContextSwitcher {
         return active && current != null && current.hand != null ? current.hand : original;
     }
 
+    /** Camara del jugador cuyo contexto esta activo (la mainCamera de GameRenderer es la de P1): cada uno tiene su posicion, rotacion y altura de ojos suavizada. */
+    public static net.minecraft.client.Camera cameraOr(net.minecraft.client.Camera original) {
+        return active && current != null && !SplitView.legacyCamera ? current.camera : original;
+    }
+
+    /** Mapa de luz del jugador activo (efectos propios como vision nocturna u oscuridad). */
+    public static net.minecraft.client.renderer.LightTexture lightOr(net.minecraft.client.renderer.LightTexture original) {
+        return active && current != null ? current.lightTexture(Minecraft.getInstance()) : original;
+    }
+
     private static PlayerContext current;
 
     /** Contexto activo (null fuera de un contexto extra). */

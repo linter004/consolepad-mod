@@ -20,6 +20,13 @@ public interface GameRendererAccessor {
     @Accessor("oldFov")
     void consolepad$setOldFov(float oldFov);
 
+    /** La camara y el mapa de luz de P1 (los de GameRenderer), sin pasar por la redireccion de GameRendererMixin. */
+    @Accessor("mainCamera")
+    net.minecraft.client.Camera consolepad$getVanillaCamera();
+
+    @Accessor("lightTexture")
+    net.minecraft.client.renderer.LightTexture consolepad$getVanillaLight();
+
     @Invoker("tickFov")
     void consolepad$tickFov();
 }

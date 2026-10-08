@@ -39,7 +39,31 @@ public final class SecondaryTick {
     private static final float[] TMP = new float[2];
     private static int errors;
 
+    /** Solo pruebas: el giro de camara de los extra vuelve a aplicarse una vez por tick (comportamiento anterior) para medir el fallo antes del arreglo. */
+    public static volatile boolean legacyLook;
+
     private SecondaryTick() {}
+
+    /**
+     * Giro de camara del stick derecho de un jugador extra, una vez por FOTOGRAMA con el tiempo real entre fotogramas (como P1 en PadDriver), dentro de
+     * su contexto. Aplicarlo en el tick (20 por segundo) daba un giro a saltos de 50 ms. La rotacion sigue yendo al servidor en el siguiente tick
+     * (LocalPlayer.tick envia la rotacion actual), asi que no pierde sincronizacion. Con menu abierto, muerto o con entrada simulada no gira.
+     */
+    public static void frameLook(Minecraft mc, PadManager.Slot slot, PlayerContext ctx, float dt) {
+        if (legacyLook || ctx == null || ctx.player == null || ctx.level == null || ctx.screen != null || slot.device == null) return;
+        if (scriptActive && ctx.slotIndex == 1) return;
+        if (ctx.player.isDeadOrDying() || ctx.player.getHealth() <= 0f) return;
+        PadSettings cfg = slot.settings;
+        PadState s = slot.device.state;
+        PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, TMP);
+        if (TMP[0] == 0f && TMP[1] == 0f) return;
+        float sens = PadDriver.sensitivityFactor(mc.options);
+        float kx = cfg.lookSpeed * sens * dt / 0.15f; // Entity.turn multiplica por 0.15
+        float ky = cfg.lookSpeedY() * sens * dt / 0.15f;
+        float pitch = cfg.invertY ? -TMP[1] : TMP[1];
+        float yaw = TMP[0];
+        ContextSwitcher.run(ctx, () -> mc.player.turn(yaw * kx, pitch * ky));
+    }
 
     /** P2 sale: la entrada simulada de pruebas se apaga (el resto del estado vive en PlayerContext.input y se descarta con el contexto). */
     public static void reset() {
@@ -155,11 +179,22 @@ public final class SecondaryTick {
         mc.gameRenderer.pick(1.0F); // a que apunta P2 (hitResult de su contexto)
         mc.gameMode.tick();
         ((dev.consolepad.mixin.GameRendererAccessor) mc.gameRenderer).consolepad$tickFov(); // FOV propio de P2 (camara = P2)
+        // Lo que GameRenderer.tick hace con la camara, el mapa de luz y el LevelRenderer, pero con los de este jugador (dentro de su contexto, las
+        // redirecciones de GameRendererMixin devuelven su camara y su mapa de luz).
+        if (!self.cameraReady) { // la altura de ojos arranca en la real, no en 0
+            var cam = (dev.consolepad.mixin.CameraAccessor) mc.gameRenderer.getMainCamera();
+            cam.consolepad$setEyeHeight(player.getEyeHeight());
+            cam.consolepad$setEyeHeightOld(player.getEyeHeight());
+            self.cameraReady = true;
+        }
+        mc.gameRenderer.getMainCamera().tick();
+        mc.gameRenderer.lightTexture().tick();
+        if (self.renderer instanceof SplitLevelRenderer r && mc.level.tickRateManager().runsNormally()) r.tickWeather(self.camera, self.slotIndex);
         if (self.hand != null) self.hand.tick(); // mano propia (lee minecraft.player = este jugador)
         SplitHud.tickToolHighlight(self); // nombre del objeto seleccionado
         SplitNotices.tick(self);
 
-        if (lookX != 0f || lookY != 0f) {
+        if (legacyLook && (lookX != 0f || lookY != 0f)) {
             float kx = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
             float ky = cfg.lookSpeedY() * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
             player.turn(lookX * kx, lookY * ky);

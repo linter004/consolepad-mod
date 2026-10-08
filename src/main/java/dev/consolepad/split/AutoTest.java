@@ -74,6 +74,7 @@ public final class AutoTest {
 
     /** Al terminar cada frame (RenderFrameEvent.Post): aqui se hace la captura, con el frame ya dibujado. */
     public static void frameEnd() {
+        sampleLook();
         if (pixelProbe != null) {
             var probe = pixelProbe;
             pixelProbe = null;
@@ -1431,6 +1432,314 @@ public final class AutoTest {
         }
         var sc = screenOf(mc, slot);
         return pauseMenu ? isPauseMenu(sc) : sc == null;
+    }
+
+    // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
+
+    private static final int JB_CYCLES = 10;
+    private static int jbPhase, jbCycle, jbErr0;
+
+    /**
+     * Intenta reproducir la excepcion "No value with id -1" (LinearPalette.read al leer el primer paquete de chunks de P3 o P4): con P2 dentro, P3 y P4 entran en
+     * el mismo tick, varias veces seguidas. Cuenta los errores de procesado de paquetes de jugadores extra (SplitDiag.packetErrors) y guarda el ultimo con las
+     * coordenadas de los chunks del paquete.
+     */
+    private static void joinBurstTest(Minecraft mc) {
+        int t = ticks;
+        switch (jbPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (leaveTo(mc, 1) && t > 20) {
+                    jbErr0 = SplitDiag.packetErrors;
+                    jbCycle = 0;
+                    jbPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // P2 dentro
+                if (joinTo(mc, 2) && t > 10) {
+                    pads.attachVirtual(2);
+                    pads.attachVirtual(3);
+                    SecondaryPlayers.join(mc, 2); // P3 y P4 en el mismo tick
+                    SecondaryPlayers.join(mc, 3);
+                    jbPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if ((extraReady(mc, 2) && extraReady(mc, 3) && t > 10) || t > 800) {
+                    jbPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // salen P3 y P4 y se repite
+                if (leaveTo(mc, 2) && t > 10) {
+                    jbCycle++;
+                    jbPhase = jbCycle >= JB_CYCLES ? 4 : 1;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                int errs = SplitDiag.packetErrors - jbErr0;
+                boolean ok = errs == 0;
+                ConsolePad.LOGGER.info("[autotest] RESULTADO " + JB_CYCLES + " entradas simultaneas de P3 y P4 con P2 dentro: errores de paquetes de jugadores extra=" + errs
+                        + (errs == 0 ? "" : ", ultimo: " + SplitDiag.lastPacketError) + " -> " + (ok ? "OK" : "FALLO"));
+                jbPhase = 5;
+                next();
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- continuidad del giro de camara con el stick derecho
+
+    private static boolean lkOk = true;
+    private static int lkPhase;
+    private static volatile boolean lkSampling;
+    private static final java.util.ArrayList<double[]> lkSamples = new java.util.ArrayList<>(); // {t (s), yaw P1, yaw P2} de la CAMARA que dibuja cada region
+
+    private static void lkVerdict(String name, boolean ok) {
+        lkOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Un fotograma: angulo horizontal de la camara de P1 y de P2 (lo que realmente se dibuja). */
+    private static void sampleLook() {
+        if (!lkSampling) return;
+        Minecraft mc = Minecraft.getInstance();
+        PlayerContext c = SecondaryPlayers.context(1);
+        if (c == null || mc.player == null) return;
+        lkSamples.add(new double[] {System.nanoTime() / 1e9, mc.gameRenderer.getMainCamera().getYRot(), c.camera.getYRot()});
+    }
+
+    /** Estadisticas de la velocidad angular por fotograma de una columna (1 = P1, 2 = P2): {media grados/s, coeficiente de variacion, fraccion de fotogramas sin cambio}. */
+    private static double[] lkStats(int col) {
+        java.util.List<Double> rates = new java.util.ArrayList<>();
+        int still = 0, frames = 0;
+        for (int i = 1; i < lkSamples.size(); i++) {
+            double dt = lkSamples.get(i)[0] - lkSamples.get(i - 1)[0];
+            double dy = lkSamples.get(i)[col] - lkSamples.get(i - 1)[col];
+            if (dt <= 0) continue;
+            frames++;
+            if (Math.abs(dy) < 1e-4) still++;
+            rates.add(dy / dt);
+        }
+        if (rates.isEmpty()) return new double[] {0, 99, 1};
+        double mean = rates.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        double var = rates.stream().mapToDouble(r -> (r - mean) * (r - mean)).average().orElse(0);
+        return new double[] {mean, mean == 0 ? 99 : Math.sqrt(var) / Math.abs(mean), frames == 0 ? 1 : (double) still / frames};
+    }
+
+    /**
+     * Giro de camara continuo: con el stick derecho a fondo, el angulo que dibuja la camara de P1 y la de P2 cambia en cada fotograma (rapidez angular casi constante,
+     * pocos fotogramas sin cambio). Antes el giro de P2 a P4 se aplicaba una vez por tick (20 por segundo) y la camara avanzaba a saltos de 50 ms: se mide
+     * primero en modo anterior (SecondaryTick.legacyLook) para ver en cual de los dos se da, y despues con el arreglo.
+     */
+    private static void lookSmoothTest(Minecraft mc) {
+        int t = ticks;
+        var cfgs = new PadSettings[] {pads.slot(0).settings, pads.slot(1).settings};
+        switch (lkPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 2) && t > 20) {
+                    for (var cfg : cfgs) {
+                        cfg.lookSpeed = 180f;
+                        cfg.lookSpeedY = 0f;
+                        cfg.invertY = false;
+                    }
+                    SecondaryTick.legacyLook = true; // primero, como estaba
+                    lkPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1, 2 -> { // 1 = giro por tick (antes), 2 = giro por fotograma (ahora)
+                if (t == 3) {
+                    lkSamples.clear();
+                    mvStick(0, 0f, 0f, 0.6f, 0f);
+                    mvStick(1, 0f, 0f, 0.6f, 0f);
+                    lkSampling = true;
+                }
+                if (t == 43) {
+                    lkSampling = false;
+                    mvStick(0, 0f, 0f, 0f, 0f);
+                    mvStick(1, 0f, 0f, 0f, 0f);
+                    double[] p1 = lkStats(1), p2 = lkStats(2);
+                    String mode = lkPhase == 1 ? "antes (giro de P2 por tick)" : "ahora (giro de P2 por fotograma)";
+                    String msg = String.format(java.util.Locale.ROOT, "%s: P1 media %.0f grados/s, variacion %.2f, fotogramas sin cambio %.0f %%; P2 media %.0f grados/s, variacion %.2f, fotogramas sin cambio %.0f %% (%d fotogramas)",
+                            mode, p1[0], p1[1], p1[2] * 100, p2[0], p2[1], p2[2] * 100, lkSamples.size());
+                    if (lkPhase == 1) {
+                        lkVerdict("diagnostico " + msg + " -> el tironeo esta en P2 (P1 fluido)", p1[1] < 0.6 && p1[2] < 0.15 && (p2[1] > 1.5 || p2[2] > 0.5));
+                        SecondaryTick.legacyLook = false;
+                        lkPhase = 2;
+                    } else {
+                        lkVerdict("continuidad del giro " + msg + " (variacion < 0,6 y menos del 15 % de fotogramas quietos en los dos)",
+                                p1[1] < 0.6 && p2[1] < 0.6 && p1[2] < 0.15 && p2[2] < 0.15 && Math.abs(p2[0] - p1[0]) < 0.25 * p1[0]);
+                        ConsolePad.LOGGER.info("[autotest] RESULTADO continuidad del giro de camara con el stick derecho en conjunto -> {}", lkOk ? "OK" : "FALLO");
+                        lkPhase = 3;
+                    }
+                    ticks = 0;
+                }
+            }
+            case 3 -> {
+                if (t > 10) {
+                    SecondaryTick.legacyLook = false;
+                    lkPhase = 4;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    // ---------------------------------------------------------------- estado de cliente por jugador: camara, mapa de luz, lluvia, niebla
+
+    private static boolean ssOk = true;
+    private static int ssPhase;
+    private static int[] ssTicks0 = new int[3];
+    private static int[] ssRain0 = new int[4];
+
+    private static void ssVerdict(String name, boolean ok) {
+        ssOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static float ssEye(Minecraft mc, int slot) {
+        var cam = slot == 0 ? mc.gameRenderer.getMainCamera() : SecondaryPlayers.context(slot).camera;
+        return ((dev.consolepad.mixin.CameraAccessor) cam).consolepad$getEyeHeight();
+    }
+
+    private static String ssEyes(Minecraft mc) {
+        return String.format("P1=%.2f P2=%.2f P3=%.2f", ssEye(mc, 0), ssEye(mc, 1), ssEye(mc, 2));
+    }
+
+    private static boolean ssNear(float v, float expect) {
+        return Math.abs(v - expect) < 0.06f;
+    }
+
+    private static int ssLevelTicks(Minecraft mc, int slot) {
+        return slot == 0 ? mc.levelRenderer.getTicks() : SecondaryPlayers.context(slot).renderer.getTicks();
+    }
+
+    /**
+     * Cada jugador tiene su camara (GameRenderer.mainCamera es una y solo seguia a P1; con la altura de ojos compartida, lo que hiciera el jugador de la
+     * ultima pasada --agacharse, elitros-- lo veian todos): agacharse en P2 baja solo su altura de ojos, y en P1 solo la de P1. La lluvia de cada region avanza
+     * (el LevelRenderer de cada extra ticaba nunca: lluvia y nubes congeladas) y crea sus gotas. Cada pasada lleva su propio estado de niebla.
+     */
+    private static void sharedStateTest(Minecraft mc) {
+        int t = ticks;
+        var s1 = pads.slot(1).settings;
+        switch (ssPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (joinTo(mc, 3) && t > 20) {
+                    ssPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // linea base y camaras distintas
+                if (t == 20) {
+                    ssVerdict("alturas de ojos de partida: " + ssEyes(mc) + " (esperado 1,62 en las tres)", ssNear(ssEye(mc, 0), 1.62f) && ssNear(ssEye(mc, 1), 1.62f) && ssNear(ssEye(mc, 2), 1.62f));
+                    double d = SecondaryPlayers.context(1).camera.getPosition().distanceTo(mc.gameRenderer.getMainCamera().getPosition());
+                    var c2 = SecondaryPlayers.context(1);
+                    double own2 = c2.camera.getPosition().distanceTo(c2.player.getEyePosition()), own1 = mc.gameRenderer.getMainCamera().getPosition().distanceTo(mc.player.getEyePosition());
+                    ssVerdict("cada jugador tiene su camara: la de P2 esta a " + String.format("%.2f", own2) + " bloques de los ojos de P2 y la de P1 a " + String.format("%.2f", own1)
+                            + " de los de P1 (< 1,5), mapas de luz distintos=" + (c2.lightTexture(mc) != mc.gameRenderer.lightTexture()),
+                            own2 < 1.5 && own1 < 1.5 && c2.lightTexture(mc) != mc.gameRenderer.lightTexture());
+                    ssPhase = 10;
+                    ticks = 0;
+                }
+            }
+            case 10 -> { // diagnostico del fallo: con la camara compartida de antes, P2 agachado no cambia la vista
+                int sneak = PadHints.buttonFor(s1, PadAction.SNEAK_TOGGLE);
+                if (t == 1) SplitView.legacyCamera = true;
+                if (t == 3) simSlot(1, 1 << sneak);
+                if (t == 6) simSlot(1, 0);
+                if (t == 30) {
+                    var c = SecondaryPlayers.context(1);
+                    float shared = ((dev.consolepad.mixin.CameraAccessor) mc.gameRenderer.getMainCamera()).consolepad$getEyeHeight();
+                    ssVerdict("hipotesis confirmada con la camara compartida (comportamiento anterior): P2 agachado (ojos de su jugador " + String.format("%.2f", c.player.getEyeHeight())
+                            + ") pero la altura de ojos de la camara que dibuja su region sigue en " + String.format("%.2f", shared), c.player.isShiftKeyDown() && c.player.getEyeHeight() < 1.4f && shared > 1.55f);
+                    simSlot(1, 1 << sneak);
+                }
+                if (t == 33) simSlot(1, 0);
+                if (t == 50) {
+                    SplitView.legacyCamera = false;
+                    ssPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // P2 se agacha
+                int sneak = PadHints.buttonFor(s1, PadAction.SNEAK_TOGGLE);
+                if (t == 3) simSlot(1, 1 << sneak);
+                if (t == 6) simSlot(1, 0);
+                if (t == 25) {
+                    var c = SecondaryPlayers.context(1);
+                    ssVerdict("P2 agachado: altura de ojos de su camara " + String.format("%.2f", ssEye(mc, 1)) + " (la de su jugador " + String.format("%.2f", c.player.getEyeHeight()) + "); " + ssEyes(mc)
+                            + " (P1 y P3 siguen en 1,62)", c.player.isShiftKeyDown() && ssNear(ssEye(mc, 1), c.player.getEyeHeight()) && ssEye(mc, 1) < 1.4f && ssNear(ssEye(mc, 0), 1.62f) && ssNear(ssEye(mc, 2), 1.62f));
+                    simSlot(1, 1 << sneak);
+                }
+                if (t == 28) simSlot(1, 0);
+                if (t == 45) {
+                    ssVerdict("P2 de pie otra vez: " + ssEyes(mc), ssNear(ssEye(mc, 1), 1.62f));
+                    ssPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // P1 se agacha
+                if (t == 3) mc.options.keyShift.setDown(true);
+                if (t == 25) {
+                    ssVerdict("P1 agachado: " + ssEyes(mc) + " (solo baja P1)", ssEye(mc, 0) < 1.4f && ssNear(ssEye(mc, 1), 1.62f) && ssNear(ssEye(mc, 2), 1.62f));
+                    mc.options.keyShift.setDown(false);
+                }
+                if (t == 45) {
+                    ssVerdict("P1 de pie otra vez: " + ssEyes(mc), ssNear(ssEye(mc, 0), 1.62f));
+                    ssPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> { // llueve
+                if (t == 1) {
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> server.overworld().setWeatherParameters(0, 24000, true, false));
+                }
+                var c2 = SecondaryPlayers.context(1);
+                var c3 = SecondaryPlayers.context(2);
+                if (t == 60) {
+                    float r1 = mc.level.getRainLevel(1f), r2 = c2.level.getRainLevel(1f), r3 = c3.level.getRainLevel(1f);
+                    ssVerdict("llueve en los tres clientes: P1 " + r1 + ", P2 " + r2 + ", P3 " + r3, r1 > 0.5f && r2 > 0.5f && r3 > 0.5f);
+                    for (int i = 0; i < 3; i++) ssTicks0[i] = ssLevelTicks(mc, i);
+                    ssRain0 = SplitDiag.rainSpawned.clone();
+                }
+                if (t == 120) {
+                    StringBuilder sb = new StringBuilder();
+                    boolean ok = true;
+                    for (int i = 0; i < 3; i++) {
+                        int d = ssLevelTicks(mc, i) - ssTicks0[i];
+                        sb.append("P").append(i + 1).append(" +").append(d).append(" ");
+                        ok &= d >= 55 && d <= 65;
+                    }
+                    ssVerdict("el LevelRenderer de cada region avanza con el tiempo (60 ticks de juego): " + sb.toString().trim(), ok);
+                    int d1 = SplitDiag.rainSpawned[1] - ssRain0[1], d2 = SplitDiag.rainSpawned[2] - ssRain0[2];
+                    ssVerdict("gotas de lluvia creadas junto a cada jugador extra en 60 ticks: P2 +" + d1 + ", P3 +" + d2 + " (deben ser > 0)", d1 > 0 && d2 > 0);
+                    double[] f1 = SplitRender.fogState(0), f2 = SplitRender.fogState(1), f3 = SplitRender.fogState(2);
+                    ssVerdict("color de niebla guardado por pasada (el estado de transicion entre biomas solo se usa bajo el agua): P1=" + String.format("%.2f,%.2f,%.2f", f1[0], f1[1], f1[2])
+                            + " P2=" + String.format("%.2f,%.2f,%.2f", f2[0], f2[1], f2[2]) + " P3=" + String.format("%.2f,%.2f,%.2f", f3[0], f3[1], f3[2]) + " (ninguno vacio)",
+                            f1[0] + f1[1] + f1[2] > 0 && f2[0] + f2[1] + f2[2] > 0 && f3[0] + f3[1] + f3[2] > 0);
+                    var server = mc.getSingleplayerServer();
+                    server.execute(() -> server.overworld().setWeatherParameters(6000, 0, false, false));
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO estado de cliente por jugador (camara, luz, lluvia, niebla) en conjunto -> {}", ssOk ? "OK" : "FALLO");
+                    ssPhase = 5;
+                    ticks = 0;
+                }
+            }
+            case 5 -> {
+                if (t > 40 && leaveTo(mc, 2) || t > 600) {
+                    ssPhase = 6;
+                    next();
+                }
+            }
+            default -> { }
+        }
     }
 
     // ---------------------------------------------------------------- HUD de P2 a P4: calabaza, barras de jefe, marcador y lista de jugadores
@@ -3368,6 +3677,7 @@ public final class AutoTest {
 
     private static boolean mqOk = true;
     private static int mqPhase;
+    private static net.minecraft.world.level.GameType mqPrev1 = net.minecraft.world.level.GameType.SURVIVAL;
 
     private static void mqVerdict(String name, boolean ok) {
         mqOk &= ok;
@@ -3394,6 +3704,12 @@ public final class AutoTest {
     private static void mannequinTest(Minecraft mc) {
         switch (mqPhase) {
             case 0 -> {
+                if (ticks == 1) { // el inventario de supervivencia: en creativo P1 abre la pantalla creativa, que dibuja el maniqui de otra forma
+                    var server = mc.getSingleplayerServer();
+                    ServerPlayer sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+                    mqPrev1 = sp1.gameMode.getGameModeForPlayer();
+                    server.execute(() -> sp1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL));
+                }
                 if (joinTo(mc, 4) && ticks > 20) {
                     mqPhase = 1;
                     ticks = 0;
@@ -3420,6 +3736,11 @@ public final class AutoTest {
                                 boolean small = b[2] < r[2] - 10 && b[3] < r[3] - 10;
                                 if (small && b[0] >= r[0] - 2 && b[1] >= r[1] - 2 && b[0] + b[2] <= r[0] + r[2] + 2 && b[1] + b[3] <= r[1] + r[3] + 2) best = b;
                             }
+                            if (best == null && owner.equals("P1")) {
+                                StringBuilder dbg = new StringBuilder();
+                                for (var d : draws) if (d.owner().equals("P1")) dbg.append(d.what()).append(java.util.Arrays.toString(d.scissor())).append(' ');
+                                ConsolePad.LOGGER.info("[autotest] DIAG maniqui P1: pantalla={} region={} dibujos de P1: {}", mc.screen, java.util.Arrays.toString(r), dbg);
+                            }
                             int colors = best == null ? 0 : distinctColors(img, best);
                             if (owner.equals("P1")) base = colors;
                             boolean ok = best != null && colors >= 15 && (owner.equals("P1") || colors >= base * 0.4);
@@ -3435,6 +3756,9 @@ public final class AutoTest {
             case 2 -> {
                 if (ticks == 1) ConsolePad.LOGGER.info("[autotest] RESULTADO maniqui del jugador en el inventario de P1 a P4 en conjunto -> {}", mqOk ? "OK" : "FALLO");
                 if (leaveTo(mc, 2) || ticks > 600) {
+                    var server = mc.getSingleplayerServer();
+                    ServerPlayer sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+                    server.execute(() -> sp1.setGameMode(mqPrev1));
                     mqPhase = 3;
                     next();
                 }
@@ -3814,9 +4138,12 @@ public final class AutoTest {
             case 35 -> moveTest(mc);
             case 36 -> hudOptionsTest(mc);
             case 37 -> hudBoardsTest(mc);
-            case 40 -> leaveTest(mc);
+            case 38 -> sharedStateTest(mc);
+            case 39 -> lookSmoothTest(mc);
+            case 40 -> joinBurstTest(mc);
+            case 50 -> leaveTest(mc);
             default -> {
-                if (state > 2 && state < 40) next(); // casilla libre entre las pruebas y la salida
+                if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida
             }
         }
     }
@@ -3938,7 +4265,7 @@ public final class AutoTest {
 
     private static void next() {
         state++;
-        while (ONLY != null && state >= 3 && state < 40 && !ONLY.contains(state)) state++;
+        while (ONLY != null && state >= 3 && state < 50 && !ONLY.contains(state)) state++;
         ticks = 0;
     }
 }

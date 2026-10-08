@@ -29,7 +29,9 @@
     "OptionsAccessor",
     "GuiStateAccessor",
     "GuiDiagMixin",
-    "RenderSystemMixin"
+    "RenderSystemMixin",
+    "CameraAccessor",
+    "FogStateAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

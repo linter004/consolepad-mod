@@ -30,6 +30,8 @@ FPS (distancia 8, sin vsync, 854×480): 1 jugador ≈ 3300, 2 jugadores ≈ 1600
 - **Rendimiento:** con 4 jugadores el coste de GPU es ~4×; se puede bajar la distancia de renderizado. No se ha optimizado.
 - **Teclado en pantalla:** distribución fija en español (sin teclas de acento muertas ni emojis); no hay deslizar ni predictivo. Para la búsqueda del inventario creativo (tanda 2) ya sirve el mismo teclado.
 - **Etiqueta con nombre:** solo cambia el nombre para mostrar (etiqueta sobre la cabeza, chat, avisos, lista de jugadores), nunca el perfil del servidor (nombre y UUID siguen siendo `Dev_N`), así que los datos de cada jugador no se tocan. La skin propia por jugador va a la tanda 2.
+- **Estado de cliente por jugador:** ver `docs/splitscreen-state-audit.md` (cámara, mapa de luz, lluvia y niebla ya por jugador; pendientes: oscurecimiento por barras de jefe, animación del tótem por región, efectos de pantalla completa, partículas ambientales y sonido por jugador).
+- **`No value with id -1` al entrar P3 y P4 a la vez:** visto una vez, no reproducido en ~35 entradas; instrumentado para cuando vuelva.
 - Sonido por jugador, partículas por jugador, Sodium/Iris y servidores externos quedan fuera.
 
 ## 2. Qué se ha comprobado solo con simulación (hay que probar con mandos reales)

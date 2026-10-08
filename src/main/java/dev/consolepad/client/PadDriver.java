@@ -12,6 +12,7 @@ import dev.consolepad.pad.PadState;
 import dev.consolepad.split.PadKeyboard;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryScreens;
+import dev.consolepad.split.SecondaryTick;
 import dev.consolepad.split.SplitView;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.InputType;
@@ -109,7 +110,10 @@ public final class PadDriver {
                 }
             }
         }
-        for (var extra : SecondaryPlayers.contexts()) SecondaryScreens.frame(mc, pads.slot(extra.slotIndex), dt, extra);
+        for (var extra : SecondaryPlayers.contexts()) {
+            SecondaryScreens.frame(mc, pads.slot(extra.slotIndex), dt, extra);
+            SecondaryTick.frameLook(mc, pads.slot(extra.slotIndex), extra, dt); // giro de camara por fotograma
+        }
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
         if (dev == null || !mc.isWindowActive()) {

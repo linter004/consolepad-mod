@@ -218,7 +218,15 @@ public final class SecondaryPlayers {
         try {
             method.invoke(real, args);
         } catch (InvocationTargetException e) {
-            ConsolePad.LOGGER.error("[split] error al procesar {} de un jugador extra (suprimido)", method.getName(), e.getCause());
+            SplitDiag.packetErrors++;
+            StringBuilder where = new StringBuilder();
+            if (args != null && args.length == 1 && args[0] instanceof net.minecraft.network.protocol.game.ClientboundBundlePacket bundle) {
+                for (var sub : bundle.subPackets()) {
+                    if (sub instanceof net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket chunk) where.append(" chunk(").append(chunk.getX()).append(',').append(chunk.getZ()).append(')');
+                }
+            }
+            SplitDiag.lastPacketError = method.getName() + ": " + e.getCause() + where;
+            ConsolePad.LOGGER.error("[split] error al procesar {} de un jugador extra (suprimido){}", method.getName(), where, e.getCause());
         } catch (IllegalAccessException e) {
             ConsolePad.LOGGER.error("[split] no se pudo invocar {} de un jugador extra", method.getName(), e);
         }
@@ -238,6 +246,7 @@ public final class SecondaryPlayers {
         if (ctx != null) {
             Runnable release = () -> {
                 try {
+                    ctx.closeLightTexture();
                     if (ctx.renderer instanceof SplitLevelRenderer r) r.release();
                     else ctx.renderer.close();
                 } catch (RuntimeException e) {

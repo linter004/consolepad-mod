@@ -58,6 +58,27 @@ public abstract class GameRendererMixin {
         dev.consolepad.split.SplitDiag.handsDrawn[slot]++;
     }
 
+    /** La camara de GameRenderer es la de P1: durante el contexto de otro jugador se usa la suya (posicion, rotacion y altura de ojos propias). */
+    @Redirect(method = {"renderLevel", "tick", "resetData", "getMainCamera"},
+            at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,
+                    target = "Lnet/minecraft/client/renderer/GameRenderer;mainCamera:Lnet/minecraft/client/Camera;"))
+    private net.minecraft.client.Camera consolepad$ownCamera(GameRenderer self) {
+        return ContextSwitcher.cameraOr(((GameRendererAccessor) self).consolepad$getVanillaCamera());
+    }
+
+    @Redirect(method = {"renderLevel", "tick", "renderItemInHand", "lightTexture"},
+            at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,
+                    target = "Lnet/minecraft/client/renderer/GameRenderer;lightTexture:Lnet/minecraft/client/renderer/LightTexture;"))
+    private net.minecraft.client.renderer.LightTexture consolepad$ownLight(GameRenderer self) {
+        return ContextSwitcher.lightOr(((GameRendererAccessor) self).consolepad$getVanillaLight());
+    }
+
+    /** La animacion del totem de un jugador extra no se dibuja sobre P1 (es una sola para todo GameRenderer). */
+    @Inject(method = "displayItemActivation", at = @At("HEAD"), cancellable = true)
+    private void consolepad$noForeignTotem(net.minecraft.world.item.ItemStack stack, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+    }
+
     /** La mano en primera persona es la del jugador que se dibuja (objeto y animaciones propios). */
     @Redirect(method = "renderItemInHand",
             at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,

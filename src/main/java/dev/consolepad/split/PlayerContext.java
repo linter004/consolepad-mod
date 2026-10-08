@@ -80,6 +80,24 @@ public final class PlayerContext {
     /** Un aviso con el tick de cliente en que llego. */
     public record Notice(net.minecraft.network.chat.Component text, long tick) {}
 
+    /** Camara propia (GameRenderer.mainCamera es una y solo sigue a P1) y su mapa de luz; ver ContextSwitcher.cameraOr/lightOr. */
+    public final net.minecraft.client.Camera camera = new net.minecraft.client.Camera();
+    public boolean cameraReady;
+    private net.minecraft.client.renderer.LightTexture lightTexture;
+
+    public net.minecraft.client.renderer.LightTexture lightTexture(net.minecraft.client.Minecraft mc) {
+        if (lightTexture == null) lightTexture = new net.minecraft.client.renderer.LightTexture(mc.gameRenderer, mc);
+        return lightTexture;
+    }
+
+    /** Libera la textura del mapa de luz (hilo de render, al salir el jugador). */
+    public void closeLightTexture() {
+        if (lightTexture != null) {
+            lightTexture.close();
+            lightTexture = null;
+        }
+    }
+
     /** Barras de jefe de este jugador (las que le llegan por su conexion). */
     private net.minecraft.client.gui.components.BossHealthOverlay bossOverlay;
     /** Marcado por el HUD: lo que se dibujo en el ultimo fotograma (autotest). */

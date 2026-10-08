@@ -33,6 +33,12 @@ public final class SplitView {
     /** Opacidad con la que se dibuja el HUD del jugador en curso (1 = opaco): RenderSystemMixin la aplica a todo setShaderColor. */
     public static volatile float hudAlpha = 1f;
 
+    /** True mientras la lluvia de un jugador extra crea sus gotas en el ParticleEngine compartido (si no, ParticleEngineMixin las descarta). */
+    public static volatile boolean particleBypass;
+
+    /** Solo pruebas: vuelve a la camara compartida de vanilla (el comportamiento anterior) para medir el fallo antes del arreglo. */
+    public static volatile boolean legacyCamera;
+
     private SplitView() {}
 
     /**
