@@ -239,6 +239,12 @@ public final class AutoTest {
 
     private static net.minecraft.world.Difficulty prevDifficulty;
     private static int prevGuiScale = -1;
+    private static boolean prevPauseOnLostFocus;
+
+    /** True si esta corriendo el autotest: la entrada de P1 no depende de que la ventana tenga el foco. */
+    public static boolean running() {
+        return WORLD != null;
+    }
     private static int leaveSub;
     private static java.nio.file.Path leaveFile;
     private static long leaveFileTime0;
@@ -300,6 +306,7 @@ public final class AutoTest {
                 var srv = mc.getSingleplayerServer();
                 if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
                 if (prevGuiScale >= 0) mc.options.guiScale().set(prevGuiScale);
+                mc.options.pauseOnLostFocus = prevPauseOnLostFocus;
                 ConsolePad.LOGGER.info("[autotest] P1 sale del mundo (dificultad restaurada a {})", prevDifficulty);
                 mc.level.disconnect(); // como PauseScreen.onDisconnect: cierra la conexion de P1 y el servidor se detiene
                 mc.disconnect();
@@ -1432,6 +1439,108 @@ public final class AutoTest {
         }
         var sc = screenOf(mc, slot);
         return pauseMenu ? isPauseMenu(sc) : sc == null;
+    }
+
+    // ---------------------------------------------------------------- chat abierto: campo de texto, teclado y barra de ayuda no se cruzan
+
+    private static final int[][] CB_WINDOWS = {{854, 480}, {1920, 1080}};
+    private static final int[] CB_PLAYERS = {1, 4};
+    private static boolean cbOk = true;
+    private static int cbPhase, cbWin, cbIdx;
+
+    private static void cbVerdict(String name, boolean ok) {
+        cbOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static boolean cbCross(int[] a, int[] b) {
+        return a[2] > 0 && a[3] > 0 && b[2] > 0 && b[3] > 0 && a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+    }
+
+    private static void cbOpenChats(Minecraft mc) {
+        mc.setScreen(new net.minecraft.client.gui.screens.ChatScreen(""));
+        for (PlayerContext c : SplitRender.activeContexts()) ContextSwitcher.run(c, () -> mc.setScreen(new ExtraChatScreen()));
+    }
+
+    /**
+     * Con el chat abierto el campo de texto de cada jugador (el de vanilla en P1, el de ExtraChatScreen en P2 a P4), su teclado en pantalla y su barra de
+     * ayuda no se cruzan: a 854x480 y 1920x1080, con 1 y con 4 jugadores. En P1 el campo de vanilla ocupa la franja de abajo donde iba la barra, que ahora
+     * no se dibuja con el chat abierto.
+     */
+    private static void chatBarTest(Minecraft mc) {
+        var window = mc.getWindow();
+        int t = ticks;
+        switch (cbPhase) {
+            case 0 -> {
+                if (t == 1) mc.setScreen(null);
+                if (t > 5) {
+                    cbWin = 0;
+                    cbIdx = 0;
+                    cbPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> {
+                int[] sz = CB_WINDOWS[cbWin];
+                if (t == 1) org.lwjgl.glfw.GLFW.glfwSetWindowSize(window.getWindow(), sz[0], sz[1]);
+                if (t >= 70) {
+                    cbPhase = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                int n = CB_PLAYERS[cbIdx];
+                int now = 1 + SecondaryPlayers.contexts().size();
+                boolean done = n >= now ? joinTo(mc, n) : leaveTo(mc, n);
+                if (done && t > 10) {
+                    cbOpenChats(mc);
+                    cbPhase = 3;
+                    ticks = 0;
+                } else if (t > 2400) {
+                    cbVerdict("pasar a " + n + " jugadores", false);
+                    cbPhase = 9;
+                }
+            }
+            case 3 -> {
+                if (t != 20) return;
+                int n = CB_PLAYERS[cbIdx];
+                String label = CB_WINDOWS[cbWin][0] + "x" + CB_WINDOWS[cbWin][1] + "/" + n + "j";
+                for (int slot = 0; slot < n; slot++) {
+                    var screen = screenOf(mc, slot);
+                    int[] box = {0, 0, 0, 0};
+                    if (screen != null && screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox eb) box = new int[] {eb.getX(), eb.getY(), eb.getWidth(), eb.getHeight()};
+                    int[] bar = PadHints.lastBarBox[slot], kb = PadKeyboard.of(slot).lastBox;
+                    boolean inside = screen != null && box[2] > 0 && box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= screen.width && box[1] + box[3] <= screen.height;
+                    boolean noBar = !cbCross(box, bar), noKb = !cbCross(box, kb), kbBar = !cbCross(kb, bar);
+                    cbVerdict(label + " P" + (slot + 1) + ": campo de texto " + java.util.Arrays.toString(box) + " en pantalla " + (screen == null ? "-" : screen.width + "x" + screen.height)
+                            + ", barra " + java.util.Arrays.toString(bar) + ", teclado " + java.util.Arrays.toString(kb) + ": sin cruces campo/barra=" + noBar + ", campo/teclado=" + noKb + ", teclado/barra=" + kbBar,
+                            inside && noBar && noKb && kbBar && kb[2] > 0);
+                }
+                for (int slot = 0; slot < n; slot++) {
+                    if (slot == 0) mc.setScreen(null);
+                    else {
+                        PlayerContext c = SecondaryPlayers.context(slot);
+                        ContextSwitcher.run(c, () -> mc.setScreen(null));
+                    }
+                }
+                cbIdx++;
+                if (cbIdx >= CB_PLAYERS.length) {
+                    cbIdx = 0;
+                    cbWin++;
+                }
+                cbPhase = cbWin >= CB_WINDOWS.length ? 8 : (cbIdx == 0 ? 1 : 2);
+                ticks = 0;
+            }
+            case 8 -> {
+                if (t == 1) ConsolePad.LOGGER.info("[autotest] RESULTADO chat abierto sin cruces entre campo, teclado y barra de ayuda en conjunto -> {}", cbOk ? "OK" : "FALLO");
+                if (t == 2) org.lwjgl.glfw.GLFW.glfwSetWindowSize(window.getWindow(), 1920, 1080);
+                if (t > 70 && (leaveTo(mc, 2) || t > 800)) {
+                    cbPhase = 9;
+                    next();
+                }
+            }
+            default -> { }
+        }
     }
 
     // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
@@ -2739,6 +2848,7 @@ public final class AutoTest {
     private static int jpExpect;
     private static long jpT0;
     private static boolean jpSeen10, jpSeen14;
+    private static int jpNewSlot = 3;
 
     private static void jpVerdict(String name, boolean ok) {
         jpOk &= ok;
@@ -2763,7 +2873,10 @@ public final class AutoTest {
             case 0 -> {
                 if (ticks == 1) mc.setScreen(null);
                 if (leaveTo(mc, 1) && ticks > 20) {
-                    for (int i = 1; i <= 3; i++) pads.detachVirtual(i); // mandos nuevos: el reloj del aviso de cada uno empieza ahora
+                    for (int i = 1; i <= 3; i++) {
+                        pads.detachVirtual(i); // mandos nuevos: el reloj del aviso de cada uno empieza ahora (los mandos reales conectados se quedan, pero su reloj tambien se reinicia)
+                        JoinPrompt.forget(i);
+                    }
                     pads.attachVirtual(1);
                     pads.attachVirtual(2);
                     jpExpect = jpPendingMask();
@@ -2775,7 +2888,8 @@ public final class AutoTest {
             case 1 -> {
                 if (ticks == 15) {
                     int[] box = JoinPrompt.lastBox, reg = JoinPrompt.lastRegion;
-                    jpVerdict("aviso de unirse: lineas dibujadas para los slots " + Integer.toBinaryString(JoinPrompt.lastSlots) + " (esperados " + Integer.toBinaryString(jpExpect) + ")",
+                    jpVerdict("aviso de unirse: lineas dibujadas para los slots " + Integer.toBinaryString(JoinPrompt.lastSlots) + " (esperados " + Integer.toBinaryString(jpExpect) + "; pantalla de P1 " + mc.screen
+                            + ", hideGui=" + mc.options.hideGui + ", pendientes " + Integer.toBinaryString(JoinPrompt.pendingSlots(mc)) + ", p1HalfScreen=" + SplitView.p1HalfScreen + "; " + JoinPrompt.lastWhy + ")",
                             JoinPrompt.lastSlots == jpExpect && jpExpect != 0);
                     boolean inside = box[2] > 0 && box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= reg[0] && box[1] + box[3] <= reg[1];
                     boolean centered = Math.abs(box[0] + box[2] / 2 - reg[0] / 2) <= 3;
@@ -2831,11 +2945,14 @@ public final class AutoTest {
                     jpSeen14 = true;
                     jpVerdict("aviso de unirse: a los " + String.format("%.1f", secs) + " s (limite 12) se ha ocultado (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ", pendientes=" + Integer.toBinaryString(jpPendingMask()) + ")",
                             JoinPrompt.lastSlots == 0 && jpPendingMask() != 0);
-                    pads.attachVirtual(3); // mando nuevo conectado
+                    jpNewSlot = 3; // el slot de un mando nuevo: el mas alto cuyo mando sea virtual o no exista (los reales no se pueden desenchufar desde la prueba)
+                    while (jpNewSlot > 1 && pads.slot(jpNewSlot).device != null && pads.slot(jpNewSlot).device.jid >= 0) jpNewSlot--;
+                    pads.detachVirtual(jpNewSlot);
+                    pads.attachVirtual(jpNewSlot); // mando nuevo conectado
                     ticks = 0;
                 }
                 if (jpSeen14 && ticks == 15) {
-                    jpVerdict("aviso de unirse: al conectar un mando nuevo (slot 4) reaparece solo el suyo (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ", esperado 1000)", JoinPrompt.lastSlots == 8);
+                    jpVerdict("aviso de unirse: al conectar un mando nuevo (slot " + (jpNewSlot + 1) + ") reaparece solo el suyo (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ", esperado " + Integer.toBinaryString(1 << jpNewSlot) + ")", JoinPrompt.lastSlots == 1 << jpNewSlot);
                     ConsolePad.LOGGER.info("[autotest] RESULTADO aviso de unirse y Start para entrar en conjunto -> {}", jpOk ? "OK" : "FALLO");
                     jpPhase = 5;
                     ticks = 0;
@@ -4074,6 +4191,7 @@ public final class AutoTest {
         SecondaryTick.autoRespawn = deathTestPhase == 0; // las pruebas dejan reaparecer solos a los extra, salvo la de la pantalla de muerte
         Minecraft mc = Minecraft.getInstance();
         ticks++;
+        if (state >= 3 && pads != null) pads.attachVirtual(0); // si el mando real de P1 se desconecta a mitad de la prueba (mandos inalambricos), un virtual ocupa su sitio
         // Si un mundo guardado trae a alguien muerto (los mobs de la noche), reaparece: la pantalla de muerte bloquearia la prueba.
         if (deathTestPhase == 0 && mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.player != null && ticks % 20 == 0) mc.player.respawn();
         PlayerContext dead = SecondaryPlayers.context();
@@ -4094,6 +4212,8 @@ public final class AutoTest {
                     var server = mc.getSingleplayerServer();
                     prevDifficulty = server.getWorldData().getDifficulty();
                     prevGuiScale = mc.options.guiScale().get();
+                    prevPauseOnLostFocus = mc.options.pauseOnLostFocus;
+                    mc.options.pauseOnLostFocus = false; // sin foco la ventana abriria el menu de pausa de P1 en mitad de una prueba
                     mc.options.guiScale().set(0); // escala de interfaz automatica, como al instalar el juego (la del usuario puede ser fija)
                     server.execute(() -> {
                         server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
@@ -4141,6 +4261,7 @@ public final class AutoTest {
             case 38 -> sharedStateTest(mc);
             case 39 -> lookSmoothTest(mc);
             case 40 -> joinBurstTest(mc);
+            case 41 -> chatBarTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida

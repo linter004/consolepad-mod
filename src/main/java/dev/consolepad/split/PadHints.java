@@ -30,6 +30,8 @@ public final class PadHints {
     public static final String[] lastRight = {"", "", "", ""};
     public static final String[] lastBar = {"", "", "", ""};
     /** Cajas {x, y, ancho, alto} de la columna izquierda y de la derecha. */
+    /** Rectangulo {x, y, ancho, alto} de la barra de ayuda de pantalla de cada jugador en unidades de su pantalla; ancho 0 = no se dibuja. */
+    public static final int[][] lastBarBox = new int[4][4];
     public static final int[][] lastBoxL = new int[4][4], lastBoxR = new int[4][4];
 
     private PadHints() {}
@@ -174,8 +176,12 @@ public final class PadHints {
      */
     public static void renderScreenBar(Minecraft mc, GuiGraphics g, int slot, Screen screen, int w, int h) {
         lastBar[slot] = "";
+        lastBarBox[slot] = new int[] {0, 0, 0, 0};
         PadManager.Slot ps = ConsolePad.PADS.slot(slot);
         if (screen == null || ps.device == null || !ps.settings.showHints) return;
+        // El campo de texto del chat de vanilla (P1) ocupa justo la franja de abajo, donde va esta barra: con el chat abierto la barra no se dibuja
+        // (el teclado en pantalla queda encima del campo, que es lo que se necesita ver).
+        if (screen instanceof net.minecraft.client.gui.screens.ChatScreen) return;
         keyboardSlot = slot;
         List<Hint> hints = screenHints(screen);
         keyboardSlot = -1;
@@ -201,5 +207,6 @@ public final class PadHints {
         }
         g.pose().popPose();
         lastBar[slot] = text(hints);
+        lastBarBox[slot] = new int[] {x + Math.round(-4 * k), y + Math.round(-k), Math.round((total + 8) * k), Math.round((PadIcons.H + 2) * k)};
     }
 }

@@ -174,13 +174,18 @@ public final class PadKeyboard {
     }
 
     /** Dibuja el teclado abajo en el centro de una pantalla de w x h unidades, encima de la barra de ayuda. */
+    /** Rectangulo {x, y, ancho, alto} del ultimo dibujo en unidades de la pantalla; ancho 0 = cerrado. */
+    public volatile int[] lastBox = {0, 0, 0, 0};
+
     public void render(GuiGraphics g, Font font, int w, int h) {
+        lastBox = new int[] {0, 0, 0, 0};
         if (!active) return;
         int width = COLS * KEY_W;
-        int x0 = (w - width) / 2, y0 = h - (PadIcons.H + 3) - HEIGHT;
+        int x0 = (w - width) / 2, y0 = h - (PadIcons.H + 3) - HEIGHT - 1; // 1 de holgura: la barra de ayuda empieza una fila por encima de su alto
         g.pose().pushPose();
         g.pose().translate(0, 0, 450);
         g.fill(x0 - 3, y0 - 1, x0 + width + 3, y0 + HEIGHT, 0xE0101010);
+        lastBox = new int[] {x0 - 3, y0 - 1, width + 6, HEIGHT + 1};
         for (int r = 0; r < ROWS; r++) {
             int y = y0 + 2 + r * KEY_H;
             if (r < ROWS - 1) {

@@ -9,6 +9,7 @@ import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
+import dev.consolepad.split.AutoTest;
 import dev.consolepad.split.PadKeyboard;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryScreens;
@@ -116,7 +117,7 @@ public final class PadDriver {
         }
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
-        if (dev == null || !mc.isWindowActive()) {
+        if (dev == null || (!mc.isWindowActive() && !AutoTest.running())) {
             releaseAll(mc);
             return;
         }

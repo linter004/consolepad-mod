@@ -14,6 +14,8 @@ import net.minecraft.client.gui.GuiGraphics;
 public final class JoinPrompt {
     /** Ultimo dibujo (para el autotest): mascara de slots avisados, caja {x, y, ancho, alto} en unidades de GUI de P1 y tamano de la region. */
     public static volatile int lastSlots;
+    /** Diagnostico del ultimo fotograma: por que se dibujo o no. */
+    public static volatile String lastWhy = "sin llamar";
     public static volatile int[] lastBox = {0, 0, 0, 0};
     public static volatile int[] lastRegion = {0, 0};
 
@@ -23,6 +25,11 @@ public final class JoinPrompt {
     private static final long[] shownAt = new long[PadManager.MAX_PLAYERS];
 
     private JoinPrompt() {}
+
+    /** Solo pruebas: el siguiente dibujo trata el mando de ese slot como recien conectado (reloj de 12 s de nuevo). */
+    public static void forget(int slot) {
+        seen[slot] = null;
+    }
 
     /** Esta pendiente y su aviso aun no ha caducado (el reloj de cada mando empieza la primera vez que se dibuja). */
     private static boolean visible(int slot, PadManager.Device device, long now) {
@@ -48,8 +55,10 @@ public final class JoinPrompt {
     /** Dibuja el aviso en una region de P1 de ancho w y alto h (unidades de GUI de P1). */
     public static void render(Minecraft mc, GuiGraphics g, int w, int h) {
         lastSlots = 0;
+        lastWhy = "pantalla/oculto";
         if (mc.screen != null || mc.options.hideGui) return;
         int mask = pendingSlots(mc);
+        lastWhy = "sin pendientes";
         if (mask == 0) return;
         Font font = mc.font;
         PadManager pads = ConsolePad.PADS;
@@ -59,6 +68,7 @@ public final class JoinPrompt {
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
             if ((mask & (1 << i)) != 0 && visible(i, pads.slot(i).device, now)) visibleMask |= 1 << i;
         }
+        lastWhy = "pendientes " + Integer.toBinaryString(mask) + " visibles " + Integer.toBinaryString(visibleMask) + " edad1=" + (now - shownAt[1]) / 1000000 + "ms edad2=" + (now - shownAt[2]) / 1000000 + "ms";
         mask = visibleMask;
         if (mask == 0) return;
         int minX = Integer.MAX_VALUE, maxX = 0, minY = Integer.MAX_VALUE, maxY = 0;

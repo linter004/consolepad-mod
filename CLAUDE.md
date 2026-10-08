@@ -73,4 +73,6 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Una espera sobre el archivo de salida de una tarea en segundo plano se cuelga del texto final, no de que exista:** el script puede haber escrito algo al empezar. Esperar a una linea concreta del log.
 - **Los mandos virtuales de prueba tienen reloj propio en el aviso de unirse:** una prueba que lo mida debe desenchufar y volver a enchufar (`detachVirtual` + `attachVirtual`) para empezar de cero.
 - **El estado del mundo "New World" lo cambia el usuario al jugar** (modo de juego de P1, posicion de P2, tiempo): una prueba que dependa de eso debe fijarlo ella y restaurarlo (supervivencia para el inventario de P1).
+- **El usuario puede tener mandos reales conectados durante el autotest (hasta 3 en los slots 0 a 2):** una prueba no puede suponer que un slot tiene un mando virtual ni desenchufarlo; los mandos reales se quedan, y su estado se suma al simulado. Para volver a empezar el reloj de un aviso usar `JoinPrompt.forget`.
+- **Con la ventana sin foco vanilla abre el menu de pausa de P1** (`pauseOnLostFocus`): el autotest lo desactiva mientras corre y `PadDriver` no exige foco si `AutoTest.running()`.
 
