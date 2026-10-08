@@ -38,3 +38,12 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### ConsolePad: nunca subir binarios, registros ni ajustes locales ###
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.log
+hs_err_pid*
+crash-reports/
+.claude/settings.local.json
+.claude/projects/
