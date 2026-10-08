@@ -17,7 +17,21 @@ public final class JoinPrompt {
     public static volatile int[] lastBox = {0, 0, 0, 0};
     public static volatile int[] lastRegion = {0, 0};
 
+    /** Segundos que se ve el aviso de un mando desde que aparece; solo vuelve a salir si se conecta un mando nuevo. */
+    public static final long SHOW_NANOS = 12_000_000_000L;
+    private static final PadManager.Device[] seen = new PadManager.Device[PadManager.MAX_PLAYERS];
+    private static final long[] shownAt = new long[PadManager.MAX_PLAYERS];
+
     private JoinPrompt() {}
+
+    /** Esta pendiente y su aviso aun no ha caducado (el reloj de cada mando empieza la primera vez que se dibuja). */
+    private static boolean visible(int slot, PadManager.Device device, long now) {
+        if (seen[slot] != device) { // mando nuevo en el slot: el aviso vuelve a empezar
+            seen[slot] = device;
+            shownAt[slot] = now;
+        }
+        return now - shownAt[slot] < SHOW_NANOS;
+    }
 
     /** Slots (1 a 3) con mando conectado y jugador fuera, con P1 en un mundo local. */
     public static int pendingSlots(Minecraft mc) {
@@ -40,6 +54,13 @@ public final class JoinPrompt {
         Font font = mc.font;
         PadManager pads = ConsolePad.PADS;
         int row = 0;
+        long now = System.nanoTime();
+        int visibleMask = 0;
+        for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
+            if ((mask & (1 << i)) != 0 && visible(i, pads.slot(i).device, now)) visibleMask |= 1 << i;
+        }
+        mask = visibleMask;
+        if (mask == 0) return;
         int minX = Integer.MAX_VALUE, maxX = 0, minY = Integer.MAX_VALUE, maxY = 0;
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
             if ((mask & (1 << i)) == 0) continue;

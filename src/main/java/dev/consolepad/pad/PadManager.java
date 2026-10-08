@@ -64,6 +64,12 @@ public final class PadManager {
         virtualDevices.add(d);
     }
 
+    /** Solo pruebas (AutoTest): quita el mando virtual de un slot (como desenchufarlo); el siguiente attachVirtual es un mando nuevo. */
+    public void detachVirtual(int slotIndex) {
+        Slot s = slots[slotIndex];
+        if (s.device != null && virtualDevices.remove(s.device)) s.device = null;
+    }
+
     public void saveSettings() {
         for (Slot s : slots) PadSettingsStore.save(s.index, s.settings);
     }

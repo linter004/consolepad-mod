@@ -2428,6 +2428,8 @@ public final class AutoTest {
     private static boolean jpOk = true;
     private static int jpPhase;
     private static int jpExpect;
+    private static long jpT0;
+    private static boolean jpSeen10, jpSeen14;
 
     private static void jpVerdict(String name, boolean ok) {
         jpOk &= ok;
@@ -2452,9 +2454,11 @@ public final class AutoTest {
             case 0 -> {
                 if (ticks == 1) mc.setScreen(null);
                 if (leaveTo(mc, 1) && ticks > 20) {
+                    for (int i = 1; i <= 3; i++) pads.detachVirtual(i); // mandos nuevos: el reloj del aviso de cada uno empieza ahora
                     pads.attachVirtual(1);
                     pads.attachVirtual(2);
                     jpExpect = jpPendingMask();
+                    jpT0 = System.nanoTime();
                     jpPhase = 1;
                     ticks = 0;
                 }
@@ -2502,10 +2506,35 @@ public final class AutoTest {
                     jpVerdict("tras unirse P2, su aviso desaparece y queda el de los demas: lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + " (esperadas " + Integer.toBinaryString(jpPendingMask()) + ")",
                             JoinPrompt.lastSlots == jpPendingMask() && (JoinPrompt.lastSlots & 2) == 0 && jpPendingMask() == (jpExpect & ~2));
                     jpVerdict("P2 entra sin menu de pausa abierto (pantalla de P2: " + screenOf(mc, 1) + ")", screenOf(mc, 1) == null);
-                    ConsolePad.LOGGER.info("[autotest] RESULTADO aviso de unirse y Start para entrar en conjunto -> {}", jpOk ? "OK" : "FALLO");
                 }
-                if (ticks > 20 && leaveTo(mc, 2) || ticks > 600) {
+                if (ticks > 20) {
                     jpPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> { // el aviso se oculta a los 12 s y solo vuelve con un mando nuevo
+                double secs = (System.nanoTime() - jpT0) / 1e9;
+                if (!jpSeen10 && secs >= 10.0) {
+                    jpSeen10 = true;
+                    jpVerdict("aviso de unirse: a los " + String.format("%.1f", secs) + " s sigue visible (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ")", JoinPrompt.lastSlots != 0);
+                }
+                if (!jpSeen14 && secs >= 14.0) {
+                    jpSeen14 = true;
+                    jpVerdict("aviso de unirse: a los " + String.format("%.1f", secs) + " s (limite 12) se ha ocultado (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ", pendientes=" + Integer.toBinaryString(jpPendingMask()) + ")",
+                            JoinPrompt.lastSlots == 0 && jpPendingMask() != 0);
+                    pads.attachVirtual(3); // mando nuevo conectado
+                    ticks = 0;
+                }
+                if (jpSeen14 && ticks == 15) {
+                    jpVerdict("aviso de unirse: al conectar un mando nuevo (slot 4) reaparece solo el suyo (lineas=" + Integer.toBinaryString(JoinPrompt.lastSlots) + ", esperado 1000)", JoinPrompt.lastSlots == 8);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO aviso de unirse y Start para entrar en conjunto -> {}", jpOk ? "OK" : "FALLO");
+                    jpPhase = 5;
+                    ticks = 0;
+                }
+            }
+            case 5 -> {
+                if (leaveTo(mc, 2) || ticks > 600) {
+                    jpPhase = 6;
                     next();
                 }
             }
