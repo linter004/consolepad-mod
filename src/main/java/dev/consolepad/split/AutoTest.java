@@ -896,13 +896,64 @@ public final class AutoTest {
                 SecondaryPlayers.join(mc);
             }
             default -> {
-                if (ticks > 175 && c != null && c.player != null && c.level != null && serverP2(mc) != null && ticks > 400) {
+                if (ticks > 250 && p2Ready(mc)) {
                     ConsolePad.LOGGER.info("[autotest] RESULTADO menus de pausa 4d en conjunto -> {}", pmOk ? "OK" : "FALLO");
                     SecondaryTick.scriptActive = false;
                     simP2(0);
                     next();
                 } else if (ticks > 1400) {
                     ConsolePad.LOGGER.info("[autotest] RESULTADO menus de pausa 4d: P2 no volvio a entrar -> FALLO");
+                    next();
+                }
+            }
+        }
+    }
+
+    /** P2 dentro, con su nivel y el chunk bajo sus pies cargados en el cliente, y en el suelo en el servidor (puede andar). */
+    private static boolean p2Ready(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        return c != null && c.player != null && c.level != null && p2 != null && p2.onGround()
+                && c.level.hasChunkAt(c.player.blockPosition());
+    }
+
+    private static boolean jlOk = true;
+
+    private static void jlVerdict(String name, boolean ok) {
+        jlOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /**
+     * Paso 4e: entrada y salida de P2 con Start+Back del slot 1. Una pulsacion corta (1 s) no lo saca; mantenerlo (3,5 s) lo saca sin
+     * romper a P1; pulsar otra vez lo mete y conserva su inventario (el cofre y el inventario de pruebas anteriores).
+     */
+    private static void joinLeaveTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        int both = (1 << PadState.START) | (1 << PadState.BACK);
+        switch (ticks) {
+            case 1 -> simP2(both);
+            case 22 -> simP2(0);
+            case 35 -> jlVerdict("pulsacion corta (1 s) de Start+Back no saca a P2: P2 dentro=" + SecondaryPlayers.isActive(), SecondaryPlayers.isActive());
+            case 40 -> simP2(both);
+            case 110 -> simP2(0);
+            case 120 -> {
+                boolean gone = !SecondaryPlayers.isActive() && serverP2(mc) == null;
+                boolean p1ok = mc.player != null && mc.level != null && mc.getSingleplayerServer() != null;
+                jlVerdict("mantener Start+Back 2 s saca a P2 (P2 fuera=" + gone + ") y P1 sigue (" + p1ok + ")", gone && p1ok);
+            }
+            case 130 -> simP2(both);
+            case 135 -> simP2(0);
+            default -> {
+                if (ticks > 250 && ticks < 5000 && p2Ready(mc)) {
+                    ServerPlayer p2 = serverP2(mc);
+                    ItemStack kept = p2.getInventory().getItem(22);
+                    jlVerdict("pulsar Start+Back mete a P2 otra vez y conserva su inventario: slot 22 = " + kept.getItem() + " x" + kept.getCount() + " (adoquin x7)",
+                            kept.is(Items.COBBLESTONE) && kept.getCount() == 7);
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO entrada y salida por mando 4e en conjunto -> {}", jlOk ? "OK" : "FALLO");
+                    next();
+                } else if (ticks >= 5000) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO entrada y salida por mando 4e: P2 no volvio a entrar -> FALLO");
                     next();
                 }
             }
@@ -1075,14 +1126,15 @@ public final class AutoTest {
             case 7 -> screensTest(mc);
             case 8 -> screens2Test(mc);
             case 9 -> pauseMenuTest(mc);
-            case 10 -> aspectTest(mc, "pequena");
-            case 11 -> resizeWindow(mc);
-            case 12 -> aspectTest(mc, "1920x1080");
-            case 13 -> pauseTest(mc);
-            case 14 -> fovTest(mc);
-            case 15 -> fpsPhase(mc, false);
-            case 16 -> fpsPhase(mc, true);
-            case 17 -> leaveTest(mc);
+            case 10 -> joinLeaveTest(mc);
+            case 11 -> aspectTest(mc, "pequena");
+            case 12 -> resizeWindow(mc);
+            case 13 -> aspectTest(mc, "1920x1080");
+            case 14 -> pauseTest(mc);
+            case 15 -> fovTest(mc);
+            case 16 -> fpsPhase(mc, false);
+            case 17 -> fpsPhase(mc, true);
+            case 18 -> leaveTest(mc);
             default -> { }
         }
     }

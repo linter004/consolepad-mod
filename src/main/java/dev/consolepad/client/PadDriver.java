@@ -61,6 +61,10 @@ public final class PadDriver {
         Runtime.getRuntime().addShutdownHook(new Thread(pads::saveSettings, "ConsolePad-save"));
     }
 
+    private static final float LEAVE_HOLD_SECONDS = 2.0f;
+    private float joinHold;
+    private boolean joinLatch;
+
     public void onFrame(RenderFrameEvent.Pre event) {
         Minecraft mc = Minecraft.getInstance();
         long now = System.nanoTime();
@@ -68,12 +72,26 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
-        // Fase 3, paso 1: Start+Back en el mando del slot 1 abre al jugador local extra.
+        // Start+Back en el mando del slot 1: pulsar = entra el jugador local extra; mantener 2 s con el jugador dentro = sale.
         PadManager.Device dev1 = pads.slot(1).device;
         if (dev1 != null) {
             PadState s1 = dev1.state;
-            if ((s1.pressed(PadState.START) && s1.isDown(PadState.BACK)) || (s1.pressed(PadState.BACK) && s1.isDown(PadState.START))) {
-                SecondaryPlayers.join(mc);
+            boolean both = s1.isDown(PadState.START) && s1.isDown(PadState.BACK);
+            if (!both) {
+                joinHold = 0f;
+                joinLatch = false; // hay que soltar los botones antes de que cuenten otra vez
+            } else if (!SecondaryPlayers.isActive()) {
+                if (!joinLatch && ((s1.pressed(PadState.START)) || (s1.pressed(PadState.BACK)))) {
+                    SecondaryPlayers.join(mc);
+                    joinLatch = true;
+                }
+            } else if (!joinLatch) {
+                joinHold += dt;
+                if (joinHold >= LEAVE_HOLD_SECONDS) {
+                    SecondaryPlayers.leave(mc);
+                    joinLatch = true;
+                    joinHold = 0f;
+                }
             }
         }
         SecondaryScreens.frame(mc, pads.slot(1), dt);

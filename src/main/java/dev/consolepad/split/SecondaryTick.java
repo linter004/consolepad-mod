@@ -34,7 +34,7 @@ public final class SecondaryTick {
 
     private static java.util.EnumSet<PadAction> prevDown = java.util.EnumSet.noneOf(PadAction.class);
     private static java.util.EnumSet<PadAction> pressedNow = java.util.EnumSet.noneOf(PadAction.class);
-    private static boolean sprintLatch, sneakLatch;
+    private static boolean sprintLatch, sneakLatch, comboLatch;
     private static int deadTicks;
 
     private static final float TICK_SECONDS = 0.05f;
@@ -53,7 +53,7 @@ public final class SecondaryTick {
         prevAttack = prevUse = prevLb = prevRb = false;
         prevDown = java.util.EnumSet.noneOf(PadAction.class);
         pressedNow = java.util.EnumSet.noneOf(PadAction.class);
-        sprintLatch = sneakLatch = sprintHeld = false;
+        sprintLatch = sneakLatch = sprintHeld = comboLatch = false;
         scriptActions = java.util.EnumSet.noneOf(PadAction.class);
         scriptActive = false;
         scriptForward = 0f;
@@ -100,6 +100,18 @@ public final class SecondaryTick {
             forward = left = lookX = lookY = 0f;
             jump = attack = use = lb = rb = false;
             downSet.clear();
+        }
+        if (slot.device != null && !scriptActive) {
+            // Start+Back es el atajo de entrar/salir: mientras esta pulsado (y hasta soltar los dos) no dispara las acciones de Start ni de Back
+            // (si no, P2 apareceria con el menu de pausa abierto).
+            PadState cs = slot.device.state;
+            if (cs.isDown(PadState.START) && cs.isDown(PadState.BACK)) comboLatch = true;
+            if (comboLatch) {
+                for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
+                    if (e.getKey() == PadState.START || e.getKey() == PadState.BACK) downSet.remove(e.getValue());
+                }
+                if (!cs.isDown(PadState.START) && !cs.isDown(PadState.BACK)) comboLatch = false;
+            }
         }
         java.util.EnumSet<PadAction> pressed = java.util.EnumSet.copyOf(downSet);
         pressed.removeAll(prevDown);
