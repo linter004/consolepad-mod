@@ -2107,13 +2107,15 @@ public final class AutoTest {
                     smVerdict("P1 solo: Ajustes del jugador se abre (pantalla: " + mc.screen + ")", mc.screen instanceof PlayerSettingsScreen);
                 }
                 if (mc.screen instanceof PlayerSettingsScreen ss) {
-                    smClick(mc, t, 41, ss.cursorSpeedCenter());
+                    if (t == 41) p1ClickAt(mc, ss.centerOnItsPage("cursorSpeed")); // la opcion puede estar en otra pagina segun el alto de la ventana
+                    if (t == 44) p1Mouse(mc, false);
                     if (t == 48) {
                         float exp = PlayerSettingsScreen.nextFloat(PlayerSettingsScreen.CURSOR_SPEEDS, smSpeed0);
                         smVerdict("velocidad del cursor de P1: " + smSpeed0 + " -> " + s0.cursorSpeed + " (esperada " + exp + ")", s0.cursorSpeed == exp && exp != smSpeed0);
                         s0.cursorSpeed = smSpeed0;
                     }
-                    smClick(mc, t, 50, ss.snapNavCenter());
+                    if (t == 50) p1ClickAt(mc, ss.centerOnItsPage("snapNav"));
+                    if (t == 53) p1Mouse(mc, false);
                     if (t == 58) {
                         smVerdict("cursor por casillas de P1 se activa en su slot (snapNav=" + s0.snapNav + ")", s0.snapNav);
                         s0.snapNav = false;
@@ -3046,10 +3048,11 @@ public final class AutoTest {
             case 1 -> {
                 PlayerContext c3 = SecondaryPlayers.context(2);
                 if (ticks == 20) {
-                    String n3 = SecondaryPlayers.secondaryName(mc, 2);
+                    // El aviso lleva el nombre visible del jugador (PlayerLabels: "Jugador 3" o el elegido), no el del perfil.
+                    String n3 = PlayerLabels.labelOf(2);
                     boolean p1 = SplitNotices.p1Log.stream().anyMatch(m -> m.contains(n3) && m.contains("joined"));
-                    ctVerdict("\"" + n3 + " joined the game\" llega a P1 (" + p1 + "), a P2 (" + hasNotice(c2, "joined the game") + ") y al propio P3 (" + hasNotice(c3, "joined the game") + ")",
-                            p1 && hasNotice(c2, n3) && hasNotice(c3, n3));
+                    ctVerdict("\"" + n3 + " joined the game\" llega a P1 (" + p1 + "), a P2 (" + hasNotice(c2, n3 + " joined the game") + ") y al propio P3 (" + hasNotice(c3, n3 + " joined the game") + ")",
+                            p1 && hasNotice(c2, n3 + " joined the game") && hasNotice(c3, n3 + " joined the game"));
                     server.execute(() -> {
                         server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("aviso para todos"), false);
                         server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal(LONG_TEXT), false);
@@ -3814,6 +3817,19 @@ public final class AutoTest {
                 int x = (int) Math.floor(p1.x) + 24;
                 int z = (int) Math.floor(p1.z);
                 int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+                // Pasillo llano hacia +z (hacia donde mira P2): las pruebas de andar miden bloques recorridos y el sitio cambia de una partida a otra
+                // (P1 se mueve y se guarda), asi que un escalon o un arbol en el camino las hacia fallar segun el terreno.
+                BlockPos.MutableBlockPos bp = new BlockPos.MutableBlockPos();
+                for (int dz = -2; dz <= 72; dz++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        bp.set(x + dx, y - 1, z + dz);
+                        if (!level.getBlockState(bp).isCollisionShapeFullBlock(level, bp)) level.setBlock(bp, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 2);
+                        for (int dy = 0; dy <= 2; dy++) {
+                            bp.set(x + dx, y + dy, z + dz);
+                            if (!level.getBlockState(bp).isAir()) level.setBlock(bp, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                        }
+                    }
+                }
                 target = new Vec3(x + 0.5, y, z + 0.5);
                 p2.teleportTo(level, target.x, target.y, target.z, 0f, 0f);
             });

@@ -134,6 +134,21 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         return b == null ? new int[] {0, 0} : center(b);
     }
 
+    /** Como centerOf, pero si la opcion esta en otra pagina pasa antes a esa pagina (para pruebas que no deben depender del alto de la ventana). */
+    public int[] centerOnItsPage(String id) {
+        if (!buttons.containsKey(id)) {
+            int perPage = Math.max(3, (this.height - 24 - 28) / PITCH);
+            for (int k = 0; k < items.size(); k++) {
+                if (items.get(k).id().equals(id)) {
+                    page = k / perPage;
+                    this.rebuildWidgets();
+                    break;
+                }
+            }
+        }
+        return centerOf(id);
+    }
+
     public int[] guiScaleCenter() {
         return centerOf("guiScale");
     }
