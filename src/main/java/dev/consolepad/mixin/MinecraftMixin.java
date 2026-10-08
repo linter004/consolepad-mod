@@ -6,6 +6,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ItemInHandRenderer;
+import org.objectweb.asm.Opcodes;
 import net.minecraft.client.server.IntegratedServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -31,6 +34,14 @@ public abstract class MinecraftMixin {
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void consolepad$secondarySetScreen(Screen screen, CallbackInfo ci) {
         if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+    }
+
+    /** "Usar" anima la mano del jugador que usa el objeto (la de P2 es propia, no la de GameRenderer). */
+    @Redirect(method = "startUseItem",
+            at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,
+                    target = "Lnet/minecraft/client/renderer/GameRenderer;itemInHandRenderer:Lnet/minecraft/client/renderer/ItemInHandRenderer;"))
+    private ItemInHandRenderer consolepad$ownHandOnUse(GameRenderer renderer) {
+        return ContextSwitcher.handOr(renderer.itemInHandRenderer);
     }
 
     /**

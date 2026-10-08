@@ -90,7 +90,8 @@ public final class SplitRender {
             }
         } finally {
             SplitDiag.endPass();
-            Item drawn = ((ItemInHandRendererAccessor) mc.gameRenderer.itemInHandRenderer).consolepad$getMainHandItem().getItem();
+            net.minecraft.client.renderer.ItemInHandRenderer handUsed = ctx != null && ctx.hand != null ? ctx.hand : mc.gameRenderer.itemInHandRenderer;
+            Item drawn = ((ItemInHandRendererAccessor) handUsed).consolepad$getMainHandItem().getItem();
             if (ctx != null) {
                 dbgHandDrawnP2 = drawn;
                 dbgHandOwnP2 = ctx.player.getMainHandItem().getItem();

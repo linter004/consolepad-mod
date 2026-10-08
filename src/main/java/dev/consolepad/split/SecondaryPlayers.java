@@ -73,6 +73,7 @@ public final class SecondaryPlayers {
         SocketAddress address = server.getConnection().startMemoryChannel();
         Connection c = Connection.connectToLocalServer(address);
         context = new PlayerContext(new SplitLevelRenderer(mc));
+        context.hand = new net.minecraft.client.renderer.ItemInHandRenderer(mc, mc.getEntityRenderDispatcher(), mc.getItemRenderer());
         connection = c; // antes de iniciar el protocolo: ConnectionMixin envuelve el listener de juego
         c.initiateServerboundPlayConnection(address.toString(), 0, new SecondaryHandshakeListener(c, mc));
         c.send(new ServerboundHelloPacket(name, profile.getId()));

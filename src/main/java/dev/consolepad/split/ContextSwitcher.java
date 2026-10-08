@@ -31,6 +31,11 @@ public final class ContextSwitcher {
         return active && current != null ? current.renderer : original;
     }
 
+    /** Mano en primera persona del jugador cuyo contexto esta activo (la de GameRenderer si no hay contexto extra). */
+    public static net.minecraft.client.renderer.ItemInHandRenderer handOr(net.minecraft.client.renderer.ItemInHandRenderer original) {
+        return active && current != null && current.hand != null ? current.hand : original;
+    }
+
     private static PlayerContext current;
 
     public static void run(PlayerContext ctx, Runnable body) {

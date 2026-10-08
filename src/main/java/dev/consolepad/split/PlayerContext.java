@@ -20,6 +20,8 @@ public final class PlayerContext {
     /** FOV suavizado de GameRenderer (fov/oldFov): efecto de correr, arco, etc. Cada jugador el suyo. */
     public float fov = 1.0F;
     public float oldFov = 1.0F;
+    /** Mano en primera persona propia (objeto, altura, animacion de equipar/usar): el de GameRenderer es unico y solo lo ticka P1. */
+    public net.minecraft.client.renderer.ItemInHandRenderer hand;
     /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
     public final LevelRenderer renderer;
 

@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import org.joml.Matrix4f;
 import org.objectweb.asm.Opcodes;
@@ -43,6 +44,14 @@ public abstract class GameRendererMixin {
                     target = "Lnet/minecraft/client/Minecraft;levelRenderer:Lnet/minecraft/client/renderer/LevelRenderer;"))
     private LevelRenderer consolepad$renderLevelRenderer(Minecraft mc) {
         return ContextSwitcher.rendererOr(mc, mc.levelRenderer);
+    }
+
+    /** La mano en primera persona es la del jugador que se dibuja (objeto y animaciones propios). */
+    @Redirect(method = "renderItemInHand",
+            at = @At(value = "FIELD", opcode = Opcodes.GETFIELD,
+                    target = "Lnet/minecraft/client/renderer/GameRenderer;itemInHandRenderer:Lnet/minecraft/client/renderer/ItemInHandRenderer;"))
+    private ItemInHandRenderer consolepad$ownHand(GameRenderer self) {
+        return ContextSwitcher.handOr(self.itemInHandRenderer);
     }
 
     /** El aspecto de la proyeccion es el de la region que se dibuja, no el de la ventana entera. */
