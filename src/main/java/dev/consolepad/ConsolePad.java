@@ -24,11 +24,14 @@ import org.slf4j.Logger;
 
 @Mod(value = ConsolePad.MODID, dist = Dist.CLIENT)
 public class ConsolePad {
+    /** Ajustes y mandos de los 4 slots (para los mixins). */
+    public static dev.consolepad.pad.PadManager PADS;
     public static final String MODID = "consolepad";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ConsolePad(IEventBus modBus, ModContainer container) {
         PadDriver driver = new PadDriver();
+        PADS = driver.pads();
         AutoTest.init(driver.pads());
         NeoForge.EVENT_BUS.addListener(driver::onFrame);
 

@@ -12,13 +12,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import javax.annotation.Nullable;
 
-/** El chat es comun: P1 ya recibe cada mensaje del servidor; el cliente de P2 no debe duplicarlo. */
+/** El chat de un extra no entra en el ChatComponent de P1: se guarda en el contexto de ese jugador (SplitNotices) y se dibuja en su region. */
 @Mixin(ChatComponent.class)
 public abstract class ChatGuardsMixin {
     @Inject(method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",
             at = @At("HEAD"), cancellable = true)
     private void consolepad$noDuplicateChat(Component message, @Nullable MessageSignature signature, @Nullable GuiMessageTag tag,
                                             CallbackInfo ci) {
-        if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+        if (ContextSwitcher.isSecondaryActive()) {
+            ci.cancel();
+            dev.consolepad.split.SplitNotices.addChat(message); // lo ve el jugador en su propia region
+        } else {
+            dev.consolepad.split.SplitNotices.logP1(message);
+        }
     }
 }

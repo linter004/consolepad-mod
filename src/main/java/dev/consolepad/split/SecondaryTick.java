@@ -140,6 +140,7 @@ public final class SecondaryTick {
         ((dev.consolepad.mixin.GameRendererAccessor) mc.gameRenderer).consolepad$tickFov(); // FOV propio de P2 (camara = P2)
         if (self.hand != null) self.hand.tick(); // mano propia (lee minecraft.player = este jugador)
         SplitHud.tickToolHighlight(self); // nombre del objeto seleccionado
+        SplitNotices.tick(self);
 
         if (lookX != 0f || lookY != 0f) {
             float k = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
@@ -204,7 +205,7 @@ public final class SecondaryTick {
                     st.sneakLatch = !st.sneakLatch;
                     input.shiftKeyDown = st.sneakLatch;
                 }
-                case PAUSE -> mc.setScreen(new P2PauseScreen());
+                case PAUSE -> mc.setScreen(new P2PauseScreen(self.slotIndex));
                 case INVENTORY -> {
                     dbgInventoryRequests++;
                     if (mc.gameMode.isServerControlledInventory()) player.sendOpenInventory();

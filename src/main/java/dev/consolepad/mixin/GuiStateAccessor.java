@@ -8,6 +8,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 /** Estado del HUD que es de un jugador y no puede compartirse entre las mitades (parpadeo de vida, nombre del objeto). */
 @Mixin(Gui.class)
 public interface GuiStateAccessor {
+    @Accessor("title")
+    net.minecraft.network.chat.Component consolepad$getTitle();
+
     @Accessor("lastHealth")
     int consolepad$getLastHealth();
 

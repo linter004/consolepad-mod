@@ -24,6 +24,9 @@ public final class SplitRender {
     /** Diagnostico (solo P2): objeto que dibuja la mano en cada pasada y objeto real del jugador de esa pasada. */
     public static volatile Item dbgHandDrawnP1, dbgHandDrawnP2, dbgHandOwnP1, dbgHandOwnP2;
 
+    /** Slot del jugador cuyo mundo se esta dibujando (0 = P1, tambien fuera de la pantalla dividida). */
+    public static volatile int passSlot;
+
     private SplitRender() {}
 
     private static boolean ready(PlayerContext c) {
@@ -90,6 +93,7 @@ public final class SplitRender {
         SplitView.width = w;
         SplitView.height = h;
         SplitDiag.beginPass(ctx != null ? ctx.label() : "P1", w, h);
+        passSlot = ctx != null ? ctx.slotIndex : 0;
         ClientLevel level = ctx != null ? ctx.level : mc.level;
         // Los dispatchers de entidades y bloques son compartidos: apuntan al nivel del jugador que se dibuja.
         mc.getEntityRenderDispatcher().setLevel(level);
@@ -102,6 +106,7 @@ public final class SplitRender {
             }
         } finally {
             SplitDiag.endPass();
+            passSlot = 0;
             if (ctx == null || ctx.slotIndex == 1) {
                 net.minecraft.client.renderer.ItemInHandRenderer handUsed = ctx != null && ctx.hand != null ? ctx.hand : mc.gameRenderer.itemInHandRenderer;
                 Item drawn = ((ItemInHandRendererAccessor) handUsed).consolepad$getMainHandItem().getItem();

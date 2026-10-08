@@ -193,7 +193,9 @@ public final class SecondaryPlayers {
                     return null;
                 }
                 if (n.equals("tick")) return null; // el tick del jugador extra lo hace SecondaryTick
-                if (n.startsWith("handle")) {
+                // Cualquier manejador de paquete (un unico argumento Packet), no solo los llamados handle*: en 1.21.1 hay cuatro con otro
+                // nombre (setTitleText, setSubtitleText, setTitlesAnimation, setActionBarText) y se procesarian con los datos de P1.
+                if (args != null && args.length == 1 && args[0] instanceof net.minecraft.network.protocol.Packet<?> && !n.equals("shouldHandleMessage")) {
                     // Hilo de red -> hilo principal, dentro del contexto del jugador. El orden de llegada se conserva.
                     mc.execute(() -> ContextSwitcher.run(ctx, () -> handle(real, method, args)));
                     return null;

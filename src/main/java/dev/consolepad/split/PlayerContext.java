@@ -38,6 +38,13 @@ public final class PlayerContext {
     public final boolean[] dpadActive = new boolean[4];
     public final float[] dpadHeld = new float[4], dpadNext = new float[4];
     public double scrollAcc;
+    /** Avisos propios: chat y mensajes del servidor que recibe este jugador, mensaje sobre la barra y titulo (el chat/avisos de P1 son los de vanilla). */
+    public final java.util.ArrayDeque<Notice> notices = new java.util.ArrayDeque<>();
+    public net.minecraft.network.chat.Component overlay;
+    public int overlayTime;
+    public net.minecraft.network.chat.Component title;
+    public int titleTime;
+    public volatile int noticesDrawn;
     /** Estado de la entrada de su mando entre ticks. */
     public final InputState input = new InputState();
     /** Region de la ventana que le toca, en unidades de GUI (origen arriba a la izquierda) y en pixeles (origen abajo a la izquierda); la fija SplitLayout. */
@@ -56,6 +63,9 @@ public final class PlayerContext {
     public String label() {
         return "P" + (slotIndex + 1);
     }
+
+    /** Un aviso con el tick de cliente en que llego. */
+    public record Notice(net.minecraft.network.chat.Component text, long tick) {}
 
     public static final class HudState {
         public int lastHealth, displayHealth, toolHighlightTimer;

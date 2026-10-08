@@ -63,6 +63,7 @@ public final class SplitHud {
                                 invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
                                 invoker.consolepad$renderEffects(graphics, deltaTracker);
                             });
+                            SplitNotices.render(mc, p, graphics);
                             SecondaryScreens.render(mc, p, graphics, partial, p1Level);
                         });
                     } finally {

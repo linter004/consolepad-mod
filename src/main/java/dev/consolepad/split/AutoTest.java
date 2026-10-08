@@ -1201,6 +1201,109 @@ public final class AutoTest {
         }
     }
 
+    private static boolean ntOk = true;
+    private static float ntP1Speed;
+
+    private static void ntVerdict(String name, boolean ok) {
+        ntOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static boolean ntHasFov(String pass, double target) {
+        for (SplitDiag.Sample sm : SplitDiag.samples()) {
+            if (sm.pass().equals(pass) && sm.where().equals("getProjectionMatrix") && Math.abs(sm.fovDeg() - target) < 0.6) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Paso 4g: avisos y ajustes por jugador. (1) Un mensaje de sistema, uno sobre la barra y un titulo enviados solo a P2 acaban en el
+     * contexto de P2 (y se dibujan en su region) y no en el chat de P1. (2) FOV propio: P1 a 90 y P2 a 60 se miden en la proyeccion de
+     * cada pasada. (3) Desde el menu de pausa de P2 se cambian su FOV y su sensibilidad con el cursor de su mando.
+     */
+    private static void notesTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context();
+        ServerPlayer p2 = serverP2(mc);
+        var pads0 = ConsolePad.PADS.slot(0).settings;
+        var pads1 = ConsolePad.PADS.slot(1).settings;
+        switch (ticks) {
+            case 1 -> {
+                SplitNotices.p1Log.clear();
+                SplitView.enabled = true;
+                ntP1Speed = pads0.lookSpeed;
+                mc.getSingleplayerServer().execute(() -> {
+                    p2.sendSystemMessage(net.minecraft.network.chat.Component.literal("aviso para P2"));
+                    p2.displayClientMessage(net.minecraft.network.chat.Component.literal("barra de P2"), true);
+                    p2.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket(net.minecraft.network.chat.Component.literal("TITULO P2")));
+                });
+            }
+            case 30 -> {
+                boolean chat = c.notices.stream().anyMatch(n -> n.text().getString().equals("aviso para P2"));
+                boolean overlay = c.overlay != null && c.overlay.getString().equals("barra de P2");
+                boolean title = c.title != null && c.title.getString().equals("TITULO P2");
+                var p1Title = ((dev.consolepad.mixin.GuiStateAccessor) mc.gui).consolepad$getTitle();
+                boolean p1NoTitle = p1Title == null || !p1Title.getString().equals("TITULO P2");
+                boolean p1NoChat = SplitNotices.p1Log.stream().noneMatch(m -> m.contains("aviso para P2"));
+                boolean drawn = c.noticesDrawn >= 3;
+                ntVerdict("avisos de P2: chat propio=" + chat + ", mensaje sobre la barra=" + overlay + ", titulo=" + title + ", dibujados=" + c.noticesDrawn + " (>=3), "
+                        + "el chat de P1 no recibe el aviso=" + p1NoChat + ", el titulo de P1 sigue sin el de P2=" + p1NoTitle, chat && overlay && title && drawn && p1NoChat && p1NoTitle);
+            }
+            case 40 -> {
+                pads0.fov = 90;
+                pads1.fov = 60;
+                SplitDiag.clear();
+                SplitDiag.recording = true;
+            }
+            case 52 -> {
+                SplitDiag.recording = false;
+                boolean ok = ntHasFov("P1", 90) && !ntHasFov("P1", 60) && ntHasFov("P2", 60) && !ntHasFov("P2", 90);
+                ntVerdict("FOV propio por jugador: P1 a 90 (" + ntHasFov("P1", 90) + "), P2 a 60 (" + ntHasFov("P2", 60) + "), sin mezcla", ok);
+                pads0.fov = 0;
+                pads1.fov = 0;
+                pads1.lookSpeed = 180f; // punto de partida conocido para el ciclo del menu
+                SecondaryTick.scriptActive = true;
+                SecondaryTick.scriptForward = 0f;
+                press(PadAction.PAUSE);
+            }
+            case 54 -> release();
+            case 70 -> {
+                if (c.screen instanceof P2PauseScreen m) {
+                    int[] f = m.fovCenter();
+                    c.cursorX = f[0];
+                    c.cursorY = f[1];
+                }
+            }
+            case 73 -> simP2(1 << PadState.A);
+            case 79 -> simP2(0);
+            case 88 -> {
+                ntVerdict("ajuste de FOV de P2 desde su menu: fov de su slot=" + pads1.fov + " (esperado 60), P1=" + pads0.fov + " (0)", pads1.fov == 60 && pads0.fov == 0);
+                if (c.screen instanceof P2PauseScreen m) {
+                    int[] f = m.sensCenter();
+                    c.cursorX = f[0];
+                    c.cursorY = f[1];
+                }
+            }
+            case 91 -> simP2(1 << PadState.A);
+            case 97 -> simP2(0);
+            case 106 -> {
+                ntVerdict("ajuste de sensibilidad de P2 desde su menu: velocidad de giro=" + pads1.lookSpeed + " (esperado 225), P1=" + pads0.lookSpeed + " (sin cambios)",
+                        Math.abs(pads1.lookSpeed - 225f) < 1f && Math.abs(pads0.lookSpeed - ntP1Speed) < 1f);
+                pads1.fov = 0;
+                pads1.lookSpeed = 180f;
+                simP2(1 << PadState.B);
+            }
+            case 112 -> simP2(0);
+            case 125 -> {
+                ntVerdict("cerrar el menu de P2 con B tras los ajustes", c.screen == null);
+                ConsolePad.LOGGER.info("[autotest] RESULTADO avisos y ajustes por jugador (4g) en conjunto -> {}", ntOk ? "OK" : "FALLO");
+                SecondaryTick.scriptActive = false;
+                simP2(0);
+                next();
+            }
+            default -> { }
+        }
+    }
+
     private static int aspectBad;
     private static Vec3 pauseP2Start, pauseP2Mid;
     private static long pauseGameTime0, pauseServerTime0;
@@ -1369,14 +1472,15 @@ public final class AutoTest {
             case 9 -> pauseMenuTest(mc);
             case 10 -> joinLeaveTest(mc);
             case 11 -> multiTest(mc);
-            case 12 -> aspectTest(mc, "pequena");
-            case 13 -> resizeWindow(mc);
-            case 14 -> aspectTest(mc, "1920x1080");
-            case 15 -> pauseTest(mc);
-            case 16 -> fovTest(mc);
-            case 17 -> fpsPhase(mc, false);
-            case 18 -> fpsPhase(mc, true);
-            case 19 -> leaveTest(mc);
+            case 12 -> notesTest(mc);
+            case 13 -> aspectTest(mc, "pequena");
+            case 14 -> resizeWindow(mc);
+            case 15 -> aspectTest(mc, "1920x1080");
+            case 16 -> pauseTest(mc);
+            case 17 -> fovTest(mc);
+            case 18 -> fpsPhase(mc, false);
+            case 19 -> fpsPhase(mc, true);
+            case 20 -> leaveTest(mc);
             default -> { }
         }
     }

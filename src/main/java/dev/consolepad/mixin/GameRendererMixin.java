@@ -54,6 +54,17 @@ public abstract class GameRendererMixin {
         return ContextSwitcher.handOr(self.itemInHandRenderer);
     }
 
+    /** Campo de vision propio de cada jugador: se escala por (FOV del jugador / FOV global); la mano (useFOVSetting = false) no cambia. */
+    @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
+    private void consolepad$ownFov(net.minecraft.client.Camera camera, float partialTicks, boolean useFovSetting, CallbackInfoReturnable<Double> cir) {
+        if (!useFovSetting || dev.consolepad.ConsolePad.PADS == null) return;
+        int slot = SplitRender.passSlot;
+        int own = dev.consolepad.ConsolePad.PADS.slot(slot).settings.fov;
+        if (own <= 0) return;
+        int global = Minecraft.getInstance().options.fov().get();
+        if (global > 0) cir.setReturnValue(cir.getReturnValue() * own / global);
+    }
+
     /** El aspecto de la proyeccion es el de la region que se dibuja, no el de la ventana entera. */
     @Redirect(method = "getProjectionMatrix",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/Window;getWidth()I"))

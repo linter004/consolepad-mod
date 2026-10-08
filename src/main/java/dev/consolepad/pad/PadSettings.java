@@ -12,6 +12,8 @@ public final class PadSettings {
     /** 1 = lineal; >1 da mas precision cerca del centro. */
     public float lookExponent = 1.6f;
     public boolean invertY = false;
+    /** Campo de vision de este jugador (grados); 0 = el de las opciones del juego. */
+    public int fov = 0;
     public float triggerThreshold = 0.5f;
     /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
     public float cursorSpeed = 550f;
