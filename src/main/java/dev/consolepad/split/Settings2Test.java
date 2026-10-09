@@ -94,6 +94,7 @@ public final class Settings2Test {
                 holdToggleLogic();
                 copyResetLogic();
                 lookLogic();
+                viewLogic();
                 phase = 1;
                 calls = 0;
             }
@@ -138,6 +139,12 @@ public final class Settings2Test {
             }
             case 6 -> { // coordenadas, direccion y FPS solo en la region de cada jugador
                 if (infoTest(mc)) {
+                    phase = 7;
+                    calls = 0;
+                }
+            }
+            case 7 -> { // distancia de chunks propia de cada jugador, medida en el servidor y al dibujar
+                if (viewTest(mc)) {
                     phase = 99;
                     calls = 0;
                 }
@@ -484,5 +491,83 @@ public final class Settings2Test {
         s1.showDirection = false;
         s0.showFps = false;
         return true;
+    }
+
+    // ---------------------------------------------------------------- paso 7: distancia de chunks por jugador
+
+    private static void viewLogic() {
+        int oldCount = PerfLimits.playerCount;
+        Boolean oldAuto = SplitSettings.autoViewDistanceOverride;
+        PadSettings s = ConsolePad.PADS.slot(3).settings;
+        int oldChosen = s.viewDistance;
+        try {
+            PerfLimits.playerCount = 2; // tope automatico con 2 jugadores: 75 % de 12 = 9
+            SplitSettings.autoViewDistanceOverride = Boolean.TRUE;
+            s.viewDistance = 0;
+            int global = PerfLimits.viewDistanceFor(3, 12);
+            s.viewDistance = 6;
+            int low = PerfLimits.viewDistanceFor(3, 12);
+            s.viewDistance = 16;
+            int high = PerfLimits.viewDistanceFor(3, 12);
+            check("distancia por jugador con la automatica activa (2 jugadores, opciones 12): global=" + global + " (9), elige 6 -> " + low + " (6), elige 16 -> " + high + " (tope 9)",
+                    global == 9 && low == 6 && high == 9);
+            SplitSettings.autoViewDistanceOverride = Boolean.FALSE;
+            s.viewDistance = 16;
+            int free = PerfLimits.viewDistanceFor(3, 12);
+            s.viewDistance = 0;
+            int none = PerfLimits.viewDistanceFor(3, 12);
+            check("distancia por jugador sin la automatica: elige 16 -> " + free + " (16), global -> " + none + " (12)", free == 16 && none == 12);
+            PerfLimits.playerCount = 4; // 50 % de 12 = 6
+            SplitSettings.autoViewDistanceOverride = Boolean.TRUE;
+            s.viewDistance = 8;
+            int four = PerfLimits.viewDistanceFor(3, 12);
+            check("con 4 jugadores el tope baja a 6 aunque elija 8 (" + four + ")", four == 6);
+        } finally {
+            PerfLimits.playerCount = oldCount;
+            SplitSettings.autoViewDistanceOverride = oldAuto;
+            s.viewDistance = oldChosen;
+        }
+    }
+
+    private static int viewTrack(net.minecraft.server.level.ServerPlayer p) {
+        return p.getChunkTrackingView() instanceof net.minecraft.server.level.ChunkTrackingView.Positioned pos ? pos.viewDistance() : -1;
+    }
+
+    private static boolean viewTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        PadSettings s0 = ConsolePad.PADS.slot(0).settings, s1 = ConsolePad.PADS.slot(1).settings;
+        var server = mc.getSingleplayerServer();
+        if (calls == 1) {
+            mc.setScreen(null);
+            s0.viewDistance = 0;
+            s1.viewDistance = 4;
+            return false;
+        }
+        if (calls == 60) {
+            var sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+            var sp2 = server.getPlayerList().getPlayer(c.player.getUUID());
+            int req = mc.options.renderDistance().get();
+            int e0 = ViewDistances.effective[0], e1 = ViewDistances.effective[1];
+            int[] inCtx = new int[1];
+            ContextSwitcher.run(c, () -> inCtx[0] = mc.options.getEffectiveRenderDistance());
+            int outside = mc.options.getEffectiveRenderDistance();
+            check("distancia por jugador en el cliente: P1 " + e0 + " (la global/automatica de " + req + "), P2 " + e1 + " (4)",
+                    e1 == 4 && e0 == PerfLimits.viewDistanceFor(0, req) && e0 > 4);
+            check("distancia al dibujar: dentro del contexto de P2 " + inCtx[0] + " (4) y la de P1 fuera " + outside + " (" + e0 + ")", inCtx[0] == 4 && outside == e0);
+            check("el servidor conoce la de cada uno: P1 pide " + sp1.requestedViewDistance() + " (" + e0 + "), P2 pide " + sp2.requestedViewDistance() + " (4)",
+                    sp1.requestedViewDistance() == e0 && sp2.requestedViewDistance() == 4);
+            check("el servidor le manda a P2 menos chunks que a P1: radio de seguimiento P1 " + viewTrack(sp1) + " (" + e0 + "), P2 " + viewTrack(sp2) + " (4)",
+                    viewTrack(sp2) == 4 && viewTrack(sp1) == e0);
+            s1.viewDistance = 0;
+            return false;
+        }
+        if (calls == 120) {
+            var sp2 = server.getPlayerList().getPlayer(c.player.getUUID());
+            int e1 = ViewDistances.effective[1];
+            check("al volver P2 a global su distancia vuelve a la automatica: cliente " + e1 + ", servidor " + sp2.requestedViewDistance() + ", seguimiento " + viewTrack(sp2),
+                    e1 == ViewDistances.effective[0] && sp2.requestedViewDistance() == e1 && viewTrack(sp2) == e1);
+            return true;
+        }
+        return false;
     }
 }

@@ -27,6 +27,8 @@ public final class PadSettings {
     public boolean showHand = true;
     /** Campo de vision de este jugador (grados); 0 = el de las opciones del juego. */
     public int fov = 0;
+    /** Distancia de chunks de este jugador (4 a 32); 0 = la de las opciones del juego. La automatica por numero de jugadores es un tope (PerfLimits). */
+    public int viewDistance = 0;
     public float triggerThreshold = 0.5f;
     /** Escala de interfaz de este jugador con la pantalla dividida: 0 = automatica (la que elegiria Minecraft para su region), 1 a 4 = fija. */
     public int guiScale = 0;

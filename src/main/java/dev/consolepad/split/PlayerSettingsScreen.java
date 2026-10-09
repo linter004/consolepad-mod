@@ -20,6 +20,7 @@ import java.util.function.Supplier;
  */
 public final class PlayerSettingsScreen extends PlayerMenuScreen {
     public static final int[] GUI_SCALES = {0, 1, 2, 3, 4};
+    public static final int[] VIEW_DISTANCES = {0, 4, 6, 8, 10, 12, 16, 24};
     public static final int[] FOVS = {0, 60, 70, 80, 90, 100, 110};
     public static final float[] SPEEDS = {90f, 135f, 180f, 225f, 270f, 315f};
     public static final float[] DEADZONES = {0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f};
@@ -89,6 +90,8 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
                 () -> s.guiScale = nextInt(GUI_SCALES, s.guiScale)));
         items.add(new Item("sens", () -> "Sensibilidad horizontal: " + Math.round(s.lookSpeed), () -> s.lookSpeed = nextFloat(SPEEDS, s.lookSpeed)));
         items.add(new Item("fov", () -> "Campo de visión: " + (s.fov <= 0 ? "global" : String.valueOf(s.fov)), () -> s.fov = nextInt(FOVS, s.fov)));
+        items.add(new Item("viewDist", () -> "Distancia de chunks: " + (s.viewDistance <= 0 ? "global" : String.valueOf(s.viewDistance)) + " (activa "
+                + PerfLimits.viewDistanceFor(slot, Minecraft.getInstance().options.renderDistance().get()) + ")", () -> s.viewDistance = nextInt(VIEW_DISTANCES, s.viewDistance)));
         items.add(new Item("moveDead", () -> "Zona muerta del movimiento: " + dz(s.moveDeadzone), () -> s.moveDeadzone = nextFloat(DEADZONES, s.moveDeadzone)));
         items.add(new Item("lookDead", () -> "Zona muerta de la cámara: " + dz(s.lookDeadzone), () -> s.lookDeadzone = nextFloat(DEADZONES, s.lookDeadzone)));
         items.add(new Item("sensY", () -> "Sensibilidad vertical: " + Math.round(s.lookSpeedY()), () -> s.lookSpeedY = nextFloat(SPEEDS, s.lookSpeedY())));

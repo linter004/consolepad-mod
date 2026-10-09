@@ -27,6 +27,26 @@ public final class PerfLimits {
         return scaled(requested, MIN_CHUNKS);
     }
 
+    /**
+     * Distancia de vision (chunks) del jugador del slot: la que elija en sus ajustes (0 = la de las opciones) y, con la distancia automatica activa,
+     * nunca mas que el tope por numero de jugadores. Sin la automatica manda su eleccion (puede pasar de la de las opciones).
+     */
+    public static int viewDistanceFor(int slot, int requested) {
+        int chosen = dev.consolepad.ConsolePad.PADS == null ? 0 : dev.consolepad.ConsolePad.PADS.slot(slot).settings.viewDistance;
+        int cap = viewDistance(requested);
+        if (chosen <= 0) return cap;
+        return SplitSettings.autoViewDistance() ? Math.min(chosen, cap) : chosen;
+    }
+
+    /** La mayor distancia que necesita algun jugador dentro (la publica ViewDistances cada fotograma); 0 = sin datos. */
+    public static volatile int serverMax = 0;
+
+    /** Distancia de vision del servidor integrado: la mayor de los jugadores; cada uno recibe la suya (ClientInformation.viewDistance). */
+    public static int serverViewDistance(int requested) {
+        int m = serverMax;
+        return m > 0 ? Math.max(2, m) : viewDistance(requested);
+    }
+
     /** Distancia de simulacion del servidor integrado (en chunks). */
     public static int simulationDistance(int requested) {
         return scaled(requested, 4);

@@ -83,6 +83,7 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
+        dev.consolepad.split.ViewDistances.frame(mc);
         dev.consolepad.split.PlayerLabels.tick(mc);
         // Start+Back en el mando de un slot 1..3: pulsar = entra ese jugador local extra; mantener 2 s con el jugador dentro = sale.
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {

@@ -18,9 +18,19 @@ public abstract class OptionsLimitsMixin {
     @Shadow private OptionInstance<Integer> renderDistance;
     @Shadow private int serverRenderDistance;
 
+    /** La informacion de cliente que se manda al servidor lleva la distancia del jugador (no la de las opciones): cada jugador recibe solo sus chunks. */
+    @Inject(method = "buildPlayerInformation", at = @At("RETURN"), cancellable = true)
+    private void consolepad$playerViewDistance(CallbackInfoReturnable<net.minecraft.server.level.ClientInformation> cir) {
+        var in = cir.getReturnValue();
+        if (dev.consolepad.ConsolePad.PADS == null) return;
+        var ctx = dev.consolepad.split.ContextSwitcher.current();
+        cir.setReturnValue(dev.consolepad.split.ViewDistances.withDistance(in, PerfLimits.viewDistanceFor(ctx == null ? 0 : ctx.slotIndex, in.viewDistance())));
+    }
+
     @Inject(method = "getEffectiveRenderDistance", at = @At("RETURN"), cancellable = true)
     private void consolepad$autoViewDistance(CallbackInfoReturnable<Integer> cir) {
-        int own = PerfLimits.viewDistance(renderDistance.get());
+        var ctx = dev.consolepad.split.ContextSwitcher.current(); // el jugador cuya region se dibuja ahora (P1 si no hay contexto extra)
+        int own = PerfLimits.viewDistanceFor(ctx == null ? 0 : ctx.slotIndex, renderDistance.get());
         cir.setReturnValue(serverRenderDistance > 0 ? Math.min(own, serverRenderDistance) : own);
     }
 }
