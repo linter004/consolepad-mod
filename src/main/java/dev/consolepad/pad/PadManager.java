@@ -32,6 +32,8 @@ public final class PadManager {
         /** El mando de este slot se desconecto y no ha vuelto (lo mira PadLost para pausar al jugador); lostJid = el que era. */
         public boolean lost;
         public int lostJid = -1;
+        /** Solo pruebas: el mando (virtual o real) que simulateDisconnect quito del slot y simulateReconnect devuelve. */
+        Device hidden;
 
         Slot(int index) { this.index = index; }
     }
@@ -77,10 +79,21 @@ public final class PadManager {
     /** Solo pruebas (AutoTest): un mando virtual se "desconecta" como uno real (el slot queda perdido hasta que vuelva un mando). */
     public boolean simulateDisconnect(int slotIndex) {
         Slot s = slots[slotIndex];
-        if (s.device == null || !virtualDevices.remove(s.device)) return false;
+        if (s.device == null) return false;
+        s.hidden = s.device; // sigue en su lista (un mando real sigue "conectado" para GLFW, asi que no se reasigna)
+        s.lostJid = s.device.jid;
         s.device = null;
         s.lost = true;
-        s.lostJid = -1;
+        return true;
+    }
+
+    /** Solo pruebas: el mando quitado por simulateDisconnect vuelve a su slot. */
+    public boolean simulateReconnect(int slotIndex) {
+        Slot s = slots[slotIndex];
+        if (s.hidden == null) return false;
+        s.device = s.hidden;
+        s.hidden = null;
+        s.lost = false;
         return true;
     }
 

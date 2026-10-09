@@ -378,8 +378,9 @@ public final class Settings2Test {
 
     private static Integer colorOf(net.minecraft.world.entity.player.Player p) {
         if (p == null) return -2;
-        var c = p.getDisplayName().getStyle().getColor();
-        return c == null ? -1 : c.getValue();
+        // el nombre completo puede ir envuelto: se busca el primer fragmento con color
+        return p.getDisplayName().visit((style, text) -> style.getColor() == null ? java.util.Optional.empty() : java.util.Optional.of(style.getColor().getValue()),
+                net.minecraft.network.chat.Style.EMPTY).orElse(-1);
     }
 
     private static boolean labelColorTest(Minecraft mc) {
@@ -392,6 +393,14 @@ public final class Settings2Test {
             return false;
         }
         if (calls < 12) return false;
+        if (calls == 12) return labelColorCheck(mc, c, s0, s1);
+        if (calls < 24) return false;
+        int back = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
+        check("etiqueta sin color: vuelve al color normal (" + back + ")", back == -1);
+        return true;
+    }
+
+    private static boolean labelColorCheck(Minecraft mc, PlayerContext c, PadSettings s0, PadSettings s1) {
         int seenByP1 = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
         int seenByP2 = colorOf(c.level.getPlayerByUUID(mc.player.getUUID()));
         check("etiqueta con color: P1 ve a P2 en rojo " + Integer.toHexString(seenByP1) + " y P2 ve a P1 en verde " + Integer.toHexString(seenByP2),
@@ -399,10 +408,7 @@ public final class Settings2Test {
         s1.labelColor = 0;
         s0.labelColor = 0;
         PlayerLabels.refreshAll(mc);
-        if (calls < 24) return false;
-        int back = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
-        check("etiqueta sin color: vuelve al color normal (" + back + ")", back == -1);
-        return true;
+        return false;
     }
 
     // ---------------------------------------------------------------- paso 5: curva de la camara y sensibilidad al apuntar
@@ -459,22 +465,25 @@ public final class Settings2Test {
         if (calls == 1) {
             mc.setScreen(null);
             aimPrev = sp.getMainHandItem().copy();
-            server.execute(() -> {
-                sp.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BOW));
-                sp.startUsingItem(net.minecraft.world.InteractionHand.MAIN_HAND);
-            });
+            server.execute(() -> sp.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BOW)));
             return false;
         }
-        if (calls < 15) return false;
-        if (calls == 15) {
+        if (calls == 10) { // el arco ya esta en la mano del cliente: ahora se tensa (con la tecla de usar pulsada: si no, el cliente lo suelta al instante)
+            mc.options.keyUse.setDown(true);
+            server.execute(() -> sp.startUsingItem(net.minecraft.world.InteractionHand.MAIN_HAND));
+            return false;
+        }
+        if (calls < 20) return false;
+        if (calls == 20) {
             check("apuntando: P1 tensando un arco cuenta como apuntar", LookControl.isAiming(mc.player));
+            mc.options.keyUse.setDown(false);
             server.execute(() -> {
                 sp.stopUsingItem();
                 sp.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, aimPrev);
             });
             return false;
         }
-        if (calls < 30) return false;
+        if (calls < 35) return false;
         check("apuntando: soltado el arco ya no cuenta como apuntar", !LookControl.isAiming(mc.player));
         return true;
     }
@@ -651,7 +660,7 @@ public final class Settings2Test {
                                 && !(mc.screen instanceof PadLostScreen) && !sp1.isInvulnerable()),
                 step("P2 sin mando: sigue con el aviso mientras no vuelva y P1 sigue jugando", 15, () -> { },
                         () -> c.screen instanceof PadLostScreen && mc.screen == null),
-                step("P2 vuelve el mando: el aviso se cierra solo y deja de ser invulnerable", 15, () -> pads.attachVirtual(1),
+                step("P2 vuelve el mando: el aviso se cierra solo y deja de ser invulnerable", 15, () -> pads.simulateReconnect(1),
                         () -> !pads.slot(1).lost && c.screen == null && !sp2.isInvulnerable()),
                 step("P1 sin mando: se desconecta, ve el aviso y es invulnerable", 15, () -> {
                     if (!lostSkipP1 && !pads.simulateDisconnect(0)) lostSkipP1 = pads.slot(0).device != null; // mando real: no se toca
@@ -660,12 +669,12 @@ public final class Settings2Test {
                     if (mc.screen instanceof PadLostScreen) mc.screen.onClose();
                 }, null),
                 step("P1: el aviso descartado no reaparece mientras no haya mando", 20, () -> { }, () -> lostSkipP1 || mc.screen == null),
-                step("P1 vuelve el mando: vuelve a ser vulnerable", 15, () -> pads.attachVirtual(0),
+                step("P1 vuelve el mando: vuelve a ser vulnerable", 15, () -> pads.simulateReconnect(0),
                         () -> lostSkipP1 || (!pads.slot(0).lost && mc.screen == null && !sp1.isInvulnerable())),
                 step("P1 se vuelve a desconectar: el aviso reaparece", 15, () -> {
                     if (!lostSkipP1) pads.simulateDisconnect(0);
                 }, () -> lostSkipP1 || mc.screen instanceof PadLostScreen),
-                step("P1 vuelve el mando otra vez: el aviso se cierra solo", 15, () -> pads.attachVirtual(0),
+                step("P1 vuelve el mando otra vez: el aviso se cierra solo", 15, () -> pads.simulateReconnect(0),
                         () -> lostSkipP1 || (mc.screen == null && !sp1.isInvulnerable())));
     }
 }
