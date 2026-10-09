@@ -1887,6 +1887,150 @@ public final class AutoTest {
         }
     }
 
+    // ---------------------------------------------------------------- horno y cofre con la misma ayuda y navegacion
+
+    private static boolean fcOk = true;
+    private static int fcStep;
+    private static net.minecraft.core.BlockPos fcPos;
+    private static ItemStack fcSaved20 = ItemStack.EMPTY;
+    private static net.minecraft.world.level.GameType fcPrevMode;
+
+    private static void fcVerdict(String name, boolean ok) {
+        fcOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /**
+     * Horno y cofre de P2: el horno usa el mismo libro de recetas con L3, LB/RB, D-pad y A (A coloca la arena de la receta del vidrio en la entrada) y la misma
+     * barra de ayuda; el cofre lleva la barra de Bedrock sin libro (Coger, Coger la mitad, Movimiento rapido, Salir).
+     */
+    private static void furnaceChestTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        if (c == null) {
+            fcStep = 0;
+            next();
+            return;
+        }
+        int t = ticks;
+        ServerPlayer p2 = serverP2(mc);
+        ccSlot = 1;
+        var screen = c.screen;
+        switch (fcStep) {
+            case 0 -> {
+                if (t == 1) {
+                    fcPrevMode = p2.gameMode.getGameModeForPlayer();
+                    fcSaved20 = p2.getInventory().getItem(20).copy();
+                    SecondaryTick.scriptActive = true;
+                    SecondaryTick.scriptForward = 0f;
+                    mc.getSingleplayerServer().execute(() -> {
+                        p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                        p2.getInventory().setItem(20, new ItemStack(Items.SAND, 4));
+                        java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>> fresh = new java.util.ArrayList<>();
+                        for (var h : mc.getSingleplayerServer().getRecipeManager().getRecipes()) {
+                            if (!p2.getRecipeBook().contains(h)) fresh.add(h);
+                        }
+                        ccAwarded = fresh;
+                        p2.awardRecipes(fresh);
+                        fcPos = p2.blockPosition().above(2);
+                        ServerLevel level = (ServerLevel) p2.level();
+                        level.setBlockAndUpdate(fcPos, net.minecraft.world.level.block.Blocks.FURNACE.defaultBlockState());
+                        p2.openMenu((net.minecraft.world.MenuProvider) level.getBlockEntity(fcPos));
+                    });
+                }
+                if (t == 50) {
+                    boolean furnace = screen instanceof net.minecraft.client.gui.screens.inventory.FurnaceScreen;
+                    fcVerdict("horno abierto en P2: " + (screen == null ? "null" : screen.getClass().getSimpleName()), furnace);
+                    ccBookInit = ConsoleCraft.bookVisible(screen);
+                    if (!ccBookInit) simSlot(1, 1 << PadState.L3);
+                }
+                if (t == 56) simSlot(1, 0);
+                if (t == 65) {
+                    ccFilterInit = ConsoleCraft.filtering(screen);
+                    if (ccFilterInit) ConsoleCraft.toggleFilter(screen);
+                    fcVerdict("horno: L3 abre el libro de recetas (visible=" + ConsoleCraft.bookVisible(screen) + ", categorias " + ConsoleCraft.visibleTabs(screen).size() + ")",
+                            ConsoleCraft.bookVisible(screen) && ConsoleCraft.visibleTabs(screen).size() >= 2);
+                    String exp = hbBarExpected(true, false, screen);
+                    fcVerdict("horno: barra de ayuda '" + PadHints.lastBar[1] + "'", PadHints.lastBar[1].equals(exp));
+                    ccTabs = ConsoleCraft.visibleTabs(screen).size();
+                    ccTab0 = ConsoleCraft.selectedTabIndex(screen);
+                    simSlot(1, 1 << PadState.RB);
+                }
+                if (t == 71) simSlot(1, 0);
+                if (t == 78) {
+                    int now = ConsoleCraft.selectedTabIndex(screen);
+                    fcVerdict("horno: RB cambia de categoria " + ccTab0 + " -> " + now + " de " + ccTabs, ccTabs > 0 && now == (ccTab0 + 1) % ccTabs);
+                    simSlot(1, 1 << PadState.LB);
+                }
+                if (t == 84) simSlot(1, 0);
+                if (t == 90) {
+                    for (int i = 0; i < 10 && ConsoleCraft.selectedTabIndex(screen) != 0; i++) ConsoleCraft.changeTab(screen, 1);
+                    var bs = ConsoleCraft.visibleRecipes(screen);
+                    if (bs.size() > 1) {
+                        double[] first = ccCenterOf(bs.get(0)), second = ccCenterOf(bs.get(1));
+                        ccSetCursor(mc, first[0], first[1]);
+                        ccB1 = second;
+                    } else {
+                        ccB1 = null;
+                    }
+                    simSlot(1, 1 << PadState.DPAD_RIGHT);
+                }
+                if (t == 96) simSlot(1, 0);
+                if (t == 102) {
+                    double[] cur = ccCursor(mc);
+                    fcVerdict("horno: D-pad derecha salta de la receta 0 a la 1 (cursor " + (int) cur[0] + "," + (int) cur[1] + ")", ccB1 != null && ccNear(cur, ccB1));
+                    ccCenter = ccFind(screen, Items.GLASS);
+                    if (ccCenter != null) ccSetCursor(mc, ccCenter[0], ccCenter[1]);
+                }
+                if (t == 108) simSlot(1, 1 << PadState.A);
+                if (t == 114) simSlot(1, 0);
+                if (t == 150) {
+                    ItemStack input = p2.containerMenu.getSlot(0).getItem();
+                    fcVerdict("horno: A sobre la receta del vidrio coloca la arena en la entrada (receta encontrada=" + (ccCenter != null) + ", entrada " + input.getItem() + " x" + input.getCount() + ")",
+                            ccCenter != null && input.is(Items.SAND) && input.getCount() >= 1);
+                    if (ccFilterInit && !ConsoleCraft.filtering(screen)) ConsoleCraft.toggleFilter(screen);
+                    if (!ccBookInit && ConsoleCraft.bookVisible(screen)) ConsoleCraft.toggleBook(screen);
+                    ContextSwitcher.run(c, () -> {
+                        if (c.screen != null) c.screen.onClose();
+                    });
+                }
+                if (t == 170) {
+                    fcVerdict("horno cerrado en P2 (pantalla " + c.screen + ")", c.screen == null);
+                    mc.getSingleplayerServer().execute(() -> {
+                        ServerLevel level = (ServerLevel) p2.level();
+                        level.setBlockAndUpdate(fcPos, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+                        var be = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(fcPos);
+                        p2.openMenu(be);
+                    });
+                }
+                if (t == 220) {
+                    boolean chest = c.screen instanceof net.minecraft.client.gui.screens.inventory.ContainerScreen;
+                    fcVerdict("cofre abierto en P2: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName()) + ", sin libro de recetas=" + !ConsoleCraft.applies(c.screen), chest && !ConsoleCraft.applies(c.screen));
+                    fcVerdict("cofre: barra de ayuda de Bedrock '" + PadHints.lastBar[1] + "'", PadHints.lastBar[1].equals("0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido"));
+                    screenshotName = "consola-cofre-P2.png";
+                    screenshotPending = true;
+                }
+                if (t == 235) {
+                    ContextSwitcher.run(c, () -> {
+                        if (c.screen != null) c.screen.onClose();
+                    });
+                    mc.getSingleplayerServer().execute(() -> {
+                        ((ServerLevel) p2.level()).setBlockAndUpdate(fcPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                        p2.setGameMode(fcPrevMode);
+                        p2.getInventory().setItem(20, fcSaved20.copy());
+                        p2.resetRecipes(ccAwarded);
+                    });
+                }
+                if (t == 260) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO horno y cofre con la ayuda de botones en conjunto -> {}", fcOk ? "OK" : "FALLO");
+                    SecondaryTick.scriptActive = false;
+                    fcStep = 0;
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
     // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
 
     private static final int JB_CYCLES = 10;
@@ -4611,6 +4755,7 @@ public final class AutoTest {
             case 41 -> chatBarTest(mc);
             case 42 -> iconTest(mc);
             case 43 -> consoleCraftTest(mc);
+            case 44 -> furnaceChestTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida
