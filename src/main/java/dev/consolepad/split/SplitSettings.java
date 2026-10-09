@@ -31,6 +31,7 @@ public final class SplitSettings {
         String orientation = Orientation.SIDE_BY_SIDE.name();
         String promptStyle = DEFAULT_PROMPT_STYLE;
         Boolean autoViewDistance = Boolean.TRUE;
+        Boolean playerLimits = Boolean.TRUE;
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -56,6 +57,8 @@ public final class SplitSettings {
                         if (read.orientation != null) Orientation.valueOf(read.orientation);
                         d.orientation = read.orientation != null ? read.orientation : d.orientation;
                         if (read.autoViewDistance != null) d.autoViewDistance = read.autoViewDistance;
+                        else complete = false;
+                        if (read.playerLimits != null) d.playerLimits = read.playerLimits;
                         else complete = false;
                         if (read.promptStyle != null && java.util.Arrays.asList(PROMPT_STYLES).contains(read.promptStyle)) d.promptStyle = read.promptStyle;
                     }
@@ -89,6 +92,15 @@ public final class SplitSettings {
     public static boolean autoViewDistance() {
         Boolean o = autoViewDistanceOverride;
         return o != null ? o : data().autoViewDistance;
+    }
+
+    /** Pruebas: fuerza los limites por jugador sin tocar el archivo (null = lo que diga split.json). */
+    public static volatile Boolean playerLimitsOverride;
+
+    /** Limites por jugador (distancia de entidades, lluvia) con 3 o 4 jugadores ({@link PerfLimits}); se apagan con "playerLimits": false en split.json. */
+    public static boolean playerLimits() {
+        Boolean o = playerLimitsOverride;
+        return o != null ? o : data().playerLimits;
     }
 
     public static Orientation orientation() {

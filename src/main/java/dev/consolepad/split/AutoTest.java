@@ -5100,6 +5100,8 @@ public final class AutoTest {
                     SplitView.enabled = true;
                     String ar = System.getenv("CONSOLEPAD_PERF_AUTORD");
                     if (ar != null && !ar.isBlank()) SplitSettings.autoViewDistanceOverride = ar.equals("on");
+                    String pl = System.getenv("CONSOLEPAD_PERF_LIMITS");
+                    if (pl != null && !pl.isBlank()) SplitSettings.playerLimitsOverride = pl.equals("on");
                     server.execute(() -> pfPrevRain = server.overworld().isRaining());
                 }
                 if (ticks >= 60) {
@@ -5170,6 +5172,8 @@ public final class AutoTest {
                 if (ticks == 600) {
                     long used = pfUsedHeapMb();
                     pfHeap = used;
+                    pfGcCount = pfGc(true);
+                    pfGcMs = pfGc(false);
                     PerfProbe.start();
                     pfPhase = 4;
                     ticks = 0;
@@ -5193,11 +5197,16 @@ public final class AutoTest {
                     PlayerContext c = SecondaryPlayers.context(slot);
                     if (c != null && c.renderer instanceof SplitLevelRenderer sr && sr.isLive()) ent.append(" | P").append(slot + 1).append(": ").append(pfSafe(sr::getEntityStatistics));
                 }
-                pf("N={} distancia efectiva={} (pedida {}), automatica={}, servidor={}", n, mc.options.getEffectiveRenderDistance(), mc.options.renderDistance().get(),
-                        SplitSettings.autoViewDistance(), server.getPlayerList().getViewDistance());
+                pf("N={} distancia efectiva={} (pedida {}), automatica={}, limites={}, servidor={}", n, mc.options.getEffectiveRenderDistance(), mc.options.renderDistance().get(),
+                        SplitSettings.autoViewDistance(), SplitSettings.playerLimits(), server.getPlayerList().getViewDistance());
                 pf("N={} fotogramas={} FPS={} frameMs={} cpuRenderMs={} cpuTickMs/fotograma={} gpuMs={} cuello={} montonUsadoMB={} (antes de medir {}) montonMaxMB={} directaMB={} extraMB/jugador={}",
                         n, r.frames(), String.format(java.util.Locale.ROOT, "%.1f", r.fps()), f2(r.frameMs()), f2(r.renderCpuMs()), f2(r.tickCpuMsPerFrame()), f2(r.gpuMs()),
                         r.bottleneck(), used, pfHeap, rt.maxMemory() >> 20, pfDirectMb(), pfPrevUsed < 0 ? "-" : String.valueOf(used - pfPrevUsed));
+                long gcN = pfGc(true) - pfGcCount, gcT = pfGc(false) - pfGcMs;
+                int batchers = 0;
+                for (Thread t : Thread.getAllStackTraces().keySet()) if (t.getName().startsWith("Chunk Batcher")) batchers++;
+                pf("N={} GC: {} recolecciones, {} ms en {} ms ({} %); hilos de mallas={}; JVM {}", n, gcN, gcT, f2(r.wallMs()), f2(100.0 * gcT / Math.max(1.0, r.wallMs())),
+                        batchers, java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().stream().filter(a -> a.startsWith("-X")).toList());
                 pf("N={} ticks={} maxTickMs={} duracionMs={} msPorTick={}", n, r.tickCalls(), f2(r.tickMaxMs()), f2(r.wallMs()), f2(r.tickCpuMsPerFrame() * r.frames() / Math.max(1, r.tickCalls())));
                 pf("N={} cpuPorPasada={} gpuPorPasada={}", n, fmtMap(r.cpuByPass()), fmtMap(r.gpuByPass()));
                 pf("N={} secciones {}", n, sec);
@@ -5219,6 +5228,7 @@ public final class AutoTest {
                     }
                     pfEntities.clear();
                     SplitSettings.autoViewDistanceOverride = null;
+                    SplitSettings.playerLimitsOverride = null;
                     mc.options.renderDistance().set(pfPrevRd);
                     mc.options.framerateLimit().set(pfPrevFps);
                     mc.options.enableVsync().set(pfPrevVsync);
@@ -5259,6 +5269,14 @@ public final class AutoTest {
         } catch (RuntimeException e) {
             return "n/d (" + e.getClass().getSimpleName() + ")";
         }
+    }
+
+    private static long pfGcCount, pfGcMs;
+
+    private static long pfGc(boolean count) {
+        long t = 0;
+        for (var b : java.lang.management.ManagementFactory.getGarbageCollectorMXBeans()) t += count ? b.getCollectionCount() : b.getCollectionTime();
+        return t;
     }
 
     private static String pfLog = "";

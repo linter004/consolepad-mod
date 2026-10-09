@@ -20,4 +20,18 @@ public abstract class LevelRendererMixin {
         target.bindWrite(setViewport);
         SplitView.restoreViewport();
     }
+
+    /** Dibujo de entidades mas corto con 3 y 4 jugadores (PerfLimits.entityScale). */
+    @org.spongepowered.asm.mixin.injection.ModifyArg(method = "setupRender", index = 0,
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;setViewScale(D)V"))
+    private double consolepad$entityScale(double scale) {
+        return scale * dev.consolepad.split.PerfLimits.entityScale();
+    }
+
+    /** Lluvia rapida con 3 y 4 jugadores (PerfLimits.fancyWeather). */
+    @Redirect(method = {"renderSnowAndRain", "tickRain"},
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;useFancyGraphics()Z"))
+    private boolean consolepad$weatherQuality() {
+        return dev.consolepad.split.PerfLimits.fancyWeather();
+    }
 }
