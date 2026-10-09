@@ -3,16 +3,23 @@ package dev.consolepad.split;
 import com.google.gson.Gson;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.ButtonLayouts;
+import dev.consolepad.pad.HoldToggle;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import net.minecraft.client.Minecraft;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
 /**
  * Segunda tanda de ajustes por jugador (casilla 48 del autotest): comprobaciones numericas de cada ajuste. La mayoria son logica pura sobre
- * PadSettings y las clases auxiliares (no hace falta jugar); las que necesitan el juego (HUD, aviso de mando desconectado...) son fases aparte.
- * Cada comprobacion escribe una linea "[autotest] RESULTADO ... -> OK/FALLO".
+ * PadSettings y las clases auxiliares (no hace falta jugar); las que necesitan el juego (tick de P2, mando de P1, HUD, aviso de mando
+ * desconectado...) son fases aparte. Cada comprobacion escribe una linea "[autotest] RESULTADO ... -> OK/FALLO".
  */
 public final class Settings2Test {
     private static final Gson GSON = new Gson();
@@ -31,23 +38,100 @@ public final class Settings2Test {
         return Math.abs(a - b) < 0.001f;
     }
 
+    // ---------------------------------------------------------------- secuencias por ticks
+
+    /** Paso de una secuencia: {@code each} se ejecuta en cada tick del paso; en el ultimo se evalua {@code check} (si hay). */
+    private record Step(String name, int ticks, Runnable each, BooleanSupplier check) {}
+
+    private static List<Step> seq = new ArrayList<>();
+    private static int seqIdx, seqTick;
+
+    private static Step step(String name, int ticks, Runnable each, BooleanSupplier check) {
+        return new Step(name, ticks, each, check);
+    }
+
+    private static void startSeq(Step... steps) {
+        seq = Arrays.asList(steps);
+        seqIdx = 0;
+        seqTick = 0;
+    }
+
+    /** Avanza la secuencia un tick; true cuando termina. */
+    private static boolean tickSeq() {
+        if (seqIdx >= seq.size()) return true;
+        Step st = seq.get(seqIdx);
+        st.each().run();
+        if (++seqTick >= st.ticks()) {
+            if (st.check() != null) check(st.name(), st.check().getAsBoolean());
+            seqIdx++;
+            seqTick = 0;
+        }
+        return seqIdx >= seq.size();
+    }
+
+    private static int codeOf(PadSettings s, PadAction a) {
+        for (var e : s.bindings.entrySet()) if (e.getValue() == a) return e.getKey();
+        return -1;
+    }
+
+    /** Entrada simulada de P2: estas acciones pulsadas (las del servidor de pruebas de SecondaryTick). */
+    private static void scriptP2(PadAction... actions) {
+        SecondaryTick.scriptActive = true;
+        EnumSet<PadAction> set = EnumSet.noneOf(PadAction.class);
+        set.addAll(Arrays.asList(actions));
+        SecondaryTick.scriptActions = set;
+    }
+
+    // ---------------------------------------------------------------- guion
+
     /** Lo llama la casilla 48 una vez por tick; true cuando ha terminado. */
     public static boolean run(Minecraft mc) {
         calls++;
         switch (phase) {
             case 0 -> {
                 layoutsTest();
+                holdToggleLogic();
+                copyResetLogic();
                 phase = 1;
                 calls = 0;
             }
             case 1 -> {
                 if (stickSwapTest()) {
+                    phase = 2;
+                    calls = 0;
+                }
+            }
+            case 2 -> { // jugador 2 dentro: agacharse, correr y atacar en modo mantener / alternar
+                if (!AutoTest.joinTo(mc, 2)) return false;
+                if (seq.isEmpty()) holdToggleP2Setup();
+                if (tickSeq()) {
+                    SecondaryTick.reset();
+                    resetModes(ConsolePad.PADS.slot(1).settings);
+                    seq = new ArrayList<>();
+                    phase = 3;
+                    calls = 0;
+                }
+            }
+            case 3 -> { // jugador 1: lo mismo con su mando (PadDriver)
+                if (seq.isEmpty()) holdToggleP1Setup(mc);
+                if (tickSeq()) {
+                    resetModes(ConsolePad.PADS.slot(0).settings);
+                    ConsolePad.PADS.slot(0).device.state.simDown = 0;
+                    seq = new ArrayList<>();
+                    phase = 4;
+                    calls = 0;
+                }
+            }
+            case 4 -> { // color de la etiqueta con el nombre
+                if (labelColorTest(mc)) {
                     phase = 99;
+                    calls = 0;
                 }
             }
             default -> {
                 ConsolePad.LOGGER.info("[autotest] RESULTADO ajustes por jugador (tanda 2) en conjunto -> {}", allOk ? "OK" : "FALLO");
                 phase = 0;
+                seq = new ArrayList<>();
                 return true;
             }
         }
@@ -106,6 +190,184 @@ public final class Settings2Test {
         st.simRy = 0f;
         pads.detachVirtual(3);
         check("sticks intercambiados: simulado izq 0.8 / der -0.6 se lee como rx=" + st.rx + " ly=" + st.ly + " lx=" + st.lx + " ry=" + st.ry, ok);
+        return true;
+    }
+
+    // ---------------------------------------------------------------- paso 2: mantener o alternar
+
+    private static void resetModes(PadSettings s) {
+        s.sneakToggle = true;
+        s.sprintToggle = true;
+        s.attackToggle = false;
+        s.toggleHolds = false;
+    }
+
+    private static void holdToggleLogic() {
+        check("mantener/alternar (logica): alternar invierte con cada pulsacion y soltar no cambia",
+                HoldToggle.next(true, false, true, true) && !HoldToggle.next(true, true, true, true)
+                        && HoldToggle.next(true, true, false, false) && !HoldToggle.next(true, false, false, false));
+        check("mantener/alternar (logica): mantener sigue al boton", HoldToggle.next(false, false, true, true) && !HoldToggle.next(false, true, false, false));
+        PadSettings s = new PadSettings();
+        check("por defecto agacharse y correr alternan, atacar y usar se mantienen",
+                s.isToggle(PadAction.SNEAK_TOGGLE) && s.isToggle(PadAction.SPRINT_TOGGLE) && !s.isToggle(PadAction.ATTACK) && !s.isToggle(PadAction.USE)
+                        && !s.isToggle(PadAction.JUMP));
+        s.toggleHolds = true;
+        s.sneakToggle = false;
+        check("accesibilidad: todo lo de mantener pasa a alternar",
+                s.isToggle(PadAction.SNEAK_TOGGLE) && s.isToggle(PadAction.ATTACK) && s.isToggle(PadAction.USE) && !s.isToggle(PadAction.JUMP));
+    }
+
+    private static void holdToggleP2Setup() {
+        PlayerContext c = SecondaryPlayers.context(1);
+        PlayerContext.InputState in = c.input;
+        PadSettings s = ConsolePad.PADS.slot(1).settings;
+        resetModes(s);
+        PadAction sneak = PadAction.SNEAK_TOGGLE, sprint = PadAction.SPRINT_TOGGLE, attack = PadAction.ATTACK;
+        startSeq(
+                step("P2 agacharse alternar: pulsa = agachado", 4, () -> scriptP2(sneak), () -> in.sneakLatch),
+                step("P2 agacharse alternar: suelta y sigue agachado", 4, () -> scriptP2(), () -> in.sneakLatch),
+                step("P2 agacharse alternar: pulsa otra vez", 4, () -> scriptP2(sneak), null),
+                step("P2 agacharse alternar: suelta y se levanta", 4, () -> scriptP2(), () -> !in.sneakLatch),
+                step("P2 agacharse mantener: pulsado = agachado", 4, () -> {
+                    s.sneakToggle = false;
+                    scriptP2(sneak);
+                }, () -> in.sneakLatch),
+                step("P2 agacharse mantener: soltar = de pie", 4, () -> scriptP2(), () -> !in.sneakLatch),
+                step("P2 correr alternar: pulsa", 4, () -> scriptP2(sprint), null),
+                step("P2 correr alternar: suelta y sigue corriendo", 4, () -> scriptP2(), () -> in.sprintLatch && in.sprintHeld),
+                step("P2 correr alternar: pulsa otra vez", 4, () -> scriptP2(sprint), null),
+                step("P2 correr alternar: suelta y para", 4, () -> scriptP2(), () -> !in.sprintLatch && !in.sprintHeld),
+                step("P2 correr mantener: pulsado = corre", 4, () -> {
+                    s.sprintToggle = false;
+                    scriptP2(sprint);
+                }, () -> in.sprintLatch && in.sprintHeld),
+                step("P2 correr mantener: soltar = para", 4, () -> scriptP2(), () -> !in.sprintLatch && !in.sprintHeld),
+                step("P2 atacar mantener (por defecto): pulsado no deja nada activo", 4, () -> scriptP2(attack), () -> !in.attackOn),
+                step("P2 atacar mantener: soltado no queda activo", 4, () -> scriptP2(), () -> !in.attackOn),
+                step("P2 atacar alternar: pulsa", 4, () -> {
+                    s.attackToggle = true;
+                    scriptP2(attack);
+                }, null),
+                step("P2 atacar alternar: suelta y sigue atacando", 4, () -> scriptP2(), () -> in.attackOn),
+                step("P2 atacar alternar: pulsa otra vez", 4, () -> scriptP2(attack), null),
+                step("P2 atacar alternar: suelta y deja de atacar", 4, () -> scriptP2(), () -> !in.attackOn),
+                step("P2 accesibilidad: con agacharse en mantener, pulsar y soltar lo deja activado", 4, () -> {
+                    s.attackToggle = false;
+                    s.sneakToggle = false;
+                    s.toggleHolds = true;
+                    scriptP2(sneak);
+                }, null),
+                step("P2 accesibilidad: sigue agachado tras soltar", 4, () -> scriptP2(), () -> in.sneakLatch),
+                step("P2 accesibilidad: otra pulsacion lo apaga", 4, () -> scriptP2(sneak), null),
+                step("P2 accesibilidad: apagado tras soltar", 4, () -> scriptP2(), () -> !in.sneakLatch));
+    }
+
+    private static void holdToggleP1Setup(Minecraft mc) {
+        PadManager pm = ConsolePad.PADS;
+        pm.attachVirtual(0);
+        PadSettings s = pm.slot(0).settings;
+        PadState st = pm.slot(0).device.state;
+        resetModes(s);
+        int sneakBit = 1 << codeOf(s, PadAction.SNEAK_TOGGLE);
+        int attackBit = 1 << codeOf(s, PadAction.ATTACK);
+        mc.setScreen(null);
+        mc.player.setXRot(-90f); // mira al cielo: atacar no rompe nada
+        Runnable pressSneak = () -> st.simDown = sneakBit;
+        Runnable up = () -> st.simDown = 0;
+        var o = mc.options;
+        startSeq(
+                step("P1 agacharse alternar: pulsa", 4, pressSneak, null),
+                step("P1 agacharse alternar: suelta y sigue agachado", 4, up, () -> o.keyShift.isDown()),
+                step("P1 agacharse alternar: pulsa otra vez", 4, pressSneak, null),
+                step("P1 agacharse alternar: suelta y se levanta", 4, up, () -> !o.keyShift.isDown()),
+                step("P1 agacharse mantener: pulsado = agachado", 4, () -> {
+                    s.sneakToggle = false;
+                    st.simDown = sneakBit;
+                }, () -> o.keyShift.isDown()),
+                step("P1 agacharse mantener: soltar = de pie", 4, up, () -> !o.keyShift.isDown()),
+                step("P1 atacar mantener: pulsado = keyAttack", 4, () -> st.simDown = attackBit, () -> o.keyAttack.isDown()),
+                step("P1 atacar mantener: soltar suelta", 4, up, () -> !o.keyAttack.isDown()),
+                step("P1 atacar alternar: pulsa", 4, () -> {
+                    s.attackToggle = true;
+                    st.simDown = attackBit;
+                }, null),
+                step("P1 atacar alternar: suelta y sigue atacando", 4, up, () -> o.keyAttack.isDown()),
+                step("P1 atacar alternar: pulsa otra vez", 4, () -> st.simDown = attackBit, null),
+                step("P1 atacar alternar: suelta y para", 4, up, () -> !o.keyAttack.isDown()));
+    }
+
+    // ---------------------------------------------------------------- paso 3: copiar y restablecer
+
+    /** Cambia cada ajuste simple de unos ajustes (booleanos, numeros, textos) para comprobar que copiar los trae todos, incluidos los que se anadan despues. */
+    private static void scramble(PadSettings s) {
+        for (java.lang.reflect.Field f : PadSettings.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getName().equals("bindings")) continue;
+            try {
+                Class<?> t = f.getType();
+                if (t == boolean.class) f.setBoolean(s, !f.getBoolean(s));
+                else if (t == int.class) f.setInt(s, f.getInt(s) + 3);
+                else if (t == float.class) f.setFloat(s, f.getFloat(s) + 0.37f);
+                else if (t == String.class) f.set(s, "x" + f.get(s));
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    private static void copyResetLogic() {
+        PadSettings a = new PadSettings();
+        scramble(a);
+        ButtonLayouts.apply(a, ButtonLayouts.Layout.LEFTY);
+        a.playerName = "Ana";
+        a.labelColor = 3;
+        PadSettings b = new PadSettings();
+        b.playerName = "Beto";
+        b.labelColor = 5;
+        b.copyFrom(a);
+        check("copiar: conserva el nombre y el color propios (" + b.playerName + ", " + b.labelColor + ")", b.playerName.equals("Beto") && b.labelColor == 5);
+        PadSettings aKeep = GSON.fromJson(GSON.toJson(a), PadSettings.class);
+        aKeep.playerName = b.playerName;
+        aKeep.labelColor = b.labelColor;
+        check("copiar: trae TODOS los demas ajustes (comparacion completa en JSON, campos cambiados uno a uno)", GSON.toJson(aKeep).equals(GSON.toJson(b)));
+        a.bindings.put(PadState.X, PadAction.JUMP);
+        check("copiar: los botones son una copia profunda (cambiar el original no cambia la copia)", ButtonLayouts.detect(b) == ButtonLayouts.Layout.LEFTY);
+        b.resetToDefaults();
+        PadSettings def = new PadSettings();
+        def.playerName = b.playerName;
+        def.labelColor = b.labelColor;
+        check("restablecer: todo vuelve a fabrica salvo el nombre y el color (" + b.playerName + ")",
+                GSON.toJson(def).equals(GSON.toJson(b)) && ButtonLayouts.detect(b) == ButtonLayouts.Layout.BEDROCK && !b.swapSticks);
+        check("copiar/restablecer: el JSON de ajustes guarda y carga igual", GSON.toJson(GSON.fromJson(GSON.toJson(aKeep), PadSettings.class)).equals(GSON.toJson(aKeep)));
+    }
+
+    // ---------------------------------------------------------------- paso 4: color de la etiqueta
+
+    private static Integer colorOf(net.minecraft.world.entity.player.Player p) {
+        if (p == null) return -2;
+        var c = p.getDisplayName().getStyle().getColor();
+        return c == null ? -1 : c.getValue();
+    }
+
+    private static boolean labelColorTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        PadSettings s0 = ConsolePad.PADS.slot(0).settings, s1 = ConsolePad.PADS.slot(1).settings;
+        if (calls == 1) {
+            s1.labelColor = 1;
+            s0.labelColor = 4;
+            PlayerLabels.refreshAll(mc);
+            return false;
+        }
+        if (calls < 12) return false;
+        int seenByP1 = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
+        int seenByP2 = colorOf(c.level.getPlayerByUUID(mc.player.getUUID()));
+        check("etiqueta con color: P1 ve a P2 en rojo " + Integer.toHexString(seenByP1) + " y P2 ve a P1 en verde " + Integer.toHexString(seenByP2),
+                seenByP1 == PlayerLabels.COLOR_RGB[1] && seenByP2 == PlayerLabels.COLOR_RGB[4]);
+        s1.labelColor = 0;
+        s0.labelColor = 0;
+        PlayerLabels.refreshAll(mc);
+        if (calls < 24) return false;
+        int back = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
+        check("etiqueta sin color: vuelve al color normal (" + back + ")", back == -1);
         return true;
     }
 }

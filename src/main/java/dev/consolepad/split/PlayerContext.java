@@ -122,6 +122,8 @@ public final class PlayerContext {
     public static final class InputState {
         public boolean prevAttack, prevUse, prevLb, prevRb;
         public boolean sprintLatch, sneakLatch, comboLatch;
+        /** Atacar y usar en modo alternar (PadSettings.isToggle): quedan activos hasta la siguiente pulsacion. */
+        public boolean attackOn, useOn;
         /** Sprint por doble toque del stick hacia delante: dura mientras el stick siga hacia delante. */
         public boolean doubleTapSprint, fwdState;
         public int ticksSinceFwdTap = 1000;

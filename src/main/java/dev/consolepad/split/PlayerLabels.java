@@ -14,6 +14,22 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 public final class PlayerLabels {
     private PlayerLabels() {}
 
+    /** Colores de etiqueta que se pueden elegir (indice en PadSettings.labelColor): nombre y RGB; el 0 es el color normal del juego. */
+    public static final String[] COLOR_NAMES = {"normal", "rojo", "naranja", "amarillo", "verde", "cian", "azul", "morado", "rosa"};
+    public static final int[] COLOR_RGB = {0xFFFFFF, 0xFF5555, 0xFFAA33, 0xFFFF55, 0x55FF55, 0x55FFFF, 0x6C8CFF, 0xB070FF, 0xFF77CC};
+
+    private static int colorIndex(int slot) {
+        int c = ConsolePad.PADS.slot(slot).settings.labelColor;
+        return c < 0 || c >= COLOR_RGB.length ? 0 : c;
+    }
+
+    /** Nombre visible del slot ya con su color de etiqueta. */
+    public static Component styled(int slot, String text) {
+        int c = colorIndex(slot);
+        net.minecraft.network.chat.MutableComponent out = Component.literal(text);
+        return c == 0 ? out : out.withStyle(net.minecraft.network.chat.Style.EMPTY.withColor(COLOR_RGB[c]));
+    }
+
     /** Slot (0 a 3) del jugador local con ese nombre de perfil, o -1 si no es local. */
     public static int slotOf(Minecraft mc, String profileName) {
         if (mc.getSingleplayerServer() == null || profileName == null) return -1;
@@ -36,9 +52,9 @@ public final class PlayerLabels {
         int slot = slotOf(mc, e.getEntity().getGameProfile().getName());
         if (slot < 0) return;
         String own = ConsolePad.PADS.slot(slot).settings.playerName;
-        boolean named = own != null && !own.isBlank();
+        boolean named = (own != null && !own.isBlank()) || colorIndex(slot) != 0;
         if (slot == 0 && !named && !SecondaryPlayers.anyActive()) return;
-        e.setDisplayname(Component.literal(labelOf(slot)));
+        e.setDisplayname(styled(slot, labelOf(slot)));
     }
 
     /** Vuelve a calcular el nombre visible de todos los jugadores locales, en el cliente de cada uno y en el servidor. */
@@ -48,7 +64,7 @@ public final class PlayerLabels {
         if (ConsolePad.PADS == null || mc.getUser() == null) return;
         int slot = slotOf(mc, e.getEntity().getGameProfile().getName());
         if (slot < 0 || !SecondaryPlayers.anyActive()) return;
-        e.setDisplayName(Component.literal(labelOf(slot) + " [P" + (slot + 1) + "]"));
+        e.setDisplayName(styled(slot, labelOf(slot) + " [P" + (slot + 1) + "]"));
     }
 
     private static volatile boolean pending;

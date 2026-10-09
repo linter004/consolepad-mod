@@ -30,6 +30,8 @@ public final class PadSettings {
     public String playerName = "";
     /** Ayuda de botones del HUD (abajo a izquierda y derecha) y barra de ayuda en pantallas. */
     public boolean showHints = true;
+    /** Color de la etiqueta con el nombre sobre la cabeza (indice de PlayerLabels.COLORS; 0 = sin color). */
+    public int labelColor = 0;
     /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */
     public boolean snapNav = false;
     /** Cursor virtual en pantallas: pixeles por segundo a inclinacion maxima. */
@@ -43,6 +45,55 @@ public final class PadSettings {
 
     /** Sticks intercambiados (zurdo): el izquierdo gira la camara y el derecho mueve, tambien en menus y teclado en pantalla. */
     public boolean swapSticks = false;
+
+    /** Agacharse, correr y atacar: true = una pulsacion alterna, false = vale mientras se mantiene el boton. */
+    public boolean sneakToggle = true;
+    public boolean sprintToggle = true;
+    public boolean attackToggle = false;
+    /** Accesibilidad: los botones de mantener (agacharse, correr, atacar, usar) pasan a alternar. */
+    public boolean toggleHolds = false;
+
+    /** Si la accion se alterna con una pulsacion (true) o se mantiene (false). */
+    public boolean isToggle(PadAction a) {
+        return switch (a) {
+            case SNEAK_TOGGLE -> sneakToggle || toggleHolds;
+            case SPRINT_TOGGLE -> sprintToggle || toggleHolds;
+            case ATTACK -> attackToggle || toggleHolds;
+            case USE -> toggleHolds;
+            default -> false;
+        };
+    }
+
+    /** Lo propio de cada jugador que ni copiar ni restablecer tocan (quien es, no como juega). */
+    private static boolean isIdentity(String field) {
+        return field.equals("playerName") || field.equals("labelColor");
+    }
+
+    /** Copia todos los ajustes de otro jugador (botones incluidos, copia profunda) salvo su nombre y su color de etiqueta. */
+    public void copyFrom(PadSettings o) {
+        if (o == this) return;
+        for (java.lang.reflect.Field f : PadSettings.class.getDeclaredFields()) {
+            int mod = f.getModifiers();
+            if (java.lang.reflect.Modifier.isStatic(mod) || isIdentity(f.getName())) continue;
+            try {
+                if (f.getName().equals("bindings")) {
+                    Map<Integer, PadAction> mine = bindings;
+                    Map<Integer, PadAction> theirs = new HashMap<>(o.bindings);
+                    mine.clear();
+                    mine.putAll(theirs);
+                } else {
+                    f.set(this, f.get(o));
+                }
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    /** Valores de fabrica (conserva el nombre y el color de etiqueta). */
+    public void resetToDefaults() {
+        copyFrom(new PadSettings());
+    }
 
     public float lookSpeedY() {
         return lookSpeedY > 0f ? lookSpeedY : lookSpeed;

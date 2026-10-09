@@ -1,5 +1,6 @@
 package dev.consolepad.split;
 
+import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.ButtonLayouts;
 import dev.consolepad.pad.PadSettings;
 import net.minecraft.client.Minecraft;
@@ -32,10 +33,20 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private final java.util.Map<String, Button> buttons = new java.util.HashMap<>();
     private Button back, prev, nextPage;
     private int page;
+    /** Jugador del que se copian los ajustes (por defecto el siguiente al propio). */
+    private int copySource;
+    private boolean resetArmed;
 
     public PlayerSettingsScreen(int slot, Screen parent) {
         super(slot, Component.literal("Ajustes del jugador " + (slot + 1)));
         this.parent = parent;
+        this.copySource = nextOther(slot);
+    }
+
+    /** El siguiente jugador (0 a 3) distinto del propio. */
+    private int nextOther(int from) {
+        int n = (from + 1) % dev.consolepad.pad.PadManager.MAX_PLAYERS;
+        return n == slot ? (n + 1) % dev.consolepad.pad.PadManager.MAX_PLAYERS : n;
     }
 
     private static String dz(float v) {
@@ -65,6 +76,10 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         return v ? "sí" : "no";
     }
 
+    private static String modeLabel(String name, boolean toggle, PadSettings s) {
+        return name + ": " + (s.toggleHolds ? "alternar (accesibilidad)" : toggle ? "alternar" : "mantener");
+    }
+
     private void buildItems() {
         items.clear();
         PadSettings s = settings();
@@ -80,11 +95,35 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         items.add(new Item("cursorSpeed", () -> "Velocidad del cursor: " + Math.round(s.cursorSpeed), () -> s.cursorSpeed = nextFloat(CURSOR_SPEEDS, s.cursorSpeed)));
         items.add(new Item("snapNav", () -> "Cursor en menús: " + (s.snapNav ? "por casillas" : "libre"), () -> s.snapNav = !s.snapNav));
         items.add(new Item("name", () -> "Nombre: " + PlayerLabels.labelOf(slot), () -> Minecraft.getInstance().setScreen(new PlayerNameScreen(slot, this))));
+        items.add(new Item("labelColor", () -> "Color de la etiqueta: " + PlayerLabels.COLOR_NAMES[s.labelColor % PlayerLabels.COLOR_NAMES.length], () -> {
+            s.labelColor = (s.labelColor + 1) % PlayerLabels.COLOR_NAMES.length;
+            PlayerLabels.refreshAll(Minecraft.getInstance());
+        }));
         items.add(new Item("hudMargin", () -> "Zona segura del HUD: " + s.hudMargin + " %", () -> s.hudMargin = nextInt(HUD_MARGINS, s.hudMargin)));
         items.add(new Item("hudOpacity", () -> "Opacidad del HUD: " + Math.round(s.hudOpacity * 100) + " %", () -> s.hudOpacity = nextFloat(HUD_OPACITIES, s.hudOpacity)));
         items.add(new Item("showHud", () -> "Mostrar HUD: " + yesNo(s.showHud), () -> s.showHud = !s.showHud));
         items.add(new Item("showHand", () -> "Mostrar mano: " + yesNo(s.showHand), () -> s.showHand = !s.showHand));
         items.add(new Item("layout", () -> "Disposición de botones: " + ButtonLayouts.name(s), () -> ButtonLayouts.apply(s, ButtonLayouts.next(s))));
+        items.add(new Item("sneakMode", () -> modeLabel("Agacharse", s.sneakToggle, s), () -> s.sneakToggle = !s.sneakToggle));
+        items.add(new Item("sprintMode", () -> modeLabel("Correr", s.sprintToggle, s), () -> s.sprintToggle = !s.sprintToggle));
+        items.add(new Item("attackMode", () -> modeLabel("Atacar", s.attackToggle, s), () -> s.attackToggle = !s.attackToggle));
+        items.add(new Item("copySource", () -> "Copiar ajustes de: " + PlayerLabels.labelOf(copySource), () -> copySource = nextOther(copySource)));
+        items.add(new Item("copyDo", () -> "Copiar ahora a este jugador", () -> {
+            s.copyFrom(ConsolePad.PADS.slot(copySource).settings);
+            ConsolePad.PADS.saveSettings();
+            resetArmed = false;
+            this.rebuildWidgets();
+        }));
+        items.add(new Item("reset", () -> resetArmed ? "¿Seguro? Pulsa otra vez para restablecer" : "Restablecer ajustes de fábrica", () -> {
+            if (!resetArmed) {
+                resetArmed = true;
+                return;
+            }
+            s.resetToDefaults();
+            ConsolePad.PADS.saveSettings();
+            resetArmed = false;
+            this.rebuildWidgets();
+        }));
         items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
     }
 

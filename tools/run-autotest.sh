@@ -3,6 +3,7 @@
 # Lanza runClient con el autotest, espera "[autotest] terminado" (max 20 min), cierra el juego a la fuerza
 # y restaura run/config/consolepad desde una copia hecha antes. NO tocar la ventana mientras corre.
 cd "$(dirname "$0")/.."
+PROJ="$(basename "$PWD")"
 OUT="${1:-autotest.log}"
 BK="$(mktemp -d)"
 cp -r run/config/consolepad "$BK/"
@@ -14,7 +15,7 @@ for i in $(seq 1 240); do
   sleep 5
 done
 sleep 2
-powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { \$_.CommandLine -match 'MDK-settings2.*fml.modFolders=consolepad' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
+powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { \$_.CommandLine -match '$PROJ.*fml.modFolders=consolepad' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
 sleep 3
 cp -r "$BK/consolepad/." run/config/consolepad/
 echo "autotest finalizado; salida en $OUT"

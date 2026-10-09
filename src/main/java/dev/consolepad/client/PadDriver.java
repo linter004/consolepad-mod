@@ -4,6 +4,7 @@ import dev.consolepad.ConsolePad;
 import dev.consolepad.mixin.ContainerScreenInvoker;
 import dev.consolepad.mixin.KeyMappingAccessor;
 import dev.consolepad.mixin.MouseHandlerInvoker;
+import dev.consolepad.pad.HoldToggle;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
@@ -189,8 +190,8 @@ public final class PadDriver {
         for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
             int code = e.getKey();
             PadAction action = e.getValue();
-            if (s.pressed(code)) onPress(mc, player, o, action);
-            if (s.released(code)) onRelease(o, action);
+            if (s.pressed(code)) onPress(mc, player, o, action, cfg);
+            if (s.released(code)) onRelease(o, action, cfg);
         }
     }
 
@@ -348,10 +349,15 @@ public final class PadDriver {
         return (float) (base * base * base * 8.0);
     }
 
-    private void onPress(Minecraft mc, LocalPlayer player, Options o, PadAction action) {
+    private void onPress(Minecraft mc, LocalPlayer player, Options o, PadAction action, PadSettings cfg) {
         if (PadManager.PADLOG && action == PadAction.ATTACK) ConsolePad.LOGGER.info("[padlog] P1 inicia ataque (lee slot 0)");
         KeyMapping hold = holdKey(o, action);
         if (hold != null) {
+            if (cfg.isToggle(action) && held.contains(action)) { // alternar: la segunda pulsacion lo suelta
+                hold.setDown(false);
+                held.remove(action);
+                return;
+            }
             hold.setDown(true);
             tap(hold);
             held.add(action);
@@ -367,11 +373,11 @@ public final class PadDriver {
             case HOTBAR_PREV -> player.getInventory().swapPaint(1.0);
             case HOTBAR_NEXT -> player.getInventory().swapPaint(-1.0);
             case SPRINT_TOGGLE -> {
-                sprintLatch = !sprintLatch;
+                sprintLatch = HoldToggle.next(cfg.isToggle(action), sprintLatch, true, true);
                 o.keySprint.setDown(sprintLatch);
             }
             case SNEAK_TOGGLE -> {
-                sneakLatch = !sneakLatch;
+                sneakLatch = HoldToggle.next(cfg.isToggle(action), sneakLatch, true, true);
                 o.keyShift.setDown(sneakLatch);
             }
             case PAUSE -> mc.pauseGame(false);
@@ -379,11 +385,18 @@ public final class PadDriver {
         }
     }
 
-    private void onRelease(Options o, PadAction action) {
+    private void onRelease(Options o, PadAction action, PadSettings cfg) {
         KeyMapping hold = holdKey(o, action);
         if (hold != null) {
+            if (cfg.isToggle(action)) return; // alternar: soltar el boton no suelta la accion
             hold.setDown(false);
             held.remove(action);
+        } else if (action == PadAction.SPRINT_TOGGLE && !cfg.isToggle(action)) {
+            sprintLatch = false;
+            o.keySprint.setDown(false);
+        } else if (action == PadAction.SNEAK_TOGGLE && !cfg.isToggle(action)) {
+            sneakLatch = false;
+            o.keyShift.setDown(false);
         }
     }
 

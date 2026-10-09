@@ -3,6 +3,7 @@ package dev.consolepad.split;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.client.PadDriver;
 import dev.consolepad.mixin.MinecraftInvoker;
+import dev.consolepad.pad.HoldToggle;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadMath;
@@ -145,6 +146,23 @@ public final class SecondaryTick {
         pressed.removeAll(st.prevDown);
         st.prevDown = rawDown;
         st.pressedNow = pressed;
+        // Atacar y usar en modo alternar: una pulsacion los deja activos hasta la siguiente (abrir un menu los apaga).
+        if (ctx.screen != null) {
+            st.attackOn = st.useOn = false;
+        } else {
+            if (cfg.isToggle(PadAction.ATTACK)) {
+                st.attackOn = HoldToggle.next(true, st.attackOn, pressed.contains(PadAction.ATTACK), attack);
+                attack = st.attackOn;
+            } else {
+                st.attackOn = false;
+            }
+            if (cfg.isToggle(PadAction.USE)) {
+                st.useOn = HoldToggle.next(true, st.useOn, pressed.contains(PadAction.USE), use);
+                use = st.useOn;
+            } else {
+                st.useOn = false;
+            }
+        }
         final float f = forward, l = left, lx = lookX, ly = lookY;
         final boolean j = jump, a = attack, u = use, bl = lb, br = rb;
         try {
@@ -172,6 +190,7 @@ public final class SecondaryTick {
         input.rawForward = forward;
         input.rawLeft = left;
         input.jumping = jump;
+        if (!cfg.isToggle(PadAction.SNEAK_TOGGLE)) st.sneakLatch = st.prevDown.contains(PadAction.SNEAK_TOGGLE); // mantener: vale mientras se pulsa
         input.shiftKeyDown = st.sneakLatch;
         if (jump) dbgJumpTicks++;
 
@@ -198,6 +217,10 @@ public final class SecondaryTick {
             float kx = cfg.lookSpeed * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
             float ky = cfg.lookSpeedY() * PadDriver.sensitivityFactor(mc.options) * TICK_SECONDS / 0.15f;
             player.turn(lookX * kx, lookY * ky);
+        }
+        if (!cfg.isToggle(PadAction.SPRINT_TOGGLE)) { // mantener: corre mientras se pulsa
+            st.sprintLatch = st.prevDown.contains(PadAction.SPRINT_TOGGLE);
+            st.sprintHeld = st.sprintLatch || st.doubleTapSprint;
         }
         // Dos empujones seguidos del stick hacia delante = correr, mientras se mantenga hacia delante.
         st.ticksSinceFwdTap++;
@@ -269,12 +292,16 @@ public final class SecondaryTick {
                     dbgPerspective++;
                 }
                 case SPRINT_TOGGLE -> {
-                    st.sprintLatch = !st.sprintLatch;
-                    st.sprintHeld = st.sprintLatch;
+                    if (cfg.isToggle(act)) {
+                        st.sprintLatch = !st.sprintLatch;
+                        st.sprintHeld = st.sprintLatch;
+                    }
                 }
                 case SNEAK_TOGGLE -> {
-                    st.sneakLatch = !st.sneakLatch;
-                    input.shiftKeyDown = st.sneakLatch;
+                    if (cfg.isToggle(act)) {
+                        st.sneakLatch = !st.sneakLatch;
+                        input.shiftKeyDown = st.sneakLatch;
+                    }
                 }
                 case PAUSE -> mc.setScreen(new PlayerPauseScreen(self.slotIndex));
                 case CHAT -> mc.setScreen(new ExtraChatScreen());
