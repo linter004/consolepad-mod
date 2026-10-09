@@ -1385,7 +1385,7 @@ public final class AutoTest {
     // ---------------------------------------------------------------- ayudas para pruebas con 3 y 4 jugadores
 
     /** Mete jugadores hasta tener n en total (mando virtual incluido). Se llama cada tick; true cuando los n estan dentro y listos. */
-    private static boolean joinTo(Minecraft mc, int n) {
+    static boolean joinTo(Minecraft mc, int n) {
         for (int slot = 1; slot < n; slot++) {
             pads.attachVirtual(slot);
             if (!SecondaryPlayers.isActive(slot)) {
@@ -1398,7 +1398,7 @@ public final class AutoTest {
     }
 
     /** Saca jugadores hasta dejar n en total. true cuando los de fuera ya no estan ni en el cliente ni en el servidor. */
-    private static boolean leaveTo(Minecraft mc, int n) {
+    static boolean leaveTo(Minecraft mc, int n) {
         boolean done = true;
         for (int slot = SecondaryPlayers.MAX_EXTRA; slot >= n; slot--) {
             if (SecondaryPlayers.isActive(slot)) {
@@ -4968,6 +4968,9 @@ public final class AutoTest {
             case 44 -> furnaceChestTest(mc);
             case 45 -> enchantAnvilTradeTest(mc);
             case 46 -> perfTest(mc);
+            case 48 -> {
+                if (Settings2Test.run(mc)) next();
+            }
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida

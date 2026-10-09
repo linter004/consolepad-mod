@@ -41,6 +41,9 @@ public final class PadSettings {
     /** Pasos de scroll por segundo a inclinacion maxima del stick derecho. */
     public float scrollSpeed = 6f;
 
+    /** Sticks intercambiados (zurdo): el izquierdo gira la camara y el derecho mueve, tambien en menus y teclado en pantalla. */
+    public boolean swapSticks = false;
+
     public float lookSpeedY() {
         return lookSpeedY > 0f ? lookSpeedY : lookSpeed;
     }

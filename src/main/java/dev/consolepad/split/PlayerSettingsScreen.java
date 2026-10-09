@@ -1,5 +1,6 @@
 package dev.consolepad.split;
 
+import dev.consolepad.pad.ButtonLayouts;
 import dev.consolepad.pad.PadSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -83,6 +84,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         items.add(new Item("hudOpacity", () -> "Opacidad del HUD: " + Math.round(s.hudOpacity * 100) + " %", () -> s.hudOpacity = nextFloat(HUD_OPACITIES, s.hudOpacity)));
         items.add(new Item("showHud", () -> "Mostrar HUD: " + yesNo(s.showHud), () -> s.showHud = !s.showHud));
         items.add(new Item("showHand", () -> "Mostrar mano: " + yesNo(s.showHand), () -> s.showHand = !s.showHand));
+        items.add(new Item("layout", () -> "Disposición de botones: " + ButtonLayouts.name(s), () -> ButtonLayouts.apply(s, ButtonLayouts.next(s))));
         items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
     }
 
@@ -175,6 +177,10 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
 
     public int[] snapNavCenter() {
         return centerOf("snapNav");
+    }
+
+    public int[] layoutCenter() {
+        return centerOnItsPage("layout");
     }
 
     public int[] backCenter() {

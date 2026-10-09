@@ -59,6 +59,15 @@ public final class PadState {
 
     public int downBits() { return down; }
 
+    /** Zurdo: intercambia los sticks ya leidos (se llama tras update/tickSim). */
+    public void swapSticks() {
+        float tx = lx, ty = ly;
+        lx = rx;
+        ly = ry;
+        rx = tx;
+        ry = ty;
+    }
+
     /** Mando virtual de pruebas: no hay hardware, el estado es solo simDown. */
     public void tickSim() {
         prevDown = down;

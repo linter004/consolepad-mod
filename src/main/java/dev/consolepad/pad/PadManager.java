@@ -77,7 +77,11 @@ public final class PadManager {
     public Slot slot(int index) { return slots[index]; }
 
     public void poll() {
-        for (Device d : virtualDevices) d.state.tickSim();
+        for (Device d : virtualDevices) {
+            d.state.tickSim();
+            Slot vs = slotOf(d);
+            if (vs != null && vs.settings.swapSticks) d.state.swapSticks();
+        }
         long now = System.nanoTime();
         if (now - lastScan > SCAN_INTERVAL_NANOS) {
             lastScan = now;
@@ -92,6 +96,7 @@ public final class PadManager {
             }
             Slot s = slotOf(dev);
             dev.state.update(buffer, s != null ? s.settings.triggerThreshold : 0.5f);
+            if (s != null && s.settings.swapSticks) dev.state.swapSticks();
             if (PADLOG && dev.state.downBits() != lastLoggedBits[jid]) {
                 lastLoggedBits[jid] = dev.state.downBits();
                 ConsolePad.LOGGER.info("[padlog] jid={} slot={} '{}' botones=0x{} LT={} RT={} stickIzq=({}, {}) stickDer=({}, {})", jid,
