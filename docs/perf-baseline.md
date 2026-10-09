@@ -47,3 +47,23 @@ Secciones dibujadas (visibles de 15000 reservadas): P1 539, P2 386-502, P3 368-3
   sus `RenderBuffers`) y ~8 MB de memoria directa. Con 4 jugadores, 758 MB de 4064: no hay presion de memoria.
 - Sospecha de fallo ocasional: una de 5 ejecuciones lanzo `NullPointerException` en `LevelRenderer.getSectionStatistics` (P1, `viewArea` nulo) con 3 jugadores;
   se atribuye a la lectura de estadisticas de la prueba (ya protegida) y no se ha vuelto a ver.
+
+## Paso 2a: distancia de vision automatica (`PerfLimits`, `OptionsLimitsMixin`, `IntegratedServerLimitsMixin`)
+
+La distancia efectiva baja con el numero de jugadores dibujados: 2 = 75 %, 3 = 60 %, 4 = 50 % de la que el usuario tiene en las opciones (minimo 6 chunks).
+Con 12 en las opciones: 9, 7 y 6. El servidor integrado usa la misma para enviar chunks y simular. Se apaga con `"autoViewDistance": false` en
+`run/config/consolepad/split.json`; las opciones guardadas no se tocan. (Primer intento: la reduccion se aplicaba dos veces porque el servidor ya manda la
+suya al cliente; corregido para aplicarla solo a la distancia pedida.)
+
+| Jugadores | Distancia | FPS antes -> despues | ms/fotograma | CPU render (ms) | GPU (ms) | Monton usado (MB) |
+|---|---|---|---|---|---|---|
+| 1 | 12 -> 12 | 418 -> 466 (ruido) | 2,39 -> 2,15 | 2,09 -> 1,85 | 1,02 -> 0,94 | 510 -> 499 |
+| 2 | 12 -> 9 | 148 -> 186 | 6,78 -> 5,38 | 6,05 -> 4,80 | 2,37 -> 1,47 | 589 -> 540 |
+| 3 | 12 -> 7 | 97 -> 162 | 10,36 -> 6,19 | 8,99 -> 5,42 | 2,63 -> 1,40 | 665 -> 561 |
+| 4 | 12 -> 6 | 78 -> 129 | 12,83 -> 7,77 | 10,78 -> 6,61 | 4,58 -> 1,45 | 758 -> 583 |
+
+Secciones dibujadas por jugador con 4: 539/386/374/368 -> 178/163/148/137. Memoria por jugador extra: ~80-90 MB -> ~20-40 MB (el servidor tambien manda menos chunks).
+
+Prueba completa (`tools/run-autotest.sh`): 355 resultados, 0 FALLO. Hallazgo colateral: una carrera real en `ContextSwitcher.cameraOr` (un hilo de mallas llamaba a
+`GameRenderer.getMainCamera` mientras el hilo de render cambiaba de contexto: `NullPointerException` y cierre del juego); ahora lee `current` una vez y solo
+devuelve la camara de un extra en el hilo de render.

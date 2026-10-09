@@ -5098,6 +5098,8 @@ public final class AutoTest {
                     PlayerContext c = SecondaryPlayers.context();
                     pfP2Pos = c != null && c.player != null ? c.player.position() : null;
                     SplitView.enabled = true;
+                    String ar = System.getenv("CONSOLEPAD_PERF_AUTORD");
+                    if (ar != null && !ar.isBlank()) SplitSettings.autoViewDistanceOverride = ar.equals("on");
                     server.execute(() -> pfPrevRain = server.overworld().isRaining());
                 }
                 if (ticks >= 60) {
@@ -5191,6 +5193,8 @@ public final class AutoTest {
                     PlayerContext c = SecondaryPlayers.context(slot);
                     if (c != null && c.renderer instanceof SplitLevelRenderer sr && sr.isLive()) ent.append(" | P").append(slot + 1).append(": ").append(pfSafe(sr::getEntityStatistics));
                 }
+                pf("N={} distancia efectiva={} (pedida {}), automatica={}, servidor={}", n, mc.options.getEffectiveRenderDistance(), mc.options.renderDistance().get(),
+                        SplitSettings.autoViewDistance(), server.getPlayerList().getViewDistance());
                 pf("N={} fotogramas={} FPS={} frameMs={} cpuRenderMs={} cpuTickMs/fotograma={} gpuMs={} cuello={} montonUsadoMB={} (antes de medir {}) montonMaxMB={} directaMB={} extraMB/jugador={}",
                         n, r.frames(), String.format(java.util.Locale.ROOT, "%.1f", r.fps()), f2(r.frameMs()), f2(r.renderCpuMs()), f2(r.tickCpuMsPerFrame()), f2(r.gpuMs()),
                         r.bottleneck(), used, pfHeap, rt.maxMemory() >> 20, pfDirectMb(), pfPrevUsed < 0 ? "-" : String.valueOf(used - pfPrevUsed));
@@ -5214,6 +5218,7 @@ public final class AutoTest {
                         server.execute(ee::discard);
                     }
                     pfEntities.clear();
+                    SplitSettings.autoViewDistanceOverride = null;
                     mc.options.renderDistance().set(pfPrevRd);
                     mc.options.framerateLimit().set(pfPrevFps);
                     mc.options.enableVsync().set(pfPrevVsync);

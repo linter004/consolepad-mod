@@ -30,6 +30,7 @@ public final class SplitSettings {
     private static final class Data {
         String orientation = Orientation.SIDE_BY_SIDE.name();
         String promptStyle = DEFAULT_PROMPT_STYLE;
+        Boolean autoViewDistance = Boolean.TRUE;
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -54,6 +55,8 @@ public final class SplitSettings {
                         complete = read.orientation != null && read.promptStyle != null;
                         if (read.orientation != null) Orientation.valueOf(read.orientation);
                         d.orientation = read.orientation != null ? read.orientation : d.orientation;
+                        if (read.autoViewDistance != null) d.autoViewDistance = read.autoViewDistance;
+                        else complete = false;
                         if (read.promptStyle != null && java.util.Arrays.asList(PROMPT_STYLES).contains(read.promptStyle)) d.promptStyle = read.promptStyle;
                     }
                 } catch (IOException | RuntimeException e) {
@@ -77,6 +80,15 @@ public final class SplitSettings {
         } catch (IOException | RuntimeException e) {
             ConsolePad.LOGGER.warn("No se pudo guardar {}: {}", path, e.toString());
         }
+    }
+
+    /** Pruebas: fuerza la distancia de vision automatica sin tocar el archivo (null = lo que diga split.json). */
+    public static volatile Boolean autoViewDistanceOverride;
+
+    /** Distancia de vision automatica segun los jugadores ({@link PerfLimits}); se apaga con "autoViewDistance": false en split.json. */
+    public static boolean autoViewDistance() {
+        Boolean o = autoViewDistanceOverride;
+        return o != null ? o : data().autoViewDistance;
     }
 
     public static Orientation orientation() {

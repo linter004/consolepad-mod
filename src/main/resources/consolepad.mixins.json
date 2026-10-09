@@ -28,6 +28,8 @@
     "MouseHandlerMixin",
     "DeathScreenAccessor",
     "OptionsAccessor",
+    "OptionsLimitsMixin",
+    "IntegratedServerLimitsMixin",
     "GuiStateAccessor",
     "GuiDiagMixin",
     "RenderSystemMixin",

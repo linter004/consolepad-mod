@@ -81,6 +81,7 @@ public final class SplitRender {
     public static void renderLevels(GameRenderer renderer, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
         List<PlayerContext> extras = activeContexts();
+        PerfLimits.playerCount = 1 + extras.size();
         if (extras.isEmpty()) {
             PerfProbe.segment("P1");
             renderer.renderLevel(deltaTracker);

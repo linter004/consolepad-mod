@@ -17,7 +17,7 @@ import net.minecraft.world.phys.HitResult;
  * Solo en el hilo principal. P1 se restaura siempre (finally) y se verifica despues.
  */
 public final class ContextSwitcher {
-    private static boolean active;
+    private static volatile boolean active;
     private static long runs;
     private static long violations;
 
@@ -29,25 +29,29 @@ public final class ContextSwitcher {
     }
 
     public static LevelRenderer rendererOr(Minecraft mc, LevelRenderer original) {
-        return active && current != null ? current.renderer : original;
+        PlayerContext c = current; // los hilos de mallas tambien llaman: la variable se lee una vez
+        return active && c != null ? c.renderer : original;
     }
 
     /** Mano en primera persona del jugador cuyo contexto esta activo (la de GameRenderer si no hay contexto extra). */
     public static net.minecraft.client.renderer.ItemInHandRenderer handOr(net.minecraft.client.renderer.ItemInHandRenderer original) {
-        return active && current != null && current.hand != null ? current.hand : original;
+        PlayerContext c = current;
+        return active && c != null && c.hand != null ? c.hand : original;
     }
 
     /** Camara del jugador cuyo contexto esta activo (la mainCamera de GameRenderer es la de P1): cada uno tiene su posicion, rotacion y altura de ojos suavizada. */
     public static net.minecraft.client.Camera cameraOr(net.minecraft.client.Camera original) {
-        return active && current != null && !SplitView.legacyCamera ? current.camera : original;
+        PlayerContext c = current; // un hilo de mallas (SectionRenderDispatcher) llama a getMainCamera mientras el hilo de render cambia de contexto
+        return active && c != null && !SplitView.legacyCamera && com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread() ? c.camera : original;
     }
 
     /** Mapa de luz del jugador activo (efectos propios como vision nocturna u oscuridad). */
     public static net.minecraft.client.renderer.LightTexture lightOr(net.minecraft.client.renderer.LightTexture original) {
-        return active && current != null ? current.lightTexture(Minecraft.getInstance()) : original;
+        PlayerContext c = current;
+        return active && c != null ? c.lightTexture(Minecraft.getInstance()) : original;
     }
 
-    private static PlayerContext current;
+    private static volatile PlayerContext current;
 
     /** Contexto activo (null fuera de un contexto extra). */
     public static PlayerContext current() {
