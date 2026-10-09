@@ -151,8 +151,15 @@ public final class Settings2Test {
             }
             case 8 -> { // accesibilidad: ayuda grande y menos efectos
                 if (accessTest(mc)) {
-                    phase = 99;
+                    phase = 9;
                     calls = 0;
+                }
+            }
+            case 9 -> { // mando desconectado: pausa y aviso hasta que vuelva
+                if (seq.isEmpty()) padLostSetup(mc);
+                if (tickSeq()) {
+                    seq = new ArrayList<>();
+                    phase = 99;
                 }
             }
             default -> {
@@ -624,5 +631,41 @@ public final class Settings2Test {
             return true;
         }
         return false;
+    }
+
+    // ---------------------------------------------------------------- paso 9: mando desconectado
+
+    private static boolean lostSkipP1;
+
+    private static void padLostSetup(Minecraft mc) {
+        PadManager pads = ConsolePad.PADS;
+        PlayerContext c = SecondaryPlayers.context(1);
+        var server = mc.getSingleplayerServer();
+        var sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+        var sp2 = server.getPlayerList().getPlayer(c.player.getUUID());
+        mc.setScreen(null);
+        lostSkipP1 = false;
+        startSeq(
+                step("P2 sin mando: se desconecta, su region muestra el aviso y es invulnerable (P1 no)", 15, () -> pads.simulateDisconnect(1),
+                        () -> pads.slot(1).lost && pads.slot(1).device == null && c.screen instanceof PadLostScreen && sp2.isInvulnerable()
+                                && !(mc.screen instanceof PadLostScreen) && !sp1.isInvulnerable()),
+                step("P2 sin mando: sigue con el aviso mientras no vuelva y P1 sigue jugando", 15, () -> { },
+                        () -> c.screen instanceof PadLostScreen && mc.screen == null),
+                step("P2 vuelve el mando: el aviso se cierra solo y deja de ser invulnerable", 15, () -> pads.attachVirtual(1),
+                        () -> !pads.slot(1).lost && c.screen == null && !sp2.isInvulnerable()),
+                step("P1 sin mando: se desconecta, ve el aviso y es invulnerable", 15, () -> {
+                    if (!lostSkipP1 && !pads.simulateDisconnect(0)) lostSkipP1 = pads.slot(0).device != null; // mando real: no se toca
+                }, () -> lostSkipP1 || (mc.screen instanceof PadLostScreen && sp1.isInvulnerable() && c.screen == null)),
+                step("P1: seguir con teclado y raton cierra el aviso", 1, () -> {
+                    if (mc.screen instanceof PadLostScreen) mc.screen.onClose();
+                }, null),
+                step("P1: el aviso descartado no reaparece mientras no haya mando", 20, () -> { }, () -> lostSkipP1 || mc.screen == null),
+                step("P1 vuelve el mando: vuelve a ser vulnerable", 15, () -> pads.attachVirtual(0),
+                        () -> lostSkipP1 || (!pads.slot(0).lost && mc.screen == null && !sp1.isInvulnerable())),
+                step("P1 se vuelve a desconectar: el aviso reaparece", 15, () -> {
+                    if (!lostSkipP1) pads.simulateDisconnect(0);
+                }, () -> lostSkipP1 || mc.screen instanceof PadLostScreen),
+                step("P1 vuelve el mando otra vez: el aviso se cierra solo", 15, () -> pads.attachVirtual(0),
+                        () -> lostSkipP1 || (mc.screen == null && !sp1.isInvulnerable())));
     }
 }

@@ -29,6 +29,9 @@ public final class PadManager {
         public final int index;
         public PadSettings settings = new PadSettings();
         public Device device;
+        /** El mando de este slot se desconecto y no ha vuelto (lo mira PadLost para pausar al jugador); lostJid = el que era. */
+        public boolean lost;
+        public int lostJid = -1;
 
         Slot(int index) { this.index = index; }
     }
@@ -61,6 +64,7 @@ public final class PadManager {
         if (s.device != null) return;
         Device d = new Device(-1, "Virtual (prueba)");
         s.device = d;
+        s.lost = false;
         virtualDevices.add(d);
     }
 
@@ -68,6 +72,16 @@ public final class PadManager {
     public void detachVirtual(int slotIndex) {
         Slot s = slots[slotIndex];
         if (s.device != null && virtualDevices.remove(s.device)) s.device = null;
+    }
+
+    /** Solo pruebas (AutoTest): un mando virtual se "desconecta" como uno real (el slot queda perdido hasta que vuelva un mando). */
+    public boolean simulateDisconnect(int slotIndex) {
+        Slot s = slots[slotIndex];
+        if (s.device == null || !virtualDevices.remove(s.device)) return false;
+        s.device = null;
+        s.lost = true;
+        s.lostJid = -1;
+        return true;
     }
 
     public void saveSettings() {
@@ -119,12 +133,16 @@ public final class PadManager {
     private void connect(int jid) {
         Device dev = new Device(jid, GLFW.glfwGetGamepadName(jid));
         devices[jid] = dev;
-        for (Slot s : slots) {
-            if (s.device == null) {
-                s.device = dev;
-                ConsolePad.LOGGER.info("Mando '{}' ({}) asignado al jugador {}", dev.name, dev.type, s.index + 1);
-                return;
-            }
+        // Un mando que vuelve recupera su jugador; si no, el primer jugador sin mando que lo habia perdido; si no, el primer slot libre.
+        Slot target = null;
+        for (Slot s : slots) if (s.device == null && s.lost && s.lostJid == jid) target = s;
+        if (target == null) for (Slot s : slots) if (s.device == null && s.lost) { target = s; break; }
+        if (target == null) for (Slot s : slots) if (s.device == null) { target = s; break; }
+        if (target != null) {
+            target.device = dev;
+            target.lost = false;
+            ConsolePad.LOGGER.info("Mando '{}' ({}) asignado al jugador {}", dev.name, dev.type, target.index + 1);
+            return;
         }
         ConsolePad.LOGGER.info("Mando '{}' detectado pero no hay slots libres", dev.name);
     }
@@ -134,7 +152,11 @@ public final class PadManager {
         devices[jid] = null;
         if (dev == null) return;
         Slot s = slotOf(dev);
-        if (s != null) s.device = null;
+        if (s != null) {
+            s.device = null;
+            s.lost = true;
+            s.lostJid = jid;
+        }
         ConsolePad.LOGGER.info("Mando '{}' desconectado", dev.name);
     }
 
