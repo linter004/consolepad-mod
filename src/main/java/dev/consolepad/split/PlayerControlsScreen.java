@@ -57,14 +57,23 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
 
     private Component rowLabel(PadAction a) {
         if (a == listening) return Component.literal(PadNames.action(a) + ": > pulsa un botón <");
-        List<Integer> codes = codesOf(a);
-        StringBuilder b = new StringBuilder(PadNames.action(a)).append(": ");
-        if (codes.isEmpty()) b.append('-');
-        for (int i = 0; i < codes.size(); i++) {
-            if (i > 0) b.append(" / ");
-            b.append(PadNames.button(codes.get(i), padType()));
+        return Component.literal(PadNames.action(a));
+    }
+
+    /** Iconos de los botones de cada accion, pegados al borde derecho de su fila (el texto de la fila es solo la accion). */
+    private void renderRowIcons(GuiGraphics g) {
+        PadType type = padType();
+        for (int i = 0; i < rows.size(); i++) {
+            PadAction a = rowActions.get(i);
+            if (a == listening) continue;
+            Button b = rows.get(i);
+            List<Integer> codes = codesOf(a);
+            int total = 0;
+            for (int c : codes) total += PadIcons.width(this.font, c, type) + 2;
+            int x = b.getX() + b.getWidth() - 4 - total;
+            int y = b.getY() + (b.getHeight() - PadIcons.H) / 2;
+            for (int c : codes) x += PadIcons.draw(g, this.font, x, y, c, type) + 2;
         }
-        return Component.literal(b.toString());
     }
 
     @Override
@@ -202,6 +211,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+        renderRowIcons(graphics);
         if (!warning.getString().isEmpty()) {
             graphics.drawCenteredString(this.font, warning, this.width / 2, this.height - 58, 0xFFFF55);
         }

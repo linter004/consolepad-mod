@@ -1543,6 +1543,99 @@ public final class AutoTest {
         }
     }
 
+    // ---------------------------------------------------------------- iconos de botones (atlas del pack de prompts)
+
+    private static boolean icOk = true;
+
+    private static void icVerdict(String name, boolean ok) {
+        icOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    /** Pixeles no transparentes de una celda del atlas. */
+    private static int icOpaque(com.mojang.blaze3d.platform.NativeImage img, int cell) {
+        int n = 0, x0 = (cell % PadIcons.COLS) * PadIcons.CELL, y0 = (cell / PadIcons.COLS) * PadIcons.CELL;
+        for (int y = 0; y < PadIcons.CELL; y++) {
+            for (int x = 0; x < PadIcons.CELL; x++) {
+                if ((img.getPixelRGBA(x0 + x, y0 + y) >>> 24) > 16) n++;
+            }
+        }
+        return n;
+    }
+
+    private static long icHash(com.mojang.blaze3d.platform.NativeImage img, int cell) {
+        long h = 1125899906842597L;
+        int x0 = (cell % PadIcons.COLS) * PadIcons.CELL, y0 = (cell / PadIcons.COLS) * PadIcons.CELL;
+        for (int y = 0; y < PadIcons.CELL; y++) {
+            for (int x = 0; x < PadIcons.CELL; x++) h = h * 31 + img.getPixelRGBA(x0 + x, y0 + y);
+        }
+        return h;
+    }
+
+    /** Todos los estilos y tipos de mando: cada boton con icono tiene su celda llena en el atlas, los tres sets son distintos y un boton sin icono no dibuja nada. */
+    private static void iconTest(Minecraft mc) {
+        if (ticks < 2) return;
+        var types = dev.consolepad.pad.PadType.values();
+        int[] codes = {PadState.A, PadState.B, PadState.X, PadState.Y, PadState.LB, PadState.RB, PadState.LT, PadState.RT, PadState.BACK, PadState.START,
+                PadState.L3, PadState.R3, PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};
+        com.mojang.blaze3d.platform.NativeImage chosen = null;
+        for (String style : SplitSettings.PROMPT_STYLES) {
+            com.mojang.blaze3d.platform.NativeImage img;
+            try (var in = mc.getResourceManager().open(PadIcons.atlas(style))) {
+                img = com.mojang.blaze3d.platform.NativeImage.read(in);
+            } catch (java.io.IOException e) {
+                icVerdict("atlas de iconos '" + style + "' se carga (" + e + ")", false);
+                continue;
+            }
+            int empty = 0, minOpaque = Integer.MAX_VALUE;
+            for (var type : types) {
+                for (int code : codes) {
+                    int n = icOpaque(img, PadIcons.cell(type, PadIcons.icon(code)));
+                    minOpaque = Math.min(minOpaque, n);
+                    if (n < 40) empty++;
+                }
+            }
+            boolean sizeOk = img.getWidth() == PadIcons.ATLAS && img.getHeight() == PadIcons.ATLAS;
+            icVerdict("estilo '" + style + "': atlas " + img.getWidth() + "x" + img.getHeight() + ", celdas vacias " + empty + " de " + types.length * codes.length + " (minimo de pixeles " + minOpaque + ")", sizeOk && empty == 0);
+            // Los tres sets son distintos: los cuatro botones de cara y Start no coinciden entre familias.
+            int same = 0;
+            for (int code : new int[] {PadState.A, PadState.B, PadState.X, PadState.Y, PadState.START}) {
+                long x = icHash(img, PadIcons.cell(dev.consolepad.pad.PadType.XBOX, PadIcons.icon(code)));
+                long p = icHash(img, PadIcons.cell(dev.consolepad.pad.PadType.PLAYSTATION, PadIcons.icon(code)));
+                long n = icHash(img, PadIcons.cell(dev.consolepad.pad.PadType.NINTENDO, PadIcons.icon(code)));
+                if (x == p || x == n || p == n) same++;
+            }
+            icVerdict("estilo '" + style + "': Xbox, PlayStation y Nintendo tienen iconos distintos (coincidencias " + same + ")", same == 0);
+            if (style.equals(SplitSettings.promptStyle())) chosen = img;
+            else img.close();
+        }
+        icVerdict("el estilo de split.json ('" + SplitSettings.promptStyle() + "') es uno de los 5", chosen != null);
+        if (chosen != null) chosen.close();
+        icVerdict("detecta el tipo de mando: Xbox/desconocido, PlayStation y Nintendo",
+                dev.consolepad.pad.PadType.detect("Xbox 360 Controller") == dev.consolepad.pad.PadType.XBOX
+                        && dev.consolepad.pad.PadType.detect("Generic USB Joystick") == dev.consolepad.pad.PadType.XBOX
+                        && dev.consolepad.pad.PadType.detect("PS5 Controller") == dev.consolepad.pad.PadType.PLAYSTATION
+                        && dev.consolepad.pad.PadType.detect("Nintendo Switch Pro Controller") == dev.consolepad.pad.PadType.NINTENDO);
+        // Dibujo real: cada boton con icono suma 1 al contador y mide mas que 0; los que no existen (Guia, codigos sueltos) no dibujan y miden 0.
+        var g = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        int drawn0 = PadIcons.drawn, badWidth = 0;
+        for (var type : types) {
+            for (int code : codes) {
+                if (PadIcons.width(mc.font, code, type) <= 0 || PadIcons.draw(g, mc.font, 0, 0, code, type) <= 0) badWidth++;
+            }
+        }
+        int drawnOk = PadIcons.drawn - drawn0;
+        int ghost0 = PadIcons.drawn, ghostWidth = 0;
+        for (var type : types) {
+            for (int code : new int[] {8, 20, -1, 99}) ghostWidth += PadIcons.width(mc.font, code, type) + PadIcons.draw(g, mc.font, 0, 0, code, type);
+        }
+        g.flush();
+        icVerdict("dibujo: " + drawnOk + " iconos dibujados de " + types.length * codes.length + " (ancho 0 en " + badWidth + ")", drawnOk == types.length * codes.length && badWidth == 0);
+        icVerdict("botones sin icono (Guia y codigos sueltos): " + (PadIcons.drawn - ghost0) + " dibujados, ancho total " + ghostWidth, PadIcons.drawn == ghost0 + 0 && ghostWidth == 0);
+        ConsolePad.LOGGER.info("[autotest] RESULTADO iconos de botones en conjunto -> {}", icOk ? "OK" : "FALLO");
+        next();
+    }
+
     // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
 
     private static final int JB_CYCLES = 10;
@@ -4262,6 +4355,7 @@ public final class AutoTest {
             case 39 -> lookSmoothTest(mc);
             case 40 -> joinBurstTest(mc);
             case 41 -> chatBarTest(mc);
+            case 42 -> iconTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida

@@ -47,3 +47,7 @@ hs_err_pid*
 crash-reports/
 .claude/settings.local.json
 .claude/projects/
+
+### Referencias de diseno descargadas (capturas): solo para consulta local, no se suben ###
+docs/reference/
+assets-src/input-prompts/Keyboard_Mouse/

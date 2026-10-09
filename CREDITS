@@ -1,0 +1,7 @@
+ConsolePad - creditos de recursos de terceros
+
+Iconos de botones de mando (src/main/resources/assets/consolepad/textures/gui/prompts/*)
+  "Free Input Prompts" de JulioCacko, publicado bajo CC0 1.0 (dominio publico, sin atribucion obligatoria).
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Los originales (128x128) estan en assets-src/input-prompts/ y tools/PromptAtlas.java los reduce y empaqueta en un atlas por estilo.
+  Aviso: la licencia CC0 es la indicada por el autor del mod al incorporar el pack; el pack no trae un archivo de licencia propio.
