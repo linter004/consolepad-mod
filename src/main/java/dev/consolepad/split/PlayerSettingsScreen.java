@@ -134,6 +134,9 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         items.add(new Item("showCoords", () -> "Mostrar coordenadas: " + yesNo(s.showCoords), () -> s.showCoords = !s.showCoords));
         items.add(new Item("showDirection", () -> "Mostrar dirección: " + yesNo(s.showDirection), () -> s.showDirection = !s.showDirection));
         items.add(new Item("showFps", () -> "Mostrar FPS: " + yesNo(s.showFps), () -> s.showFps = !s.showFps));
+        items.add(new Item("bigHints", () -> "Ayuda de botones grande: " + yesNo(s.bigHints), () -> s.bigHints = !s.bigHints));
+        items.add(new Item("reduceEffects", () -> "Menos efectos de pantalla: " + yesNo(s.reduceEffects), () -> s.reduceEffects = !s.reduceEffects));
+        items.add(new Item("toggleHolds", () -> "Mantener como alternar: " + yesNo(s.toggleHolds), () -> s.toggleHolds = !s.toggleHolds));
         items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
     }
 

@@ -36,7 +36,8 @@
     "CameraAccessor",
     "FogStateAccessor",
     "RecipeBookComponentAccessor",
-    "RecipeBookPageAccessor"
+    "RecipeBookPageAccessor",
+    "ReduceFovMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -60,6 +60,9 @@ public final class PadSettings {
     public boolean sneakToggle = true;
     public boolean sprintToggle = true;
     public boolean attackToggle = false;
+    /** Accesibilidad: ayuda de botones un 50 % mayor, y menos efectos de pantalla (vineta, balanceo y sacudida de la camara, FOV al correr). */
+    public boolean bigHints = false;
+    public boolean reduceEffects = false;
     /** Accesibilidad: los botones de mantener (agacharse, correr, atacar, usar) pasan a alternar. */
     public boolean toggleHolds = false;
 

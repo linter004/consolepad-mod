@@ -38,4 +38,13 @@ public abstract class GuiGuardsMixin {
     private void consolepad$noSubtitle(Component subtitle, CallbackInfo ci) {
         if (ContextSwitcher.isSecondaryActive()) ci.cancel();
     }
+
+    /** Accesibilidad: sin vineta en la region del jugador que lo pida (el contexto activo es el suyo; P1 si no hay ninguno). */
+    @Inject(method = "renderVignette", at = @At("HEAD"), cancellable = true)
+    private void consolepad$noVignette(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.world.entity.Entity entity, CallbackInfo ci) {
+        if (dev.consolepad.split.ReduceEffects.contextOn()) {
+            dev.consolepad.split.ReduceEffects.skippedVignette[dev.consolepad.split.ReduceEffects.contextSlot()]++;
+            ci.cancel();
+        }
+    }
 }

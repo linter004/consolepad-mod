@@ -97,8 +97,9 @@ public final class PadHints {
         // La barra de objetos ocupa 182 de ancho en el centro: la ayuda de cada lado se encoge si no cabe en lo que queda.
         int margin = Math.max(24, (w - 182) / 2 - 8);
         int[] boxL = {Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 0}, boxR = {Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 0};
-        drawColumn(g, font, left, type, 4, h - 4, margin, false, boxL);
-        drawColumn(g, font, right, type, w - 4, h - 4, margin, true, boxR);
+        float boost = cfg.bigHints ? BIG : 1f;
+        drawColumn(g, font, left, type, 4, h - 4, margin, false, boxL, boost);
+        drawColumn(g, font, right, type, w - 4, h - 4, margin, true, boxR, boost);
         lastLeft[slot] = text(left);
         lastRight[slot] = text(right);
         if (boxL[0] != Integer.MAX_VALUE) lastBoxL[slot] = new int[] {boxL[0], boxL[1], boxL[2] - boxL[0], boxL[3] - boxL[1]};
@@ -115,11 +116,14 @@ public final class PadHints {
     }
 
     /** Filas de [icono] texto, de abajo hacia arriba, pegadas a una esquina; si la mas ancha no cabe en maxW, se dibuja a menor escala. */
-    private static void drawColumn(GuiGraphics g, Font font, List<Hint> hints, PadType type, int anchorX, int bottom, int maxW, boolean rightAlign, int[] box) {
+    /** Accesibilidad: la ayuda de botones se dibuja 1,5 veces mayor (si cabe). */
+    public static final float BIG = 1.5f;
+
+    private static void drawColumn(GuiGraphics g, Font font, List<Hint> hints, PadType type, int anchorX, int bottom, int maxW, boolean rightAlign, int[] box, float boost) {
         if (hints.isEmpty()) return;
         int widest = 0;
         for (Hint hint : hints) widest = Math.max(widest, PadIcons.width(font, hint.code(), type) + 3 + font.width(hint.text()));
-        float k = widest > maxW ? Math.max(0.5f, (float) maxW / widest) : 1f;
+        float k = Math.max(0.5f, Math.min(boost, (float) maxW / widest));
         int row = 0;
         for (int i = hints.size() - 1; i >= 0; i--) { // la primera de la lista queda arriba
             Hint hint = hints.get(i);
@@ -198,7 +202,7 @@ public final class PadHints {
         int total = 0;
         for (Hint hint : hints) total += PadIcons.width(font, hint.code(), type) + 3 + font.width(hint.text()) + 10;
         total -= 10;
-        float k = total > w - 8 ? Math.max(0.5f, (float) (w - 8) / total) : 1f;
+        float k = Math.max(0.5f, Math.min(ps.settings.bigHints ? BIG : 1f, (float) (w - 8) / total));
         int x = 4;
         int y = Math.round(h - (PadIcons.H + 3) * k);
         g.pose().pushPose();

@@ -129,6 +129,23 @@ public abstract class GameRendererMixin {
         }
     }
 
+    /** Accesibilidad: sin sacudida al recibir dano ni balanceo al andar en la region del jugador que lo pida (pasada de dibujo = su slot). */
+    @Inject(method = "bobHurt", at = @At("HEAD"), cancellable = true)
+    private void consolepad$noBobHurt(com.mojang.blaze3d.vertex.PoseStack poseStack, float partialTicks, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (dev.consolepad.split.ReduceEffects.passOn()) {
+            dev.consolepad.split.ReduceEffects.skippedBob[SplitRender.passSlot]++;
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "bobView", at = @At("HEAD"), cancellable = true)
+    private void consolepad$noBobView(com.mojang.blaze3d.vertex.PoseStack poseStack, float partialTicks, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (dev.consolepad.split.ReduceEffects.passOn()) {
+            dev.consolepad.split.ReduceEffects.skippedBob[SplitRender.passSlot]++;
+            ci.cancel();
+        }
+    }
+
     /** Campo de vision propio de cada jugador: se escala por (FOV del jugador / FOV global); la mano (useFOVSetting = false) no cambia. */
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void consolepad$ownFov(net.minecraft.client.Camera camera, float partialTicks, boolean useFovSetting, CallbackInfoReturnable<Double> cir) {

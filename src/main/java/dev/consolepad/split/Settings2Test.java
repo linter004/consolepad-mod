@@ -145,6 +145,12 @@ public final class Settings2Test {
             }
             case 7 -> { // distancia de chunks propia de cada jugador, medida en el servidor y al dibujar
                 if (viewTest(mc)) {
+                    phase = 8;
+                    calls = 0;
+                }
+            }
+            case 8 -> { // accesibilidad: ayuda grande y menos efectos
+                if (accessTest(mc)) {
                     phase = 99;
                     calls = 0;
                 }
@@ -566,6 +572,55 @@ public final class Settings2Test {
             int e1 = ViewDistances.effective[1];
             check("al volver P2 a global su distancia vuelve a la automatica: cliente " + e1 + ", servidor " + sp2.requestedViewDistance() + ", seguimiento " + viewTrack(sp2),
                     e1 == ViewDistances.effective[0] && sp2.requestedViewDistance() == e1 && viewTrack(sp2) == e1);
+            return true;
+        }
+        return false;
+    }
+
+    // ---------------------------------------------------------------- paso 8: accesibilidad
+
+    private static int[] boxA;
+
+    private static boolean accessTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        PadSettings s1 = ConsolePad.PADS.slot(1).settings;
+        if (calls == 1) {
+            mc.setScreen(null);
+            s1.bigHints = false;
+            s1.reduceEffects = false;
+            return false;
+        }
+        if (calls == 20) {
+            boxA = PadHints.lastBoxL[1].clone();
+            s1.bigHints = true;
+            return false;
+        }
+        if (calls == 40) {
+            int[] b = PadHints.lastBoxL[1];
+            check("ayuda de botones grande: caja de P2 " + boxA[2] + "x" + boxA[3] + " -> " + b[2] + "x" + b[3] + " (x1.5 si cabe)",
+                    boxA[2] > 0 && b[2] > boxA[2] * 1.2f && b[3] > boxA[3] * 1.2f);
+            s1.bigHints = false;
+            Arrays.fill(ReduceEffects.skippedBob, 0);
+            Arrays.fill(ReduceEffects.skippedVignette, 0);
+            s1.reduceEffects = true;
+            return false;
+        }
+        if (calls == 80) {
+            check("menos efectos: balanceo omitido en P2 " + ReduceEffects.skippedBob[1] + " veces y en P1 " + ReduceEffects.skippedBob[0] + " (debe ser 0)",
+                    ReduceEffects.skippedBob[1] > 0 && ReduceEffects.skippedBob[0] == 0);
+            if (Minecraft.useFancyGraphics()) {
+                check("menos efectos: vineta omitida en P2 " + ReduceEffects.skippedVignette[1] + " veces y en P1 " + ReduceEffects.skippedVignette[0] + " (debe ser 0)",
+                        ReduceEffects.skippedVignette[1] > 0 && ReduceEffects.skippedVignette[0] == 0);
+            }
+            float[] fov = new float[2];
+            c.player.setSprinting(true);
+            s1.reduceEffects = false;
+            ContextSwitcher.run(c, () -> fov[0] = c.player.getFieldOfViewModifier());
+            s1.reduceEffects = true;
+            ContextSwitcher.run(c, () -> fov[1] = c.player.getFieldOfViewModifier());
+            c.player.setSprinting(false);
+            check("menos efectos: FOV de P2 corriendo " + fov[0] + " sin la opcion y " + fov[1] + " con ella (1.0)", fov[0] > 1.001f && near(fov[1], 1f));
+            s1.reduceEffects = false;
             return true;
         }
         return false;
