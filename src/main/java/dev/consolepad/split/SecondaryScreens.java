@@ -209,10 +209,10 @@ public final class SecondaryScreens {
                 if (sl.isActive()) out.add(new double[] {c.getGuiLeft() + sl.x + 8, c.getGuiTop() + sl.y + 8, 16, 16});
             }
             out.addAll(ConsoleCraft.extraTargets(screen)); // libro de recetas abierto: recetas, paginas y filtro
-            // Botones y campos propios de la pantalla (ofertas del aldeano, nombre del yunque...), salvo el boton del libro (lo abre L3).
+            // Botones y campos propios de la pantalla (ofertas del aldeano, nombre del yunque...) y el boton del libro de recetas (el icono verde):
+            // el D-pad puede posarse en el y A lo abre y cierra, igual que L3.
             for (var child : screen.children()) {
-                if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible
-                        && !(w instanceof net.minecraft.client.gui.components.ImageButton)) {
+                if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible) {
                     out.add(new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, w.getWidth(), w.getHeight()});
                 }
             }

@@ -1655,6 +1655,11 @@ public final class AutoTest {
         return slot == 0 ? mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID()) : serverP2(mc);
     }
 
+    private static double[] ccBtn, ccNavFrom;
+    private static int ccNavDir;
+    private static boolean ccNavBook;
+    private static final int[] CC_DPAD = {PadState.DPAD_UP, PadState.DPAD_DOWN, PadState.DPAD_LEFT, PadState.DPAD_RIGHT};
+
     private static double[] ccCursor(Minecraft mc) {
         if (ccSlot == 0) return dev.consolepad.client.PadDriver.guiCursor(mc);
         PlayerContext c = SecondaryPlayers.context(ccSlot);
@@ -1750,6 +1755,55 @@ public final class AutoTest {
                         PlayerContext c = SecondaryPlayers.context(1);
                         ContextSwitcher.run(c, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(c.player)));
                     }
+                    ccStep = 10;
+                    ticks = 0;
+                }
+            }
+            case 10 -> { // el boton verde del libro es destino del D-pad y A lo abre y cierra
+                if (t == 5) {
+                    ccBtn = null;
+                    ccNavFrom = null;
+                    for (var child : screen.children()) {
+                        if (child instanceof net.minecraft.client.gui.components.ImageButton b) ccBtn = new double[] {b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0};
+                    }
+                    var targets = SecondaryScreens.targets(screen);
+                    boolean listed = false;
+                    if (ccBtn != null) {
+                        for (double[] tg : targets) listed |= ccNear(new double[] {tg[0], tg[1]}, ccBtn);
+                        search:
+                        for (double[] from : targets) {
+                            if (ccNear(new double[] {from[0], from[1]}, ccBtn)) continue;
+                            for (int d = 0; d < 4; d++) {
+                                double[] to = SecondaryScreens.pick(targets, from[0], from[1], d);
+                                if (to != null && ccNear(new double[] {to[0], to[1]}, ccBtn)) {
+                                    ccNavFrom = from;
+                                    ccNavDir = d;
+                                    break search;
+                                }
+                            }
+                        }
+                    }
+                    ccVerdict(who + ": el boton del libro (" + (ccBtn == null ? "no existe" : (int) ccBtn[0] + "," + (int) ccBtn[1]) + ") esta entre los destinos del D-pad ("
+                            + targets.size() + " destinos) y se llega a el desde un hueco/boton vecino=" + (ccNavFrom != null), listed && ccNavFrom != null);
+                    if (ccNavFrom == null) {
+                        ccStep = 1;
+                        ticks = 0;
+                        return;
+                    }
+                    ccNavBook = ConsoleCraft.bookVisible(screen);
+                    ccSetCursor(mc, ccNavFrom[0], ccNavFrom[1]);
+                }
+                if (t == 8) simSlot(ccSlot, 1 << CC_DPAD[ccNavDir]);
+                if (t == 14) simSlot(ccSlot, 0);
+                if (t == 20) {
+                    double[] cur = ccCursor(mc);
+                    ccVerdict(who + ": D-pad (direccion " + ccNavDir + ") posa el cursor en el boton del libro (cursor " + (int) cur[0] + "," + (int) cur[1] + ")", ccNear(cur, ccBtn));
+                    simSlot(ccSlot, 1 << PadState.A);
+                }
+                if (t == 26) simSlot(ccSlot, 0);
+                if (t == 34) {
+                    ccVerdict(who + ": A sobre el boton cambia el libro (antes " + ccNavBook + ", ahora " + ConsoleCraft.bookVisible(screen) + ")", ConsoleCraft.bookVisible(screen) != ccNavBook);
+                    if (ConsoleCraft.bookVisible(screen) != ccNavBook) ConsoleCraft.toggleBook(screen); // el resto de la prueba parte del estado inicial
                     ccStep = 1;
                     ticks = 0;
                 }
