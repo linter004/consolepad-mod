@@ -94,6 +94,7 @@ public abstract class GameRendererMixin {
         float k = SplitView.p1Scale();
         if (!SplitView.p1HalfScreen) {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
+            if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX, mouseY, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
             return;
@@ -107,6 +108,7 @@ public abstract class GameRendererMixin {
         SplitView.guiHeight = screen.height;
         try {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, Math.round(mouseX / k), Math.round(mouseY / k), partial);
+            if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX / k, mouseY / k, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
         } finally {

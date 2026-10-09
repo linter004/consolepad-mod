@@ -160,13 +160,23 @@ public final class PadHints {
             out.add(new Hint(PadState.RB, ">"));
             return out;
         }
-        out.add(new Hint(PadState.A, "Seleccionar"));
+        boolean craftBook = ConsoleCraft.applies(screen);
+        boolean container = screen instanceof AbstractContainerScreen<?>;
+        // Textos de la barra de Bedrock con mando en los contenedores: Coger / Coger la mitad / Movimiento rápido / Salir.
+        out.add(new Hint(PadState.A, craftBook && ConsoleCraft.hovering(keyboardSlot) ? "Fabricar" : container ? "Coger" : "Seleccionar"));
         out.add(new Hint(PadState.B, screen instanceof PlayerMenuScreen || screen instanceof net.minecraft.client.gui.screens.PauseScreen ? "Volver" : "Salir"));
         if (screen instanceof AbstractContainerScreen<?>) {
-            out.add(new Hint(PadState.X, "Mitad"));
-            out.add(new Hint(PadState.Y, "Mover rápido"));
+            out.add(new Hint(PadState.X, "Coger la mitad"));
+            out.add(new Hint(PadState.Y, "Movimiento rápido"));
         }
         if (screen instanceof PlayerScreen ps && ps.hintTabs()) out.add(new Hint(PadState.LB, "Pestañas"));
+        if (craftBook) {
+            out.add(new Hint(PadState.L3, "Libro de recetas"));
+            if (ConsoleCraft.bookVisible(screen)) {
+                out.add(new Hint(PadState.LB, "Categoría"));
+                out.add(new Hint(PadState.RB, "Categoría"));
+            }
+        }
         return out;
     }
 

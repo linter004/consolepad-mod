@@ -31,7 +31,9 @@
     "GuiDiagMixin",
     "RenderSystemMixin",
     "CameraAccessor",
-    "FogStateAccessor"
+    "FogStateAccessor",
+    "RecipeBookComponentAccessor",
+    "RecipeBookPageAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

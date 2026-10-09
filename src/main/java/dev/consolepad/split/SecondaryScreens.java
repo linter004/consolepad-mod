@@ -74,6 +74,7 @@ public final class SecondaryScreens {
         SplitView.guiHeight = h;
         try {
             screen.renderWithTooltip(graphics, (int) ctx.cursorX, (int) ctx.cursorY, partialTick);
+            if (ConsoleCraft.applies(screen)) ConsoleCraft.renderPanel(mc, graphics, ctx.slotIndex, screen, ctx.cursorX, ctx.cursorY, w, h);
             PadHints.renderScreenBar(mc, graphics, ctx.slotIndex, screen, w, h);
             PadKeyboard.of(ctx.slotIndex).render(graphics, mc.font, w, h);
             graphics.pose().pushPose();
@@ -133,8 +134,9 @@ public final class SecondaryScreens {
             }
             dpad(ctx, screen, s, cfg.snapNav, dt);
             // Clics: pulsar y soltar por separado, para poder arrastrar.
-            click(screen, ctx, s, PadState.A, 0);
-            if (s.pressed(PadState.A)) kb.tryOpenFromClick(screen); // A sobre un campo de texto abre el teclado
+            boolean craftedNow = ConsoleCraft.handle(mc, screen, s, ctx.slotIndex, ctx.cursorX, ctx.cursorY); // libro de recetas: L3, LB/RB, A sobre una receta
+            if (!craftedNow) click(screen, ctx, s, PadState.A, 0);
+            if (s.pressed(PadState.A) && !craftedNow) kb.tryOpenFromClick(screen); // A sobre un campo de texto abre el teclado
             click(screen, ctx, s, PadState.X, 1);
             if (s.pressed(PadState.Y) && screen instanceof AbstractContainerScreen<?> container) {
                 Slot hovered = container.getSlotUnderMouse();
@@ -146,7 +148,7 @@ public final class SecondaryScreens {
             int steps = (int) ctx.scrollAcc;
             if (steps != 0) {
                 ctx.scrollAcc -= steps;
-                screen.mouseScrolled(ctx.cursorX, ctx.cursorY, 0.0, steps);
+                if (!ConsoleCraft.scroll(screen, steps)) screen.mouseScrolled(ctx.cursorX, ctx.cursorY, 0.0, steps);
             }
             // Cerrar: B, Start o la tecla de inventario de su mando.
             int closing = 0;
@@ -200,12 +202,13 @@ public final class SecondaryScreens {
     }
 
     /** Centros (x, y, ancho, alto) de lo que se puede apuntar en la pantalla: slots activos o botones activos. */
-    private static java.util.List<double[]> targets(Screen screen) {
+    public static java.util.List<double[]> targets(Screen screen) {
         java.util.List<double[]> out = new java.util.ArrayList<>();
         if (screen instanceof AbstractContainerScreen<?> c) {
             for (Slot sl : c.getMenu().slots) {
                 if (sl.isActive()) out.add(new double[] {c.getGuiLeft() + sl.x + 8, c.getGuiTop() + sl.y + 8, 16, 16});
             }
+            out.addAll(ConsoleCraft.extraTargets(screen)); // libro de recetas abierto: recetas, paginas y filtro
         } else {
             for (var child : screen.children()) {
                 if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible) {
@@ -218,12 +221,21 @@ public final class SecondaryScreens {
 
     /** dir: 0 arriba, 1 abajo, 2 izquierda, 3 derecha. */
     private static void jump(PlayerContext ctx, Screen screen, int dir) {
-        java.util.List<double[]> all = targets(screen);
+        double[] best = pick(targets(screen), ctx.cursorX, ctx.cursorY, dir);
+        if (best != null) {
+            ctx.cursorX = best[0];
+            ctx.cursorY = best[1];
+            screen.mouseMoved(best[0], best[1]);
+        }
+    }
+
+    /** Destino al que salta el cursor desde (cx, cy) en la direccion pedida (0 arriba, 1 abajo, 2 izq, 3 der), o null. Mismo criterio para P1 y los extra. */
+    public static double[] pick(java.util.List<double[]> all, double cx, double cy, int dir) {
         double[] current = null;
         for (double[] t : all) {
-            if (Math.abs(ctx.cursorX - t[0]) <= t[2] / 2 && Math.abs(ctx.cursorY - t[1]) <= t[3] / 2) current = t;
+            if (Math.abs(cx - t[0]) <= t[2] / 2 && Math.abs(cy - t[1]) <= t[3] / 2) current = t;
         }
-        double ox = current != null ? current[0] : ctx.cursorX, oy = current != null ? current[1] : ctx.cursorY;
+        double ox = current != null ? current[0] : cx, oy = current != null ? current[1] : cy;
         double[] best = null;
         double bestScore = Double.MAX_VALUE;
         for (double[] t : all) {
@@ -246,11 +258,7 @@ public final class SecondaryScreens {
                 best = t;
             }
         }
-        if (best != null) {
-            ctx.cursorX = best[0];
-            ctx.cursorY = best[1];
-            screen.mouseMoved(best[0], best[1]);
-        }
+        return best;
     }
 
     private static void click(Screen screen, PlayerContext ctx, PadState s, int padButton, int mouseButton) {

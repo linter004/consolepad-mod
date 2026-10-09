@@ -10,6 +10,7 @@ import dev.consolepad.pad.PadMath;
 import dev.consolepad.pad.PadSettings;
 import dev.consolepad.pad.PadState;
 import dev.consolepad.split.AutoTest;
+import dev.consolepad.split.ConsoleCraft;
 import dev.consolepad.split.PadKeyboard;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryScreens;
@@ -231,7 +232,9 @@ public final class PadDriver {
                 mouseDown &= ~1;
             }
         } else {
-            mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            double[] gc = guiCursor(mc);
+            boolean craftedNow = ConsoleCraft.handle(mc, mc.screen, s, 0, gc[0], gc[1]); // libro de recetas: L3, LB/RB, A sobre una receta
+            if (!craftedNow) mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
         }
         mouseButton(mouse, window, s, PadState.X, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         if (s.pressed(PadState.A) && mc.screen != null) PadKeyboard.of(0).tryOpenFromClick(mc.screen); // A sobre un campo de texto abre el teclado
@@ -249,7 +252,7 @@ public final class PadDriver {
         int steps = (int) scrollAcc;
         if (steps != 0) {
             scrollAcc -= steps;
-            mouse.consolepad$onScroll(window, 0.0, steps);
+            if (!ConsoleCraft.scroll(mc.screen, steps)) mouse.consolepad$onScroll(window, 0.0, steps);
         }
 
         boolean closeByPause = false;
@@ -295,53 +298,22 @@ public final class PadDriver {
         }
     }
 
-    /** Mueve el cursor al centro del slot mas cercano en la direccion pedida (0 arriba, 1 abajo, 2 izq, 3 der). */
-    private void jumpToSlot(Minecraft mc, MouseHandlerInvoker mouse, long window,
-                            AbstractContainerScreen<?> screen, int dir) {
-        float k = SplitView.p1Scale(); // con la pantalla dividida la pantalla de P1 puede dibujarse a otra escala que la ventana
+    /** Posicion del cursor de P1 en unidades de su pantalla (la pantalla de P1 puede dibujarse a otra escala que la ventana). */
+    public static double[] guiCursor(Minecraft mc) {
+        float k = SplitView.p1Scale();
         double sx = (double) mc.getWindow().getScreenWidth() / (mc.getWindow().getGuiScaledWidth() / k);
         double sy = (double) mc.getWindow().getScreenHeight() / (mc.getWindow().getGuiScaledHeight() / k);
-        double gx = mc.mouseHandler.xpos() / sx;
-        double gy = mc.mouseHandler.ypos() / sy;
-        Slot current = screen.getSlotUnderMouse();
-        double ox = gx, oy = gy;
-        if (current != null) {
-            ox = screen.getGuiLeft() + current.x + 8;
-            oy = screen.getGuiTop() + current.y + 8;
-        }
+        return new double[] {mc.mouseHandler.xpos() / sx, mc.mouseHandler.ypos() / sy, sx, sy};
+    }
 
-        Slot best = null;
-        double bestScore = Double.MAX_VALUE;
-        for (Slot slot : screen.getMenu().slots) {
-            if (slot == current || !slot.isActive()) continue;
-            double cx = screen.getGuiLeft() + slot.x + 8;
-            double cy = screen.getGuiTop() + slot.y + 8;
-            double dx = cx - ox, dy = cy - oy;
-            double score;
-            if (current == null) {
-                score = dx * dx + dy * dy; // lejos de cualquier slot: salta al mas cercano
-            } else {
-                double primary = switch (dir) {
-                    case 0 -> -dy;
-                    case 1 -> dy;
-                    case 2 -> -dx;
-                    default -> dx;
-                };
-                if (primary < 1.0) continue; // no esta en esa direccion
-                double perp = dir < 2 ? Math.abs(dx) : Math.abs(dy);
-                score = primary + 2.0 * perp;
-            }
-            if (score < bestScore) {
-                bestScore = score;
-                best = slot;
-            }
-        }
+    /** Mueve el cursor al centro del hueco o boton de receta mas cercano en la direccion pedida (0 arriba, 1 abajo, 2 izq, 3 der). */
+    private void jumpToSlot(Minecraft mc, MouseHandlerInvoker mouse, long window,
+                            AbstractContainerScreen<?> screen, int dir) {
+        double[] gc = guiCursor(mc);
+        double[] best = SecondaryScreens.pick(SecondaryScreens.targets(screen), gc[0], gc[1], dir);
         if (best == null) return;
-
-        double nx = (screen.getGuiLeft() + best.x + 8) * sx;
-        double ny = (screen.getGuiTop() + best.y + 8) * sy;
-        nx = Math.max(0, Math.min(mc.getWindow().getScreenWidth() - 1, nx));
-        ny = Math.max(0, Math.min(mc.getWindow().getScreenHeight() - 1, ny));
+        double nx = Math.max(0, Math.min(mc.getWindow().getScreenWidth() - 1, best[0] * gc[2]));
+        double ny = Math.max(0, Math.min(mc.getWindow().getScreenHeight() - 1, best[1] * gc[3]));
         GLFW.glfwSetCursorPos(window, nx, ny);
         mouse.consolepad$onMove(window, nx, ny);
     }

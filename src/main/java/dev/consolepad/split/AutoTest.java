@@ -1636,6 +1636,257 @@ public final class AutoTest {
         next();
     }
 
+    // ---------------------------------------------------------------- crafteo estilo consola (libro de recetas con mando)
+
+    private static boolean ccOk = true, ccBookInit, ccFilterInit;
+    private static int ccSlot, ccStep, ccTabs, ccTab0, ccPlanks0, ccTable0;
+    private static double[] ccCenter, ccB1, ccB6;
+    private static java.util.List<net.minecraft.world.item.ItemStack> ccSaved;
+    private static java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>> ccAwarded = java.util.List.of();
+    private static net.minecraft.world.level.GameType ccPrevMode;
+
+    private static void ccVerdict(String name, boolean ok) {
+        ccOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static ServerPlayer ccServer(Minecraft mc, int slot) {
+        return slot == 0 ? mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID()) : serverP2(mc);
+    }
+
+    private static double[] ccCursor(Minecraft mc) {
+        if (ccSlot == 0) return dev.consolepad.client.PadDriver.guiCursor(mc);
+        PlayerContext c = SecondaryPlayers.context(ccSlot);
+        return new double[] {c.cursorX, c.cursorY};
+    }
+
+    private static void ccSetCursor(Minecraft mc, double x, double y) {
+        if (ccSlot == 0) {
+            p1MoveTo(mc, x, y);
+        } else {
+            PlayerContext c = SecondaryPlayers.context(ccSlot);
+            c.cursorX = x;
+            c.cursorY = y;
+        }
+    }
+
+    private static double[] ccCenterOf(net.minecraft.client.gui.screens.recipebook.RecipeButton b) {
+        return new double[] {b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0};
+    }
+
+    private static boolean ccNear(double[] a, double[] b) {
+        return Math.abs(a[0] - b[0]) < 1.5 && Math.abs(a[1] - b[1]) < 1.5;
+    }
+
+    /** Busca por todas las paginas del libro la receta cuyo resultado es el objeto; deja el libro en su pagina y devuelve su centro (o null). */
+    private static double[] ccFind(net.minecraft.client.gui.screens.Screen screen, Item item) {
+        while (ConsoleCraft.changePage(screen, -1)) { }
+        for (int page = 0; page < 80; page++) {
+            for (var b : ConsoleCraft.visibleRecipes(screen)) {
+                for (var h : b.getCollection().getRecipes()) {
+                    if (h.value().getResultItem(b.getCollection().registryAccess()).is(item)) return ccCenterOf(b);
+                }
+            }
+            if (!ConsoleCraft.changePage(screen, 1)) break;
+        }
+        return null;
+    }
+
+    private static void ccClose(Minecraft mc) {
+        if (ccSlot == 0) {
+            if (mc.screen != null) mc.screen.onClose();
+        } else {
+            PlayerContext c = SecondaryPlayers.context(1);
+            ContextSwitcher.run(c, () -> {
+                if (c.screen != null) c.screen.onClose();
+            });
+        }
+    }
+
+    /**
+     * Libro de recetas con mando en el inventario de supervivencia, para P1 (ruta de PadDriver, con el raton real) y P2 (ruta de SecondaryScreens): L3 abre y
+     * cierra el libro, LB/RB cambian de categoria, el D-pad salta entre recetas, A fabrica (coloca la receta con el paquete de vanilla y recoge el resultado) y el
+     * panel de ingredientes marca lo que falta. El estado del jugador (modo, inventario, recetas) se guarda y se restaura.
+     */
+    private static void consoleCraftTest(Minecraft mc) {
+        int t = ticks;
+        if (ccSlot == 1 && SecondaryPlayers.context(1) == null) {
+            ConsolePad.LOGGER.info("[autotest] RESULTADO crafteo estilo consola en conjunto (sin P2: solo P1) -> {}", ccOk ? "OK" : "FALLO");
+            ccSlot = 0;
+            ccStep = 0;
+            next();
+            return;
+        }
+        String who = "P" + (ccSlot + 1);
+        ServerPlayer sp = ccServer(mc, ccSlot);
+        var screen = screenOf(mc, ccSlot);
+        switch (ccStep) {
+            case 0 -> {
+                if (t == 1) {
+                    ccPrevMode = sp.gameMode.getGameModeForPlayer();
+                    ccSaved = new java.util.ArrayList<>();
+                    for (ItemStack st : sp.getInventory().items) ccSaved.add(st.copy());
+                    SecondaryTick.scriptActive = true;
+                    SecondaryTick.scriptForward = 0f;
+                    mc.getSingleplayerServer().execute(() -> {
+                        sp.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                        for (int i = 0; i < sp.getInventory().items.size(); i++) sp.getInventory().items.set(i, ItemStack.EMPTY);
+                        sp.getInventory().setItem(20, new ItemStack(Items.OAK_PLANKS, 8));
+                        java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>> fresh = new java.util.ArrayList<>();
+                        for (var h : mc.getSingleplayerServer().getRecipeManager().getRecipes()) {
+                            if (!sp.getRecipeBook().contains(h)) fresh.add(h);
+                        }
+                        ccAwarded = fresh;
+                        sp.awardRecipes(fresh);
+                    });
+                }
+                if (t == 40) {
+                    ccPlanks0 = sp.getInventory().countItem(Items.OAK_PLANKS);
+                    ccTable0 = sp.getInventory().countItem(Items.CRAFTING_TABLE);
+                    if (ccSlot == 0) {
+                        mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+                    } else {
+                        PlayerContext c = SecondaryPlayers.context(1);
+                        ContextSwitcher.run(c, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(c.player)));
+                    }
+                    ccStep = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // L3 abre y cierra el libro
+                if (t == 15) {
+                    ccBookInit = ConsoleCraft.bookVisible(screen);
+                    simSlot(ccSlot, 1 << PadState.L3);
+                }
+                if (t == 21) simSlot(ccSlot, 0);
+                if (t == 30) {
+                    ccVerdict(who + ": L3 cambia el libro de recetas (antes " + ccBookInit + ", ahora " + ConsoleCraft.bookVisible(screen) + ")", ConsoleCraft.bookVisible(screen) != ccBookInit);
+                    simSlot(ccSlot, 1 << PadState.L3);
+                }
+                if (t == 36) simSlot(ccSlot, 0);
+                if (t == 45) {
+                    ccVerdict(who + ": L3 otra vez devuelve el estado (" + ConsoleCraft.bookVisible(screen) + ")", ConsoleCraft.bookVisible(screen) == ccBookInit);
+                    if (!ConsoleCraft.bookVisible(screen)) ConsoleCraft.toggleBook(screen); // el resto necesita el libro abierto
+                }
+                if (t == 55) {
+                    ccFilterInit = ConsoleCraft.filtering(screen);
+                    if (ccFilterInit) ConsoleCraft.toggleFilter(screen); // sin "solo fabricables": todas las recetas visibles
+                    ccVerdict(who + ": libro abierto con " + ConsoleCraft.visibleTabs(screen).size() + " categorias y " + ConsoleCraft.visibleRecipes(screen).size() + " recetas en pantalla",
+                            ConsoleCraft.bookVisible(screen) && ConsoleCraft.visibleTabs(screen).size() >= 2);
+                    ccStep = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // LB/RB cambian de categoria
+                if (t == 1) {
+                    ccTabs = ConsoleCraft.visibleTabs(screen).size();
+                    ccTab0 = ConsoleCraft.selectedTabIndex(screen);
+                    simSlot(ccSlot, 1 << PadState.RB);
+                }
+                if (t == 7) simSlot(ccSlot, 0);
+                if (t == 14) {
+                    int now = ConsoleCraft.selectedTabIndex(screen);
+                    ccVerdict(who + ": RB pasa de la categoria " + ccTab0 + " a " + now + " de " + ccTabs, ccTabs > 0 && now == (ccTab0 + 1) % ccTabs);
+                    simSlot(ccSlot, 1 << PadState.LB);
+                }
+                if (t == 20) simSlot(ccSlot, 0);
+                if (t == 27) {
+                    int now = ConsoleCraft.selectedTabIndex(screen);
+                    ccVerdict(who + ": LB vuelve a la categoria " + ccTab0 + " (ahora " + now + ")", now == ccTab0);
+                    ccStep = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // D-pad entre recetas: de la primera a la derecha y luego abajo
+                if (t == 1) {
+                    for (int i = 0; i < 10 && ConsoleCraft.selectedTabIndex(screen) != 0; i++) ConsoleCraft.changeTab(screen, 1);
+                    while (ConsoleCraft.changePage(screen, -1)) { }
+                    var bs = ConsoleCraft.visibleRecipes(screen);
+                    ccB1 = null;
+                    ccB6 = null;
+                    if (bs.size() > 6) {
+                        double[] first = ccCenterOf(bs.get(0));
+                        ccB1 = ccCenterOf(bs.get(1));
+                        ccB6 = ccCenterOf(bs.get(6));
+                        ccSetCursor(mc, first[0], first[1]);
+                    }
+                }
+                if (t == 4) simSlot(ccSlot, 1 << PadState.DPAD_RIGHT);
+                if (t == 10) simSlot(ccSlot, 0);
+                if (t == 15) {
+                    double[] cur = ccCursor(mc);
+                    ccVerdict(who + ": D-pad derecha salta de la receta 0 a la 1 (cursor " + (int) cur[0] + "," + (int) cur[1] + ", esperado " + (ccB1 == null ? "?" : (int) ccB1[0] + "," + (int) ccB1[1]) + ")",
+                            ccB1 != null && ccNear(cur, ccB1));
+                    simSlot(ccSlot, 1 << PadState.DPAD_DOWN);
+                }
+                if (t == 21) simSlot(ccSlot, 0);
+                if (t == 26) {
+                    double[] cur = ccCursor(mc);
+                    ccVerdict(who + ": D-pad abajo salta a la fila siguiente (cursor " + (int) cur[0] + "," + (int) cur[1] + ", esperado " + (ccB6 == null ? "?" : (int) ccB6[0] + "," + (int) ccB6[1]) + ")",
+                            ccB6 != null && ccNear(cur, ccB6));
+                    ccStep = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> { // A fabrica una mesa de crafteo (4 tablones)
+                if (t == 1) {
+                    ccCenter = ccFind(screen, Items.CRAFTING_TABLE);
+                    if (ccCenter != null) ccSetCursor(mc, ccCenter[0], ccCenter[1]);
+                }
+                if (t == 6) simSlot(ccSlot, 1 << PadState.A);
+                if (t == 12) simSlot(ccSlot, 0);
+                if (t == 70) {
+                    int planks = sp.getInventory().countItem(Items.OAK_PLANKS), tables = sp.getInventory().countItem(Items.CRAFTING_TABLE);
+                    ccVerdict(who + ": A sobre la receta fabrica una mesa (receta encontrada=" + (ccCenter != null) + ", mesas " + ccTable0 + " -> " + tables + ", tablones " + ccPlanks0 + " -> " + planks
+                            + ", fabricadas con A=" + ConsoleCraft.crafted[ccSlot] + ", marcada fabricable=" + ConsoleCraft.lastCraftable[ccSlot] + ", libro visible=" + ConsoleCraft.bookVisible(screen) + ")",
+                            ccCenter != null && tables == ccTable0 + 1 && planks == ccPlanks0 - 4);
+                    ccStep = 5;
+                    ticks = 0;
+                }
+            }
+            case 5 -> { // panel de ingredientes: la arenisca (2x2) pide 4 de arena y el jugador no tiene
+                if (t == 1) {
+                    ccCenter = ccFind(screen, Items.SANDSTONE);
+                    if (ccCenter != null) ccSetCursor(mc, ccCenter[0], ccCenter[1]);
+                }
+                if (t == 12) {
+                    String panel = ConsoleCraft.lastPanel[ccSlot];
+                    ccVerdict(who + ": panel de ingredientes de la arenisca muestra lo que falta: '" + panel + "'", ccCenter != null && ConsoleCraft.hoverRecipe[ccSlot] && panel.contains("sand=0/4"));
+                    ccVerdict(who + ": la barra de ayuda dice Fabricar con el cursor sobre una receta ('" + PadHints.lastBar[ccSlot] + "')", ccCenter != null && PadHints.lastBar[ccSlot].contains("Fabricar"));
+                    screenshotName = "consola-crafteo-" + who + ".png";
+                    screenshotPending = true;
+                }
+                if (t == 20) {
+                    if (ccFilterInit && !ConsoleCraft.filtering(screen)) ConsoleCraft.toggleFilter(screen); // deja el filtro como estaba
+                    if (!ccBookInit && ConsoleCraft.bookVisible(screen)) ConsoleCraft.toggleBook(screen); // deja el libro como estaba
+                    ccClose(mc);
+                    mc.getSingleplayerServer().execute(() -> {
+                        sp.setGameMode(ccPrevMode);
+                        for (int i = 0; i < sp.getInventory().items.size(); i++) sp.getInventory().items.set(i, ccSaved.get(i).copy());
+                        sp.resetRecipes(ccAwarded);
+                    });
+                    ccStep = 6;
+                    ticks = 0;
+                }
+            }
+            case 6 -> {
+                if (t == 25) {
+                    ccStep = 0;
+                    ticks = 0;
+                    if (ccSlot == 1) {
+                        ccSlot = 0;
+                        ConsolePad.LOGGER.info("[autotest] RESULTADO crafteo estilo consola en conjunto -> {}", ccOk ? "OK" : "FALLO");
+                        SecondaryTick.scriptActive = false;
+                        next();
+                    } else {
+                        ccSlot = 1; // P1 primero, luego P2
+                    }
+                }
+            }
+            default -> { }
+        }
+    }
+
     // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
 
     private static final int JB_CYCLES = 10;
@@ -2802,8 +3053,11 @@ public final class AutoTest {
         return new String[] {left, right};
     }
 
-    private static String hbBarExpected(boolean container, boolean menu) {
-        return container ? "0:Seleccionar|1:Salir|2:Mitad|3:Mover rápido" : menu ? "0:Seleccionar|1:Volver" : "0:Seleccionar|1:Salir";
+    private static String hbBarExpected(boolean container, boolean menu, net.minecraft.client.gui.screens.Screen screen) {
+        if (container && ConsoleCraft.applies(screen)) { // inventario de supervivencia: L3 abre el libro de recetas; con el libro abierto, LB/RB cambian de categoria
+            return "0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido|" + PadState.L3 + ":Libro de recetas" + (ConsoleCraft.bookVisible(screen) ? "|" + PadState.LB + ":Categoría|" + PadState.RB + ":Categoría" : "");
+        }
+        return container ? "0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido" : menu ? "0:Seleccionar|1:Volver" : "0:Seleccionar|1:Salir";
     }
 
     /**
@@ -2878,8 +3132,8 @@ public final class AutoTest {
                 } else if (ticks == 10) {
                     screenshotName = "consola-barra-inventario-4j.png";
                     screenshotPending = true;
-                    String exp = hbBarExpected(true, false);
                     for (int slot = 0; slot < 4; slot++) {
+                        String exp = hbBarExpected(true, false, screenOf(mc, slot));
                         hbVerdict("P" + (slot + 1) + ": barra de ayuda del inventario '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
                     }
                     scaCloseScreens(mc);
@@ -2892,7 +3146,7 @@ public final class AutoTest {
                     mc.setScreen(new PlayerPauseScreen(0));
                     for (PlayerContext c : SplitRender.activeContexts()) ContextSwitcher.run(c, () -> mc.setScreen(new PlayerPauseScreen(c.slotIndex)));
                 } else if (ticks == 10) {
-                    String exp = hbBarExpected(false, true);
+                    String exp = hbBarExpected(false, true, null);
                     for (int slot = 0; slot < 4; slot++) {
                         hbVerdict("P" + (slot + 1) + ": barra de ayuda del menu de pausa '" + PadHints.lastBar[slot] + "'", PadHints.lastBar[slot].equals(exp));
                     }
@@ -4356,6 +4610,7 @@ public final class AutoTest {
             case 40 -> joinBurstTest(mc);
             case 41 -> chatBarTest(mc);
             case 42 -> iconTest(mc);
+            case 43 -> consoleCraftTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida
