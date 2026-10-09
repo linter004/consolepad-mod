@@ -41,3 +41,8 @@ neoForge {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+// El CREDITS (licencias de los iconos de terceros) viaja dentro del .jar.
+tasks.named("jar") {
+    from("CREDITS")
+}
