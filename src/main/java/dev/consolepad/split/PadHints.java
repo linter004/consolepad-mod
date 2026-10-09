@@ -189,9 +189,6 @@ public final class PadHints {
         lastBarBox[slot] = new int[] {0, 0, 0, 0};
         PadManager.Slot ps = ConsolePad.PADS.slot(slot);
         if (screen == null || ps.device == null || !ps.settings.showHints) return;
-        // El campo de texto del chat de vanilla (P1) ocupa justo la franja de abajo, donde va esta barra: con el chat abierto la barra no se dibuja
-        // (el teclado en pantalla queda encima del campo, que es lo que se necesita ver).
-        if (screen instanceof net.minecraft.client.gui.screens.ChatScreen) return;
         keyboardSlot = slot;
         List<Hint> hints = screenHints(screen);
         keyboardSlot = -1;

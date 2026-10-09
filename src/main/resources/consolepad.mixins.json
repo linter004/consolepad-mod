@@ -15,6 +15,7 @@
     "ParticleEngineMixin",
     "GuiGuardsMixin",
     "ChatGuardsMixin",
+    "ChatScreenLiftMixin",
     "ToastGuardsMixin",
     "MinecraftInvoker",
     "KeyMappingGuardMixin",

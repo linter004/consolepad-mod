@@ -1464,8 +1464,8 @@ public final class AutoTest {
 
     /**
      * Con el chat abierto el campo de texto de cada jugador (el de vanilla en P1, el de ExtraChatScreen en P2 a P4), su teclado en pantalla y su barra de
-     * ayuda no se cruzan: a 854x480 y 1920x1080, con 1 y con 4 jugadores. En P1 el campo de vanilla ocupa la franja de abajo donde iba la barra, que ahora
-     * no se dibuja con el chat abierto.
+     * ayuda no se cruzan: a 854x480 y 1920x1080, con 1 y con 4 jugadores. En P1 el chat de vanilla sube (ChatScreenLiftMixin) como el de P2 a P4 y su
+     * barra se dibuja; el campo se toma del rectangulo que dibujo el mixin, porque el widget conserva su posicion original.
      */
     private static void chatBarTest(Minecraft mc) {
         var window = mc.getWindow();
@@ -1508,13 +1508,14 @@ public final class AutoTest {
                 for (int slot = 0; slot < n; slot++) {
                     var screen = screenOf(mc, slot);
                     int[] box = {0, 0, 0, 0};
-                    if (screen != null && screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox eb) box = new int[] {eb.getX(), eb.getY(), eb.getWidth(), eb.getHeight()};
+                    if (screen != null && slot == 0 && screen instanceof net.minecraft.client.gui.screens.ChatScreen) box = ChatLift.lastInput.clone();
+                    else if (screen != null && screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox eb) box = new int[] {eb.getX(), eb.getY(), eb.getWidth(), eb.getHeight()};
                     int[] bar = PadHints.lastBarBox[slot], kb = PadKeyboard.of(slot).lastBox;
                     boolean inside = screen != null && box[2] > 0 && box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= screen.width && box[1] + box[3] <= screen.height;
                     boolean noBar = !cbCross(box, bar), noKb = !cbCross(box, kb), kbBar = !cbCross(kb, bar);
                     cbVerdict(label + " P" + (slot + 1) + ": campo de texto " + java.util.Arrays.toString(box) + " en pantalla " + (screen == null ? "-" : screen.width + "x" + screen.height)
                             + ", barra " + java.util.Arrays.toString(bar) + ", teclado " + java.util.Arrays.toString(kb) + ": sin cruces campo/barra=" + noBar + ", campo/teclado=" + noKb + ", teclado/barra=" + kbBar,
-                            inside && noBar && noKb && kbBar && kb[2] > 0);
+                            inside && noBar && noKb && kbBar && kb[2] > 0 && bar[2] > 0);
                 }
                 for (int slot = 0; slot < n; slot++) {
                     if (slot == 0) mc.setScreen(null);
