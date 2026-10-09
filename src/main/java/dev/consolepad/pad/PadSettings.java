@@ -34,6 +34,10 @@ public final class PadSettings {
     public String playerName = "";
     /** Ayuda de botones del HUD (abajo a izquierda y derecha) y barra de ayuda en pantallas. */
     public boolean showHints = true;
+    /** Informacion extra en la region de este jugador: coordenadas, direccion a la que mira y FPS. */
+    public boolean showCoords = false;
+    public boolean showDirection = false;
+    public boolean showFps = false;
     /** Color de la etiqueta con el nombre sobre la cabeza (indice de PlayerLabels.COLORS; 0 = sin color). */
     public int labelColor = 0;
     /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */

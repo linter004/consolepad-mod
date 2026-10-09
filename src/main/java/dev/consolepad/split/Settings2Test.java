@@ -132,6 +132,12 @@ public final class Settings2Test {
             }
             case 5 -> { // apuntar con arco: P1 de verdad (el servidor le pone el arco en la mano)
                 if (aimTest(mc)) {
+                    phase = 6;
+                    calls = 0;
+                }
+            }
+            case 6 -> { // coordenadas, direccion y FPS solo en la region de cada jugador
+                if (infoTest(mc)) {
                     phase = 99;
                     calls = 0;
                 }
@@ -450,6 +456,33 @@ public final class Settings2Test {
         }
         if (calls < 30) return false;
         check("apuntando: soltado el arco ya no cuenta como apuntar", !LookControl.isAiming(mc.player));
+        return true;
+    }
+
+    // ---------------------------------------------------------------- paso 6: informacion extra por jugador
+
+    private static boolean infoTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        PadSettings s0 = ConsolePad.PADS.slot(0).settings, s1 = ConsolePad.PADS.slot(1).settings;
+        if (calls == 1) {
+            mc.setScreen(null);
+            s1.showCoords = true;
+            s1.showDirection = true;
+            s0.showFps = true;
+            return false;
+        }
+        if (calls < 25) return false;
+        String t0 = PlayerInfo.lastText[0], t1 = PlayerInfo.lastText[1];
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("XYZ: (-?[0-9.]+) / (-?[0-9.]+) / (-?[0-9.]+)").matcher(t1);
+        boolean coords = m.find() && Math.abs(Double.parseDouble(m.group(1)) - c.player.getX()) < 0.6
+                && Math.abs(Double.parseDouble(m.group(2)) - c.player.getY()) < 0.6 && Math.abs(Double.parseDouble(m.group(3)) - c.player.getZ()) < 0.6;
+        check("coordenadas de P2 en su region y son las suyas: '" + t1 + "' frente a " + c.player.blockPosition().toShortString(), coords);
+        check("direccion de P2 en su region: '" + t1 + "'", t1.contains("Mira al"));
+        check("P1 solo muestra lo suyo (FPS) y no las coordenadas de P2: '" + t0 + "'", t0.contains("FPS") && !t0.contains("XYZ") && !t0.contains("Mira al"));
+        check("P3 (no esta dentro) no muestra nada: '" + PlayerInfo.lastText[2] + "'", PlayerInfo.lastText[2].isEmpty());
+        s1.showCoords = false;
+        s1.showDirection = false;
+        s0.showFps = false;
         return true;
     }
 }

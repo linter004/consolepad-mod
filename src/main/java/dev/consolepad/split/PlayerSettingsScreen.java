@@ -128,6 +128,9 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
             resetArmed = false;
             this.rebuildWidgets();
         }));
+        items.add(new Item("showCoords", () -> "Mostrar coordenadas: " + yesNo(s.showCoords), () -> s.showCoords = !s.showCoords));
+        items.add(new Item("showDirection", () -> "Mostrar dirección: " + yesNo(s.showDirection), () -> s.showDirection = !s.showDirection));
+        items.add(new Item("showFps", () -> "Mostrar FPS: " + yesNo(s.showFps), () -> s.showFps = !s.showFps));
         items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
     }
 

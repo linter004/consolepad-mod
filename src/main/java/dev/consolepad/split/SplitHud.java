@@ -100,6 +100,7 @@ public final class SplitHud {
                                 }
                                 SplitNotices.render(mc, p, graphics);
                                 if (cfg.showHud) PadHints.renderHud(mc, graphics, p.slotIndex, fw, fh);
+                                PlayerInfo.render(mc, graphics, p.slotIndex);
                             } finally {
                                 endAlpha(graphics);
                                 pose.popPose();
@@ -143,6 +144,7 @@ public final class SplitHud {
             mc.options.hideGui = oldHide;
             JoinPrompt.render(mc, graphics, fw, fh);
             if (cfg.showHud) PadHints.renderHud(mc, graphics, 0, fw, fh);
+            PlayerInfo.render(mc, graphics, 0);
         } finally {
             mc.options.hideGui = oldHide;
             endAlpha(graphics);
