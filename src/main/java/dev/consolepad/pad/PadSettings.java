@@ -12,6 +12,10 @@ public final class PadSettings {
     /** 1 = lineal; >1 da mas precision cerca del centro. */
     public float lookExponent = 1.6f;
     public boolean invertY = false;
+    /** Curva de respuesta del stick de la camara (lineal, suave = la de siempre, con aceleracion). */
+    public LookControl.Curve lookCurve = LookControl.Curve.SMOOTH;
+    /** Multiplicador de la sensibilidad de la camara al apuntar con arco, ballesta o catalejo (1 = la misma). */
+    public float aimSensitivity = 1f;
     /** Sensibilidad vertical (grados por segundo); 0 = la misma que la horizontal. */
     public float lookSpeedY = 0f;
     /** Empujar dos veces seguidas el stick izquierdo hacia delante activa el sprint. */

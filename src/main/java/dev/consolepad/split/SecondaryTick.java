@@ -4,6 +4,7 @@ import dev.consolepad.ConsolePad;
 import dev.consolepad.client.PadDriver;
 import dev.consolepad.mixin.MinecraftInvoker;
 import dev.consolepad.pad.HoldToggle;
+import dev.consolepad.pad.LookControl;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadMath;
@@ -56,14 +57,10 @@ public final class SecondaryTick {
         if (ctx.player.isDeadOrDying() || ctx.player.getHealth() <= 0f) return;
         PadSettings cfg = slot.settings;
         PadState s = slot.device.state;
-        PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, TMP);
+        LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(ctx.player), PadDriver.sensitivityFactor(mc.options), dt, ctx.input.look, TMP);
         if (TMP[0] == 0f && TMP[1] == 0f) return;
-        float sens = PadDriver.sensitivityFactor(mc.options);
-        float kx = cfg.lookSpeed * sens * dt / 0.15f; // Entity.turn multiplica por 0.15
-        float ky = cfg.lookSpeedY() * sens * dt / 0.15f;
-        float pitch = cfg.invertY ? -TMP[1] : TMP[1];
-        float yaw = TMP[0];
-        ContextSwitcher.run(ctx, () -> mc.player.turn(yaw * kx, pitch * ky));
+        float yaw = TMP[0], pitch = TMP[1];
+        ContextSwitcher.run(ctx, () -> mc.player.turn(yaw, pitch));
     }
 
     /** P2 sale: la entrada simulada de pruebas se apaga (el resto del estado vive en PlayerContext.input y se descarta con el contexto). */

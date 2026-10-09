@@ -5,6 +5,7 @@ import dev.consolepad.mixin.ContainerScreenInvoker;
 import dev.consolepad.mixin.KeyMappingAccessor;
 import dev.consolepad.mixin.MouseHandlerInvoker;
 import dev.consolepad.pad.HoldToggle;
+import dev.consolepad.pad.LookControl;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadMath;
@@ -42,6 +43,7 @@ public final class PadDriver {
     private final PadManager pads = new PadManager();
     private final EnumSet<PadAction> held = EnumSet.noneOf(PadAction.class);
     private final float[] tmp = new float[2];
+    private final LookControl.State lookState = new LookControl.State();
     private long lastNanos = System.nanoTime();
     private boolean sprintLatch;
     private boolean fwdState;
@@ -178,13 +180,8 @@ public final class PadDriver {
         }
 
         // Camara (stick derecho), independiente de los ticks para que sea fluida.
-        PadMath.radial(s.rx, s.ry, cfg.lookDeadzone, cfg.lookExponent, tmp);
-        if (tmp[0] != 0f || tmp[1] != 0f) {
-            float kx = cfg.lookSpeed * sensitivityFactor(o) * dt / 0.15f; // Entity.turn multiplica por 0.15
-            float ky = cfg.lookSpeedY() * sensitivityFactor(o) * dt / 0.15f;
-            float pitch = cfg.invertY ? -tmp[1] : tmp[1];
-            player.turn(tmp[0] * kx, pitch * ky);
-        }
+        LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(player), sensitivityFactor(o), dt, lookState, tmp);
+        if (tmp[0] != 0f || tmp[1] != 0f) player.turn(tmp[0], tmp[1]);
 
         // Botones segun los bindings del jugador.
         for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {

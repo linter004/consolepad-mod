@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.ButtonLayouts;
 import dev.consolepad.pad.HoldToggle;
+import dev.consolepad.pad.LookControl;
 import dev.consolepad.pad.PadAction;
 import dev.consolepad.pad.PadManager;
 import dev.consolepad.pad.PadSettings;
@@ -92,6 +93,7 @@ public final class Settings2Test {
                 layoutsTest();
                 holdToggleLogic();
                 copyResetLogic();
+                lookLogic();
                 phase = 1;
                 calls = 0;
             }
@@ -124,6 +126,12 @@ public final class Settings2Test {
             }
             case 4 -> { // color de la etiqueta con el nombre
                 if (labelColorTest(mc)) {
+                    phase = 5;
+                    calls = 0;
+                }
+            }
+            case 5 -> { // apuntar con arco: P1 de verdad (el servidor le pone el arco en la mano)
+                if (aimTest(mc)) {
                     phase = 99;
                     calls = 0;
                 }
@@ -368,6 +376,80 @@ public final class Settings2Test {
         if (calls < 24) return false;
         int back = colorOf(mc.level.getPlayerByUUID(c.player.getUUID()));
         check("etiqueta sin color: vuelve al color normal (" + back + ")", back == -1);
+        return true;
+    }
+
+    // ---------------------------------------------------------------- paso 5: curva de la camara y sensibilidad al apuntar
+
+    private static void lookLogic() {
+        PadSettings s = new PadSettings();
+        float[] o = new float[2];
+        LookControl.State st = new LookControl.State();
+        float dt = 0.1f, stick = 0.6f;
+        float scaled = (stick - s.lookDeadzone) / (1f - s.lookDeadzone);
+        float k = dt / 0.15f;
+        s.lookCurve = LookControl.Curve.SMOOTH;
+        LookControl.compute(s, stick, 0f, false, 1f, dt, st, o);
+        float smooth = o[0];
+        check("curva suave (la de siempre): giro " + smooth + " esperado " + (float) Math.pow(scaled, s.lookExponent) * s.lookSpeed * k,
+                near(smooth, (float) Math.pow(scaled, s.lookExponent) * s.lookSpeed * k));
+        s.lookCurve = LookControl.Curve.LINEAR;
+        LookControl.compute(s, stick, 0f, false, 1f, dt, st, o);
+        float linear = o[0];
+        check("curva lineal: giro " + linear + " esperado " + scaled * s.lookSpeed * k + " (y mayor que la suave a media inclinacion)",
+                near(linear, scaled * s.lookSpeed * k) && linear > smooth);
+        s.lookCurve = LookControl.Curve.ACCEL;
+        st = new LookControl.State();
+        LookControl.compute(s, 1f, 0f, false, 1f, dt, st, o);
+        float first = o[0];
+        for (int i = 0; i < 6; i++) LookControl.compute(s, 1f, 0f, false, 1f, dt, st, o);
+        float last = o[0];
+        check("curva con aceleracion: a fondo el giro sube de " + first + " a " + last + " (x" + last / first + ", maximo x" + LookControl.ACCEL_MAX + " tras " + LookControl.ACCEL_RAMP + " s)",
+                last > first * 1.5f && near(last / (s.lookSpeed * k), LookControl.ACCEL_MAX) && near(LookControl.accelFactor(0f), 1f));
+        LookControl.compute(s, 0f, 0f, false, 1f, dt, st, o);
+        check("curva con aceleracion: al soltar el stick vuelve a empezar (tiempo a fondo " + st.held + ")", st.held == 0f && o[0] == 0f && o[1] == 0f);
+        s.lookCurve = LookControl.Curve.SMOOTH;
+        LookControl.compute(s, stick, 0f, true, 1f, dt, st, o);
+        float normal = o[0];
+        s.aimSensitivity = 0.5f;
+        LookControl.compute(s, stick, 0f, true, 1f, dt, st, o);
+        float aimed = o[0];
+        LookControl.compute(s, stick, 0f, false, 1f, dt, st, o);
+        check("sensibilidad al apuntar al 50 %: " + normal + " -> " + aimed + " (sin apuntar sigue igual: " + o[0] + ")",
+                near(aimed, normal * 0.5f) && near(o[0], smooth));
+        s.invertY = true;
+        LookControl.compute(s, 0f, 0.8f, false, 1f, dt, st, o);
+        float inv = o[1];
+        s.invertY = false;
+        LookControl.compute(s, 0f, 0.8f, false, 1f, dt, st, o);
+        check("eje Y invertido sigue funcionando con las curvas (" + inv + " frente a " + o[1] + ")", near(inv, -o[1]) && inv != 0f);
+    }
+
+    private static net.minecraft.world.item.ItemStack aimPrev;
+
+    private static boolean aimTest(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        net.minecraft.server.level.ServerPlayer sp = server.getPlayerList().getPlayer(mc.player.getUUID());
+        if (calls == 1) {
+            mc.setScreen(null);
+            aimPrev = sp.getMainHandItem().copy();
+            server.execute(() -> {
+                sp.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BOW));
+                sp.startUsingItem(net.minecraft.world.InteractionHand.MAIN_HAND);
+            });
+            return false;
+        }
+        if (calls < 15) return false;
+        if (calls == 15) {
+            check("apuntando: P1 tensando un arco cuenta como apuntar", LookControl.isAiming(mc.player));
+            server.execute(() -> {
+                sp.stopUsingItem();
+                sp.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, aimPrev);
+            });
+            return false;
+        }
+        if (calls < 30) return false;
+        check("apuntando: soltado el arco ya no cuenta como apuntar", !LookControl.isAiming(mc.player));
         return true;
     }
 }

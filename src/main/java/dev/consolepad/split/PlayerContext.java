@@ -124,6 +124,8 @@ public final class PlayerContext {
         public boolean sprintLatch, sneakLatch, comboLatch;
         /** Atacar y usar en modo alternar (PadSettings.isToggle): quedan activos hasta la siguiente pulsacion. */
         public boolean attackOn, useOn;
+        /** Aceleracion del giro de camara (dev.consolepad.pad.LookControl). */
+        public final dev.consolepad.pad.LookControl.State look = new dev.consolepad.pad.LookControl.State();
         /** Sprint por doble toque del stick hacia delante: dura mientras el stick siga hacia delante. */
         public boolean doubleTapSprint, fwdState;
         public int ticksSinceFwdTap = 1000;

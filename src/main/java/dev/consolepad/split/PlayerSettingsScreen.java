@@ -2,6 +2,7 @@ package dev.consolepad.split;
 
 import dev.consolepad.ConsolePad;
 import dev.consolepad.pad.ButtonLayouts;
+import dev.consolepad.pad.LookControl;
 import dev.consolepad.pad.PadSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -24,6 +25,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     public static final float[] DEADZONES = {0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f};
     public static final int[] HUD_MARGINS = {0, 2, 4, 6, 8, 10};
     public static final float[] HUD_OPACITIES = {1f, 0.75f, 0.5f, 0.25f};
+    public static final float[] AIM_SENS = {1f, 0.75f, 0.5f, 0.35f, 0.25f};
     public static final float[] CURSOR_SPEEDS = {250f, 350f, 450f, 550f, 700f, 850f, 1000f};
 
     private record Item(String id, Supplier<String> label, Runnable next) {}
@@ -90,6 +92,8 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         items.add(new Item("moveDead", () -> "Zona muerta del movimiento: " + dz(s.moveDeadzone), () -> s.moveDeadzone = nextFloat(DEADZONES, s.moveDeadzone)));
         items.add(new Item("lookDead", () -> "Zona muerta de la cámara: " + dz(s.lookDeadzone), () -> s.lookDeadzone = nextFloat(DEADZONES, s.lookDeadzone)));
         items.add(new Item("sensY", () -> "Sensibilidad vertical: " + Math.round(s.lookSpeedY()), () -> s.lookSpeedY = nextFloat(SPEEDS, s.lookSpeedY())));
+        items.add(new Item("lookCurve", () -> "Curva de la cámara: " + s.lookCurve.label, () -> s.lookCurve = LookControl.Curve.values()[(s.lookCurve.ordinal() + 1) % LookControl.Curve.values().length]));
+        items.add(new Item("aimSens", () -> "Sensibilidad al apuntar: " + Math.round(s.aimSensitivity * 100) + " %", () -> s.aimSensitivity = nextFloat(AIM_SENS, s.aimSensitivity)));
         items.add(new Item("invertY", () -> "Invertir eje Y: " + yesNo(s.invertY), () -> s.invertY = !s.invertY));
         items.add(new Item("doubleTap", () -> "Correr con doble toque: " + yesNo(s.doubleTapSprint), () -> s.doubleTapSprint = !s.doubleTapSprint));
         items.add(new Item("cursorSpeed", () -> "Velocidad del cursor: " + Math.round(s.cursorSpeed), () -> s.cursorSpeed = nextFloat(CURSOR_SPEEDS, s.cursorSpeed)));
