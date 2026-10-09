@@ -67,3 +67,42 @@ Secciones dibujadas por jugador con 4: 539/386/374/368 -> 178/163/148/137. Memor
 Prueba completa (`tools/run-autotest.sh`): 355 resultados, 0 FALLO. Hallazgo colateral: una carrera real en `ContextSwitcher.cameraOr` (un hilo de mallas llamaba a
 `GameRenderer.getMainCamera` mientras el hilo de render cambiaba de contexto: `NullPointerException` y cierre del juego); ahora lee `current` una vez y solo
 devuelve la camara de un extra en el hilo de render.
+
+## Paso 2b: limites por jugador (`PerfLimits.entityScale/fancyWeather`, `LevelRendererMixin`)
+
+Con 3 y 4 jugadores (ajuste `"playerLimits": false` en split.json para apagarlo): la distancia de dibujo de entidades se multiplica por 0,8 y 0,65 (sobre la
+escala de vanilla, que ya baja con la distancia de vision), y la lluvia pasa a la version "rapida" (radio 5 en vez de 10 y la cuarta parte de gotas; las gotas
+de los extra son las unicas particulas propias que crean). Las particulas generales no se tocan: solo existe el `ParticleEngine` de P1 y su coste es pequeno en la escena.
+
+Comparacion A/B en la misma ejecucion (distancia automatica activa en ambos): 3 jugadores 141 -> 176 FPS (CPU render 6,17 -> 5,07 ms); 4 jugadores 115 -> 169 FPS (7,35 -> 5,19 ms).
+Prueba completa: 355 resultados, 0 FALLO.
+
+## Paso 2c: resolucion de dibujo por jugador -> NO implementada (roadmap)
+
+El paso 1 no muestra ningun caso limitado por la GPU: con la linea base la GPU gasta 1,0-4,6 ms de 2,4-12,8 ms por fotograma, y con las optimizaciones 1,0-1,5 ms de
+2,7-5,4. Un `RenderTarget` reducido por jugador solo ayudaria en una GPU mucho mas lenta o a 4K. Se deja en el roadmap con una condicion: reabrirlo si alguien mide
+`gpuMs >= 0,9 * frameMs` (la prueba lo marca como cuello "GPU").
+
+## Paso 2d: memoria y CPU (analisis; nada arriesgado cambiado)
+
+- **Niveles de cliente de los extra:** cada extra tiene su `ClientLevel`, su cache de chunks y su `LevelRenderer` (rejilla de secciones + mallas). Los chunks llegan
+  por su propia conexion y se guardan una vez por jugador. Medido: ~80-90 MB de monton por extra a distancia 12 y ~17-36 MB con la distancia automatica. Compartir
+  `ClientLevel` o mallas entre jugadores exigiria un nivel de cliente unico con entidades y jugadores por conexion: **riesgoso y no se hace**. La presion de memoria
+  no existe (604 MB de 4064 MB con 4 jugadores).
+- **Mallas repetidas:** los jugadores comparten casi todos los chunks en el sofa, asi que cada seccion se malla hasta 4 veces. No se ha medido por separado el coste de
+  mallado (el recuento de hilos por nombre no dio datos, **supuesto**); la causa principal del coste de CPU medida es el recorrido y emision de ~150-550 secciones por pasada, que ya
+  baja con la distancia automatica. Mallas compartidas: descartado por el mismo motivo.
+- **JVM:** el GC cuesta ~1,5 % del tiempo (6-11 recolecciones y ~220 ms cada 14,8 s, medido, G1 por defecto, monton maximo 4064 MB = 1/4 de la RAM). No hay ganancia
+  que esperar de cambiar de recolector. Recomendacion para el lanzador del usuario: `-Xms1G -Xmx4G` (mas de 4 GB no se usa) y dejar G1; si hay tirones por GC con packs de recursos
+  pesados, probar `-XX:+UseZGC -XX:+ZGenerational` (Java 21). Con 4 jugadores y distancia 12 sin optimizar se usan ~760 MB, con la automatica ~600 MB.
+
+## Resumen: antes y despues (1920x1080, distancia 12 en las opciones, escena de bosque con lluvia y 60 animales)
+
+| Jugadores | FPS antes -> despues | ms/fotograma | CPU render (ms) | GPU (ms) | Monton (MB) | Distancia efectiva |
+|---|---|---|---|---|---|---|
+| 1 | 418 -> 371* | 2,39 -> 2,69* | 2,09 -> 2,37* | 1,02 -> 1,04 | 510 -> 534* | 12 -> 12 |
+| 2 | 148 -> 185 | 6,78 -> 5,42 | 6,05 -> 4,80 | 2,37 -> 1,51 | 589 -> 563 | 12 -> 9 |
+| 3 | 97 -> 201 | 10,36 -> 4,98 | 8,99 -> 4,43 | 2,63 -> 1,23 | 665 -> 580 | 12 -> 7 |
+| 4 | 78 -> 189 | 12,83 -> 5,29 | 10,78 -> 4,62 | 4,58 -> 1,19 | 758 -> 604 | 12 -> 6 |
+
+\* Con 1 jugador no cambia nada (los limites no actuan); las ejecuciones de 1 jugador dieron 371-505 FPS segun el momento del equipo (ruido de ±15 %).

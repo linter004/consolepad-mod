@@ -84,3 +84,9 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Los iconos de botones salen de `tools/PromptAtlas.java`** (`java tools/PromptAtlas.java` desde la raiz; sin Python/PIL). Un boton sin icono mide 0 y no dibuja; el orden de `ICONS` debe coincidir con `PadIcons.Icon`.
 - **Pruebas de pantallas especiales:** un yunque sin bloque debajo cae y cierra la pantalla; el aldeano necesita `villager.setTradingPlayer(player)` antes de `openTradingScreen`; las opciones de encantamiento sin coste no son destino.
 - **Los scripts de Python con comillas triples o apostrofes se escriben con Write** y se ejecutan con `python script.py args`, nunca con heredoc de shell. Cuidado con `cd` dentro de una cadena larga: `tools/run-autotest.sh` se busca desde la raiz.
+
+### Reglas aprendidas de la tanda de rendimiento (2026-10-09)
+
+- **Medir con `CONSOLEPAD_AUTOTEST_CASES=46 CONSOLEPAD_PERF_TAG=<x> [CONSOLEPAD_PERF_NS=1,2,3,4] [CONSOLEPAD_PERF_AUTORD=on|off] [CONSOLEPAD_PERF_LIMITS=on|off] tools/run-autotest.sh run/perf/<x>.log`;** las lineas `[perf]` son el resultado. Para A/B comparar en la misma ejecucion (el ruido entre ejecuciones es de ±15 %). Nunca lanzar dos `run-autotest.sh` a la vez: el segundo mata el juego del primero; un script viejo vivo hace lo mismo a los 20 min.
+- **El cuello de botella es la CPU** (cada pasada de mundo ~2-3 ms): la palanca es dibujar menos (distancia, entidades, lluvia), no la resolucion. `Options.getEffectiveRenderDistance` es global y el servidor ya manda al cliente su distancia reducida: aplicar el factor a la distancia pedida y luego `min` con la del servidor.
+- **Los hilos de mallas llaman a `GameRenderer.getMainCamera`:** cualquier redireccion por contexto debe leer el estado una vez y comprobar `RenderSystem.isOnRenderThread()`.
