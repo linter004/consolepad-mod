@@ -15,7 +15,7 @@ for i in $(seq 1 240); do
   sleep 5
 done
 sleep 2
-powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { \$_.CommandLine -match '$PROJ.*fml.modFolders=consolepad' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
+powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { \$_.CommandLine -match 'fml.modFolders=consolepad.*$PROJ' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
 sleep 3
 cp -r "$BK/consolepad/." run/config/consolepad/
 echo "autotest finalizado; salida en $OUT"
