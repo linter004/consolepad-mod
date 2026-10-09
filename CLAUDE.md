@@ -20,7 +20,7 @@ Estas reglas se suman a las de ahorro; no las sustituyen. Objetivo: 2-4 jugadore
 - **Para y espera solo si:**
   - (a) un paso falla incluso con el subagente;
   - (b) hay una fuga de contexto de P2 hacia P1 que no consigues cerrar;
-  - (c) el uso semanal pasa del 50 % en `/usage`;
+  - (c) el uso semanal pasa del 75 % en `/usage`;
   - (d) el usuario debe probar algo jugando que no se pueda medir: dar una lista corta de qué probar;
   - (e) hay que usar algo que gaste créditos de pago.
 - **Si algo es demasiado arriesgado o grande**, déjalo en el roadmap como pendiente con el motivo y sigue con lo siguiente.
