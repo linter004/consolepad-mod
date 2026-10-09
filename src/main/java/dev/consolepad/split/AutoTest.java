@@ -4968,6 +4968,7 @@ public final class AutoTest {
             case 44 -> furnaceChestTest(mc);
             case 45 -> enchantAnvilTradeTest(mc);
             case 46 -> perfTest(mc);
+            case 47 -> elytraTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida
@@ -5344,6 +5345,126 @@ public final class AutoTest {
         StringBuilder sb = new StringBuilder("{");
         for (var e : m.entrySet()) sb.append(e.getKey()).append('=').append(f2(e.getValue())).append(' ');
         return sb.append('}').toString();
+    }
+
+    // ------------------------------------------------------------------ elitros con mando (casilla 47) ------------------------------------------------------------------
+    private static int elSlot, elStep;
+    private static boolean elOk = true;
+    private static net.minecraft.world.level.GameType elPrevMode;
+    private static Vec3 elPrevPos;
+    private static float elYaw0, elPitch0;
+    private static double elSpeed0;
+    private static int elRockets0;
+
+    private static void elVerdict(String name, boolean ok) {
+        elOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static net.minecraft.client.player.LocalPlayer elClient(Minecraft mc, int slot) {
+        if (slot == 0) return mc.player;
+        PlayerContext c = SecondaryPlayers.context(slot);
+        return c == null ? null : c.player;
+    }
+
+    /**
+     * Elitros con el mando de cada jugador: se suelta de 200 bloques con elitros puestos, se pulsa saltar dos veces y solo el que lo pide
+     * pasa a volar (cliente y servidor); despues el stick derecho gira la vista en vuelo y el boton de usar lanza un cohete (mas velocidad, un cohete menos).
+     * LocalPlayer.aiStep exige un toque nuevo de salto (lee jumping antes de tick()); PadInput lo copia dentro de tick() para que los extra lo cumplan.
+     */
+    private static void elytraTest(Minecraft mc) {
+        int t = ticks;
+        if (elSlot > 1 || (elSlot == 1 && elClient(mc, 1) == null)) {
+            ConsolePad.LOGGER.info("[autotest] RESULTADO elitros con el mando en conjunto -> {}", elOk ? "OK" : "FALLO");
+            elSlot = 0;
+            elStep = 0;
+            next();
+            return;
+        }
+        String who = "P" + (elSlot + 1);
+        int other = elSlot == 0 ? 1 : 0;
+        var server = mc.getSingleplayerServer();
+        ServerPlayer sp = ccServer(mc, elSlot);
+        var me = elClient(mc, elSlot);
+        PadState pad = pads.slot(elSlot).device.state;
+        switch (elStep) {
+            case 0 -> {
+                if (t == 1) {
+                    elPrevMode = sp.gameMode.getGameModeForPlayer();
+                    elPrevPos = sp.position();
+                    Vec3 p = elPrevPos;
+                    server.execute(() -> {
+                        sp.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.ELYTRA));
+                        sp.getInventory().selected = 0;
+                        sp.getInventory().setItem(0, new ItemStack(Items.FIREWORK_ROCKET, 3));
+                        sp.teleportTo((net.minecraft.server.level.ServerLevel) sp.level(), p.x, p.y + 200, p.z, 0f, 0f);
+                        sp.fallDistance = 0f;
+                    });
+                }
+                if (t == 14) {
+                    elVerdict(who + ": cae con los elitros puestos (en el suelo=" + me.onGround() + ", y=" + (int) me.getY() + ", elitros=" + me.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.ELYTRA) + ")",
+                            !me.onGround() && me.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.ELYTRA) && !me.isFallFlying());
+                    pad.simDown = 1 << PadState.A; // saltar (toque 1)
+                }
+                if (t == 17) pad.simDown = 0;
+                if (t == 20) pad.simDown = 1 << PadState.A; // saltar (toque 2)
+                if (t == 23) pad.simDown = 0;
+                if (t == 32) {
+                    var o = elClient(mc, other);
+                    elVerdict(who + ": saltar dos veces en el aire abre los elitros (cliente=" + me.isFallFlying() + ", servidor=" + sp.isFallFlying() + ")", me.isFallFlying() && sp.isFallFlying());
+                    elVerdict(who + ": el otro jugador no vuela (P" + (other + 1) + " cliente=" + (o != null && o.isFallFlying()) + ", servidor=" + (ccServer(mc, other) != null && ccServer(mc, other).isFallFlying()) + ")",
+                            o == null || (!o.isFallFlying() && !ccServer(mc, other).isFallFlying()));
+                    elYaw0 = me.getYRot();
+                    elPitch0 = me.getXRot();
+                    pad.simRx = 0.9f; // stick derecho: girar a la derecha y bajar el morro
+                    pad.simRy = 0.6f;
+                    elStep = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // direccion con el stick derecho
+                if (t == 30) {
+                    pad.simRx = 0f;
+                    pad.simRy = 0f;
+                    float dyaw = Math.abs(net.minecraft.util.Mth.wrapDegrees(me.getYRot() - elYaw0)), dpitch = me.getXRot() - elPitch0;
+                    elVerdict(who + ": en vuelo el stick derecho gira la vista (guinada " + (int) dyaw + " grados, cabeceo " + (int) dpitch + ")", me.isFallFlying() && dyaw > 8f && Math.abs(dpitch) > 3f);
+                    elSpeed0 = me.getDeltaMovement().length();
+                    elRockets0 = sp.getInventory().getItem(0).getCount();
+                    pad.simDown = 1 << PadState.LT; // usar: cohete
+                }
+                if (t == 33) pad.simDown = 0;
+                if (t == 45) {
+                    double v = me.getDeltaMovement().length();
+                    int left = sp.getInventory().getItem(0).getCount();
+                    elVerdict(who + ": el cohete acelera (velocidad " + String.format(java.util.Locale.ROOT, "%.2f", elSpeed0) + " -> " + String.format(java.util.Locale.ROOT, "%.2f", v)
+                            + ", cohetes " + elRockets0 + " -> " + left + ")", left == elRockets0 - 1 && v > elSpeed0 + 0.2);
+                    server.execute(() -> {
+                        sp.stopFallFlying();
+                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
+                        sp.getInventory().setItem(0, ItemStack.EMPTY);
+                        sp.setGameMode(elPrevMode);
+                        sp.teleportTo((net.minecraft.server.level.ServerLevel) sp.level(), elPrevPos.x, elPrevPos.y, elPrevPos.z, 0f, 0f);
+                        sp.fallDistance = 0f;
+                    });
+                    elStep = 2;
+                    ticks = 0;
+                }
+            }
+            case 2 -> {
+                if (t >= 60 && me.onGround() && !me.isFallFlying()) {
+                    elSlot++;
+                    elStep = 0;
+                    ticks = 0;
+                } else if (t > 400) {
+                    elVerdict(who + ": vuelve al suelo tras la prueba", false);
+                    elSlot++;
+                    elStep = 0;
+                    ticks = 0;
+                }
+            }
+            default -> { }
+        }
     }
 
     private static void next() {

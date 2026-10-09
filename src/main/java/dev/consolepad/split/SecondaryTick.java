@@ -171,7 +171,7 @@ public final class SecondaryTick {
         PadInput input = (PadInput) player.input;
         input.rawForward = forward;
         input.rawLeft = left;
-        input.jumping = jump;
+        input.rawJumping = jump; // PadInput.tick lo pasa a jumping dentro de aiStep (flanco)
         input.shiftKeyDown = st.sneakLatch;
         if (jump) dbgJumpTicks++;
 
