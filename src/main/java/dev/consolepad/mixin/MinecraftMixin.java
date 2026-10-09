@@ -68,4 +68,14 @@ public abstract class MinecraftMixin {
     private boolean consolepad$noGlobalPause(IntegratedServer server) {
         return SecondaryPlayers.anyActive() || server.isPublished();
     }
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void consolepad$perfTickBegin(CallbackInfo ci) {
+        dev.consolepad.split.PerfProbe.tickBegin();
+    }
+
+    @Inject(method = "tick", at = @At("RETURN"))
+    private void consolepad$perfTickEnd(CallbackInfo ci) {
+        dev.consolepad.split.PerfProbe.tickEnd();
+    }
 }

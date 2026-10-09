@@ -82,7 +82,9 @@ public final class SplitRender {
         Minecraft mc = Minecraft.getInstance();
         List<PlayerContext> extras = activeContexts();
         if (extras.isEmpty()) {
+            PerfProbe.segment("P1");
             renderer.renderLevel(deltaTracker);
+            PerfProbe.segment("post");
             return;
         }
         for (PlayerContext c : extras) {
@@ -109,6 +111,7 @@ public final class SplitRender {
             }
             int[] p = SplitView.p1Px;
             pass(mc, renderer, deltaTracker, null, p[0], p[1], p[2], p[3]);
+            PerfProbe.segment("post");
         } finally {
             RenderSystem.disableScissor();
             RenderSystem.viewport(0, 0, w, h);
@@ -121,6 +124,7 @@ public final class SplitRender {
 
     private static void pass(Minecraft mc, GameRenderer renderer, DeltaTracker deltaTracker, PlayerContext ctx,
                              int x, int y, int w, int h) {
+        PerfProbe.segment(ctx != null ? "P" + (ctx.slotIndex + 1) : "P1");
         RenderSystem.enableScissor(x, y, w, h);
         RenderSystem.viewport(x, y, w, h);
         SplitView.x = x;

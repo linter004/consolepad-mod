@@ -4913,6 +4913,7 @@ public final class AutoTest {
             case 43 -> consoleCraftTest(mc);
             case 44 -> furnaceChestTest(mc);
             case 45 -> enchantAnvilTradeTest(mc);
+            case 46 -> perfTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida
@@ -5033,6 +5034,239 @@ public final class AutoTest {
             testIndex++;
             ticks = 0;
         }
+    }
+
+    // ------------------------------------------------------------------ prueba de rendimiento (casilla 46) ------------------------------------------------------------------
+    private static int pfPhase, pfN, pfI;
+    private static net.minecraft.core.BlockPos pfBase;
+    private static Vec3 pfP1Pos, pfP2Pos;
+    private static float pfP1Yaw;
+    private static int pfPrevRd, pfPrevFps;
+    private static boolean pfPrevVsync, pfPrevRain;
+    private static final java.util.List<net.minecraft.world.entity.Entity> pfEntities = new java.util.ArrayList<>();
+    private static long pfPrevUsed = -1;
+    private static final String PF_TAG = System.getenv("CONSOLEPAD_PERF_TAG") == null ? "base" : System.getenv("CONSOLEPAD_PERF_TAG");
+    private static final int[] PF_COUNTS = pfCounts();
+
+    private static int[] pfCounts() {
+        String v = System.getenv("CONSOLEPAD_PERF_NS");
+        String[] p = (v == null || v.isBlank() ? "1,2,3,4" : v).split(",");
+        int[] out = new int[p.length];
+        for (int i = 0; i < p.length; i++) out[i] = Integer.parseInt(p[i].trim());
+        return out;
+    }
+
+    private static final double[][] PF_OFFSETS = {{0, 0}, {4, 0}, {0, 4}, {4, 4}};
+    private static final float[] PF_YAWS = {0f, 90f, 180f, 270f};
+
+    private static void pf(String fmt, Object... args) {
+        ConsolePad.LOGGER.info("[perf] [" + PF_TAG + "] " + fmt, args);
+    }
+
+    private static long pfUsedHeapMb() {
+        System.gc();
+        System.gc();
+        Runtime r = Runtime.getRuntime();
+        return (r.totalMemory() - r.freeMemory()) >> 20;
+    }
+
+    private static long pfDirectMb() {
+        long t = 0;
+        for (var b : java.lang.management.ManagementFactory.getPlatformMXBeans(java.lang.management.BufferPoolMXBean.class)) t += b.getMemoryUsed();
+        return t >> 20;
+    }
+
+    /**
+     * Rendimiento: ventana a 1920x1080, bosque (o donde este P1 si no hay), lluvia y ~60 animales; para cada numero de jugadores
+     * (CONSOLEPAD_PERF_NS, por defecto 1,2,3,4) mide CPU del hilo principal, GPU (consultas de tiempo), FPS, memoria del monton y
+     * secciones/entidades dibujadas por jugador. Las lineas "[perf]" llevan la etiqueta CONSOLEPAD_PERF_TAG. Restaura todo al acabar.
+     */
+    private static void perfTest(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        switch (pfPhase) {
+            case 0 -> { // ventana
+                com.mojang.blaze3d.platform.Window window = mc.getWindow();
+                if (ticks == 1) {
+                    pfPrevRd = mc.options.renderDistance().get();
+                    pfPrevFps = mc.options.framerateLimit().get();
+                    pfPrevVsync = mc.options.enableVsync().get();
+                    org.lwjgl.glfw.GLFW.glfwSetWindowSize(window.getWindow(), 1920, 1080);
+                    mc.options.enableVsync().set(false);
+                    mc.options.framerateLimit().set(260);
+                    pfP1Pos = mc.player.position();
+                    pfP1Yaw = mc.player.getYRot();
+                    PlayerContext c = SecondaryPlayers.context();
+                    pfP2Pos = c != null && c.player != null ? c.player.position() : null;
+                    SplitView.enabled = true;
+                    server.execute(() -> pfPrevRain = server.overworld().isRaining());
+                }
+                if (ticks >= 60) {
+                    pf("ventana {}x{}, escala de interfaz {}, distancia de renderizado {}, GPU timer={}", window.getWidth(), window.getHeight(),
+                            window.getGuiScale(), mc.options.renderDistance().get(), PerfProbe.gpuAvailable());
+                    pfPhase = 1;
+                    ticks = 0;
+                }
+            }
+            case 1 -> { // buscar bosque, mover a P1, entidades y lluvia
+                if (ticks == 1) {
+                    net.minecraft.server.level.ServerLevel level = server.overworld();
+                    ServerPlayer sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+                    server.execute(() -> {
+                        var found = level.findClosestBiome3d(h -> h.is(net.minecraft.tags.BiomeTags.IS_FOREST), sp1.blockPosition(), 6400, 32, 64);
+                        net.minecraft.core.BlockPos at = found != null ? found.getFirst() : sp1.blockPosition();
+                        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ());
+                        pfBase = new net.minecraft.core.BlockPos(at.getX(), y, at.getZ());
+                        pfLog = "bioma " + (found != null ? found.getSecond().unwrapKey().map(k -> k.location().toString()).orElse("?") : "ninguno (posicion de P1)") + " en " + pfBase;
+                        sp1.teleportTo(level, pfBase.getX() + 0.5, y, pfBase.getZ() + 0.5, PF_YAWS[0], 0f);
+                        level.setWeatherParameters(0, 24000, true, false);
+                    });
+                }
+                if (ticks == 40 && pfBase != null) {
+                    pf("{}", pfLog);
+                    pfPhase = 2;
+                    pfN = 0;
+                    ticks = 0;
+                }
+            }
+            case 2 -> { // pone el numero de jugadores
+                int want = PF_COUNTS[pfN];
+                if (ticks == 1) {
+                    for (int slot = 1; slot < want; slot++) if (!SecondaryPlayers.isActive(slot)) SecondaryPlayers.join(mc, slot);
+                }
+                if (ticks > 1 && leaveTo(mc, want)) {
+                    boolean ready = true;
+                    for (int slot = 1; slot < want; slot++) ready &= extraReady(mc, slot);
+                    if (!ready && ticks < 1500) return;
+                    if (!ready) { pf("jugadores no listos"); pfPhase = 90; return; }
+                    net.minecraft.server.level.ServerLevel level = server.overworld();
+                    int n = want;
+                    server.execute(() -> {
+                        for (int slot = 0; slot < n; slot++) {
+                            ServerPlayer sp = slot == 0 ? server.getPlayerList().getPlayer(mc.player.getUUID()) : serverExtra(mc, slot);
+                            if (sp == null) continue;
+                            int x = pfBase.getX() + (int) PF_OFFSETS[slot][0], z = pfBase.getZ() + (int) PF_OFFSETS[slot][1];
+                            int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                            sp.teleportTo(level, x + 0.5, y, z + 0.5, PF_YAWS[slot], 0f);
+                        }
+                        if (pfEntities.isEmpty()) {
+                            net.minecraft.world.entity.EntityType<?>[] types = {net.minecraft.world.entity.EntityType.COW, net.minecraft.world.entity.EntityType.SHEEP,
+                                    net.minecraft.world.entity.EntityType.PIG, net.minecraft.world.entity.EntityType.CHICKEN};
+                            java.util.Random rnd = new java.util.Random(7);
+                            for (int i = 0; i < 60; i++) {
+                                int x = pfBase.getX() - 20 + rnd.nextInt(40), z = pfBase.getZ() - 20 + rnd.nextInt(40);
+                                int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                                var e = types[i % types.length].spawn(level, new net.minecraft.core.BlockPos(x, y, z), net.minecraft.world.entity.MobSpawnType.COMMAND);
+                                if (e != null) pfEntities.add(e);
+                            }
+                        }
+                    });
+                    pfPhase = 3;
+                    ticks = 0;
+                }
+            }
+            case 3 -> { // espera a que carguen y se construyan las mallas, despues calienta
+                if (ticks == 600) {
+                    long used = pfUsedHeapMb();
+                    pfHeap = used;
+                    PerfProbe.start();
+                    pfPhase = 4;
+                    ticks = 0;
+                }
+            }
+            case 4 -> {
+                if (ticks < 300) return;
+                PerfProbe.stop();
+                PerfProbe.Result r = PerfProbe.result();
+                int n = PF_COUNTS[pfN];
+                Runtime rt = Runtime.getRuntime();
+                long used = pfUsedHeapMb();
+                StringBuilder sec = new StringBuilder();
+                sec.append("P1: ").append(pfSafe(mc.levelRenderer::getSectionStatistics));
+                for (int slot = 1; slot < n; slot++) {
+                    PlayerContext c = SecondaryPlayers.context(slot);
+                    if (c != null && c.renderer instanceof SplitLevelRenderer sr && sr.isLive()) sec.append(" | P").append(slot + 1).append(": ").append(pfSafe(sr::getSectionStatistics));
+                }
+                StringBuilder ent = new StringBuilder("P1: ").append(pfSafe(mc.levelRenderer::getEntityStatistics));
+                for (int slot = 1; slot < n; slot++) {
+                    PlayerContext c = SecondaryPlayers.context(slot);
+                    if (c != null && c.renderer instanceof SplitLevelRenderer sr && sr.isLive()) ent.append(" | P").append(slot + 1).append(": ").append(pfSafe(sr::getEntityStatistics));
+                }
+                pf("N={} fotogramas={} FPS={} frameMs={} cpuRenderMs={} cpuTickMs/fotograma={} gpuMs={} cuello={} montonUsadoMB={} (antes de medir {}) montonMaxMB={} directaMB={} extraMB/jugador={}",
+                        n, r.frames(), String.format(java.util.Locale.ROOT, "%.1f", r.fps()), f2(r.frameMs()), f2(r.renderCpuMs()), f2(r.tickCpuMsPerFrame()), f2(r.gpuMs()),
+                        r.bottleneck(), used, pfHeap, rt.maxMemory() >> 20, pfDirectMb(), pfPrevUsed < 0 ? "-" : String.valueOf(used - pfPrevUsed));
+                pf("N={} ticks={} maxTickMs={} duracionMs={} msPorTick={}", n, r.tickCalls(), f2(r.tickMaxMs()), f2(r.wallMs()), f2(r.tickCpuMsPerFrame() * r.frames() / Math.max(1, r.tickCalls())));
+                pf("N={} cpuPorPasada={} gpuPorPasada={}", n, fmtMap(r.cpuByPass()), fmtMap(r.gpuByPass()));
+                pf("N={} secciones {}", n, sec);
+                pf("N={} entidades {}", n, ent);
+                pfPrevUsed = used;
+                pfN++;
+                if (pfN >= PF_COUNTS.length) {
+                    pfPhase = 90;
+                } else {
+                    pfPhase = 2;
+                }
+                ticks = 0;
+            }
+            case 90 -> { // restaura
+                if (ticks == 1) {
+                    for (var e : pfEntities) {
+                        var ee = e;
+                        server.execute(ee::discard);
+                    }
+                    pfEntities.clear();
+                    mc.options.renderDistance().set(pfPrevRd);
+                    mc.options.framerateLimit().set(pfPrevFps);
+                    mc.options.enableVsync().set(pfPrevVsync);
+                    server.execute(() -> {
+                        server.overworld().setWeatherParameters(pfPrevRain ? 0 : 24000, pfPrevRain ? 6000 : 0, pfPrevRain, false);
+                        ServerPlayer sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+                        sp1.teleportTo(server.overworld(), pfP1Pos.x, pfP1Pos.y, pfP1Pos.z, pfP1Yaw, 0f);
+                    });
+                }
+                if (leaveTo(mc, 1) && ticks > 20) {
+                    SecondaryPlayers.join(mc);
+                    pfPhase = 91;
+                    ticks = 0;
+                }
+            }
+            case 91 -> {
+                if (ticks > 40 && extraReady(mc, 1)) {
+                    ServerPlayer p2 = serverP2(mc);
+                    if (pfP2Pos != null) server.execute(() -> p2.teleportTo(server.overworld(), pfP2Pos.x, pfP2Pos.y, pfP2Pos.z, 0f, 0f));
+                    pf("restaurado");
+                    pfPhase = 92;
+                    ticks = 0;
+                }
+            }
+            case 92 -> {
+                if (ticks > 40) {
+                    ConsolePad.LOGGER.info("[autotest] RESULTADO rendimiento [{}] terminado -> OK", PF_TAG);
+                    next();
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private static String pfSafe(java.util.function.Supplier<String> s) {
+        try {
+            return s.get();
+        } catch (RuntimeException e) {
+            return "n/d (" + e.getClass().getSimpleName() + ")";
+        }
+    }
+
+    private static String pfLog = "";
+    private static long pfHeap;
+
+    private static String f2(double v) {
+        return String.format(java.util.Locale.ROOT, "%.2f", v);
+    }
+
+    private static String fmtMap(java.util.Map<String, Double> m) {
+        StringBuilder sb = new StringBuilder("{");
+        for (var e : m.entrySet()) sb.append(e.getKey()).append('=').append(f2(e.getValue())).append(' ');
+        return sb.append('}').toString();
     }
 
     private static void next() {

@@ -31,6 +31,16 @@ public abstract class GameRendererMixin {
         SplitRender.renderLevels(self, deltaTracker);
     }
 
+    @Inject(method = "render", at = @At("HEAD"))
+    private void consolepad$perfBegin(DeltaTracker deltaTracker, boolean renderLevel, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        dev.consolepad.split.PerfProbe.frameBegin();
+    }
+
+    @Inject(method = "render", at = @At("RETURN"))
+    private void consolepad$perfEnd(DeltaTracker deltaTracker, boolean renderLevel, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        dev.consolepad.split.PerfProbe.frameEnd();
+    }
+
     /** El HUD se divide igual que el mundo (SplitHud). */
     @Redirect(method = "render",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"))
