@@ -76,3 +76,11 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **El usuario puede tener mandos reales conectados durante el autotest (hasta 3 en los slots 0 a 2):** una prueba no puede suponer que un slot tiene un mando virtual ni desenchufarlo; los mandos reales se quedan, y su estado se suma al simulado. Para volver a empezar el reloj de un aviso usar `JoinPrompt.forget`.
 - **Con la ventana sin foco vanilla abre el menu de pausa de P1** (`pauseOnLostFocus`): el autotest lo desactiva mientras corre y `PadDriver` no exige foco si `AutoTest.running()`.
 
+
+### Reglas aprendidas de la tanda Bedrock (iconos, crafteo estilo consola; entradas del 2026-10-09 de `routing-log.md`)
+
+- **El crafteo por mando no necesita tocar el servidor:** el libro de recetas de vanilla coloca la receta con `handlePlaceRecipe` (`ServerboundPlaceRecipePacket`). `ConsoleCraft` solo lo maneja (accessors de `RecipeBookComponent`/`RecipeBookPage`) y recoge el resultado con un mover rapido. La marca "fabricable" del cliente puede ir retrasada: no condicionar la accion a ella.
+- **El estado del libro es por jugador y se guarda en el servidor** (abierto/cerrado y filtro "solo fabricables"): una prueba debe fijarlo y restaurarlo (con el filtro activo P2 solo veia 4 recetas). Las recetas 3x3 no salen en el libro del inventario (cuadricula 2x2).
+- **Los iconos de botones salen de `tools/PromptAtlas.java`** (`java tools/PromptAtlas.java` desde la raiz; sin Python/PIL). Un boton sin icono mide 0 y no dibuja; el orden de `ICONS` debe coincidir con `PadIcons.Icon`.
+- **Pruebas de pantallas especiales:** un yunque sin bloque debajo cae y cierra la pantalla; el aldeano necesita `villager.setTradingPlayer(player)` antes de `openTradingScreen`; las opciones de encantamiento sin coste no son destino.
+- **Los scripts de Python con comillas triples o apostrofes se escriben con Write** y se ejecutan con `python script.py args`, nunca con heredoc de shell. Cuidado con `cd` dentro de una cadena larga: `tools/run-autotest.sh` se busca desde la raiz.

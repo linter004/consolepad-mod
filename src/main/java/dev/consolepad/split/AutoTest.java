@@ -2031,6 +2031,161 @@ public final class AutoTest {
         }
     }
 
+    // ---------------------------------------------------------------- encantamientos, yunque y aldeanos con el mando
+
+    private static boolean eyOk = true;
+    private static net.minecraft.core.BlockPos eyPos;
+    private static net.minecraft.world.level.GameType eyPrevMode;
+
+    private static void eyVerdict(String name, boolean ok) {
+        eyOk &= ok;
+        ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
+    }
+
+    private static boolean eyHasTarget(java.util.List<double[]> targets, double x, double y) {
+        for (double[] t : targets) {
+            if (Math.abs(t[0] - x) < 1.5 && Math.abs(t[1] - y) < 1.5) return true;
+        }
+        return false;
+    }
+
+    private static void eyClose(Minecraft mc, PlayerContext c) {
+        ContextSwitcher.run(c, () -> {
+            if (c.screen != null) c.screen.onClose();
+        });
+    }
+
+    /**
+     * Pantallas con botones que no son huecos: la mesa de encantamientos (3 opciones dibujadas a mano), el yunque (campo del nombre) y el aldeano (ofertas).
+     * El D-pad y A tienen que poder llegar a ellos: los destinos de salto los incluyen, A sobre una opcion encanta (en creativo no cuesta) y A sobre el campo del yunque
+     * abre el teclado en pantalla.
+     */
+    private static void enchantAnvilTradeTest(Minecraft mc) {
+        PlayerContext c = SecondaryPlayers.context(1);
+        if (c == null) {
+            next();
+            return;
+        }
+        int t = ticks;
+        ServerPlayer p2 = serverP2(mc);
+        var screen = c.screen;
+        if (t == 1) {
+            eyPrevMode = p2.gameMode.getGameModeForPlayer();
+            SecondaryTick.scriptActive = true;
+            SecondaryTick.scriptForward = 0f;
+            mc.getSingleplayerServer().execute(() -> {
+                p2.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
+                eyPos = p2.blockPosition().above(3); // sobre un bloque de piedra: el yunque se cae si no tiene apoyo
+                ServerLevel level = (ServerLevel) p2.level();
+                level.setBlockAndUpdate(eyPos.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+                level.setBlockAndUpdate(eyPos, net.minecraft.world.level.block.Blocks.ENCHANTING_TABLE.defaultBlockState());
+                p2.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inv, pl) -> new net.minecraft.world.inventory.EnchantmentMenu(id, inv,
+                        net.minecraft.world.inventory.ContainerLevelAccess.create(level, eyPos)), net.minecraft.network.chat.Component.literal("Enchant")));
+                p2.containerMenu.getSlot(0).set(new ItemStack(Items.DIAMOND_SWORD));
+                p2.containerMenu.broadcastChanges();
+            });
+        }
+        if (t == 50) {
+            boolean ench = screen instanceof net.minecraft.client.gui.screens.inventory.EnchantmentScreen;
+            eyVerdict("mesa de encantamientos abierta en P2: " + (screen == null ? "null" : screen.getClass().getSimpleName()), ench);
+            if (ench) {
+                var es = (net.minecraft.client.gui.screens.inventory.EnchantmentScreen) screen;
+                var targets = SecondaryScreens.targets(screen);
+                int found = 0, enabled = 0;
+                for (int k = 0; k < 3; k++) {
+                    if (es.getMenu().costs[k] > 0) enabled++; // las opciones sin coste estan desactivadas y no son destino
+                    if (eyHasTarget(targets, es.getGuiLeft() + 114, es.getGuiTop() + 14 + 19 * k + 9.5)) found++;
+                }
+                eyVerdict("encantamientos: el D-pad llega a las opciones activas (" + found + " destinos de " + enabled + " activas; costes " + es.getMenu().costs[0] + "," + es.getMenu().costs[1] + "," + es.getMenu().costs[2] + ")", found == enabled && enabled >= 1);
+                c.cursorX = es.getGuiLeft() + 114;
+                c.cursorY = es.getGuiTop() + 14 + 9.5;
+            }
+        }
+        if (t == 56) simSlot(1, 1 << PadState.A);
+        if (t == 62) simSlot(1, 0);
+        if (t == 90) {
+            boolean enchanted = p2.containerMenu.getSlot(0).getItem().isEnchanted();
+            eyVerdict("encantamientos: A sobre la primera opcion encanta la espada (encantada=" + enchanted + ")", enchanted);
+            eyClose(mc, c);
+        }
+        if (t == 105) {
+            mc.getSingleplayerServer().execute(() -> {
+                ServerLevel level = (ServerLevel) p2.level();
+                level.setBlockAndUpdate(eyPos, net.minecraft.world.level.block.Blocks.ANVIL.defaultBlockState());
+                p2.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inv, pl) -> new net.minecraft.world.inventory.AnvilMenu(id, inv,
+                        net.minecraft.world.inventory.ContainerLevelAccess.create(level, eyPos)), net.minecraft.network.chat.Component.literal("Anvil")));
+                p2.containerMenu.getSlot(0).set(new ItemStack(Items.IRON_SWORD));
+                p2.containerMenu.broadcastChanges();
+            });
+        }
+        if (t == 150) {
+            boolean anvil = c.screen instanceof net.minecraft.client.gui.screens.inventory.AnvilScreen;
+            eyVerdict("yunque abierto en P2: " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName()), anvil);
+            net.minecraft.client.gui.components.EditBox box = null;
+            if (anvil) {
+                for (var child : c.screen.children()) {
+                    if (child instanceof net.minecraft.client.gui.components.EditBox e) box = e;
+                }
+            }
+            boolean listed = false;
+            if (box != null) {
+                listed = eyHasTarget(SecondaryScreens.targets(c.screen), box.getX() + box.getWidth() / 2.0, box.getY() + box.getHeight() / 2.0);
+                c.cursorX = box.getX() + box.getWidth() / 2.0;
+                c.cursorY = box.getY() + box.getHeight() / 2.0;
+            }
+            eyVerdict("yunque: el campo del nombre es un destino del D-pad (" + listed + ")", listed);
+        }
+        if (t == 156) simSlot(1, 1 << PadState.A);
+        if (t == 162) simSlot(1, 0);
+        if (t == 175) {
+            eyVerdict("yunque: A sobre el campo del nombre abre el teclado en pantalla (activo=" + PadKeyboard.of(1).active() + ")", PadKeyboard.of(1).active());
+            simSlot(1, 1 << PadState.B);
+        }
+        if (t == 181) simSlot(1, 0);
+        if (t == 195) {
+            eyVerdict("yunque: B cierra el teclado y la pantalla sigue abierta (teclado=" + PadKeyboard.of(1).active() + ", pantalla " + c.screen + ")",
+                    !PadKeyboard.of(1).active() && c.screen != null);
+            eyClose(mc, c);
+        }
+        if (t == 210) {
+            mc.getSingleplayerServer().execute(() -> {
+                ServerLevel level = (ServerLevel) p2.level();
+                var villager = new net.minecraft.world.entity.npc.Villager(net.minecraft.world.entity.EntityType.VILLAGER, level);
+                villager.setVillagerData(villager.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.FARMER));
+                villager.setTradingPlayer(p2); // MerchantMenu.stillValid exige que el aldeano comercie con este jugador
+                villager.openTradingScreen(p2, net.minecraft.network.chat.Component.literal("Trade"), 1);
+            });
+        }
+        if (t == 260) {
+            boolean trade = c.screen instanceof net.minecraft.client.gui.screens.inventory.MerchantScreen;
+            int buttons = 0;
+            boolean allListed = true;
+            if (trade) {
+                var targets = SecondaryScreens.targets(c.screen);
+                for (var child : c.screen.children()) {
+                    if (child instanceof net.minecraft.client.gui.components.Button b && b.visible && b.active) {
+                        buttons++;
+                        allListed &= eyHasTarget(targets, b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0);
+                    }
+                }
+            }
+            eyVerdict("aldeano: pantalla " + (c.screen == null ? "null" : c.screen.getClass().getSimpleName()) + ", " + buttons + " ofertas activas, todas son destinos del D-pad=" + allListed, trade && buttons >= 1 && allListed);
+            eyClose(mc, c);
+        }
+        if (t == 285) {
+            mc.getSingleplayerServer().execute(() -> {
+                ((ServerLevel) p2.level()).setBlockAndUpdate(eyPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                ((ServerLevel) p2.level()).setBlockAndUpdate(eyPos.below(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                p2.setGameMode(eyPrevMode);
+            });
+        }
+        if (t == 300) {
+            ConsolePad.LOGGER.info("[autotest] RESULTADO encantamientos, yunque y aldeano con el mando en conjunto -> {}", eyOk ? "OK" : "FALLO");
+            SecondaryTick.scriptActive = false;
+            next();
+        }
+    }
+
     // ---------------------------------------------------------------- entradas simultaneas de P3 y P4 (excepcion "No value with id -1")
 
     private static final int JB_CYCLES = 10;
@@ -4756,6 +4911,7 @@ public final class AutoTest {
             case 42 -> iconTest(mc);
             case 43 -> consoleCraftTest(mc);
             case 44 -> furnaceChestTest(mc);
+            case 45 -> enchantAnvilTradeTest(mc);
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida

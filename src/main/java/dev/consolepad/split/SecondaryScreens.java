@@ -209,6 +209,19 @@ public final class SecondaryScreens {
                 if (sl.isActive()) out.add(new double[] {c.getGuiLeft() + sl.x + 8, c.getGuiTop() + sl.y + 8, 16, 16});
             }
             out.addAll(ConsoleCraft.extraTargets(screen)); // libro de recetas abierto: recetas, paginas y filtro
+            // Botones y campos propios de la pantalla (ofertas del aldeano, nombre del yunque...), salvo el boton del libro (lo abre L3).
+            for (var child : screen.children()) {
+                if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible
+                        && !(w instanceof net.minecraft.client.gui.components.ImageButton)) {
+                    out.add(new double[] {w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, w.getWidth(), w.getHeight()});
+                }
+            }
+            // Las tres opciones de la mesa de encantamientos no son widgets: se dibujan y se pulsan a mano (EnchantmentScreen.mouseClicked).
+            if (screen instanceof net.minecraft.client.gui.screens.inventory.EnchantmentScreen es) {
+                for (int k = 0; k < 3; k++) {
+                    if (es.getMenu().costs[k] > 0) out.add(new double[] {es.getGuiLeft() + 60 + 54, es.getGuiTop() + 14 + 19 * k + 9.5, 108, 19});
+                }
+            }
         } else {
             for (var child : screen.children()) {
                 if (child instanceof net.minecraft.client.gui.components.AbstractWidget w && w.active && w.visible) {
