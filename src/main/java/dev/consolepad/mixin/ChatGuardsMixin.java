@@ -27,6 +27,21 @@ public abstract class ChatGuardsMixin {
         }
     }
 
+    /**
+     * El historial del chat de P1 no se dibuja mientras tiene abierta una pantalla de contenedor (inventario, cofre...): se cruzaba con ella. El chat
+     * propio (ChatScreen) y los menus siguen como en vanilla. Los extra hacen lo mismo en SplitNotices.
+     */
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    private void consolepad$hideOverContainer(net.minecraft.client.gui.GuiGraphics graphics, int tickCount, int mouseX, int mouseY, boolean focused, CallbackInfo ci) {
+        if (ContextSwitcher.isSecondaryActive()) return;
+        if (net.minecraft.client.Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) {
+            dev.consolepad.split.SplitDiag.p1ChatHidden++;
+            ci.cancel();
+        } else {
+            dev.consolepad.split.SplitDiag.p1ChatShown++;
+        }
+    }
+
     /** Con la pantalla dividida el chat de P1 no puede ser mas ancho que su region (320 unidades se saldrian a la region de otro jugador). */
     @Inject(method = "getWidth()I", at = @At("RETURN"), cancellable = true)
     private void consolepad$regionWidth(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> cir) {

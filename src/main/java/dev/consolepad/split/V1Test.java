@@ -53,8 +53,35 @@ public final class V1Test {
             case 2 -> {
                 if (Settings2Test.tickSeq()) {
                     Settings2Test.seq = new ArrayList<>();
-                    phase = 99;
+                    phase = 3;
                 }
+            }
+            case 3 -> { // chat sobre el inventario con 1 jugador
+                if (!AutoTest.leaveTo(mc, 1)) return false;
+                chatOverContainerSetup(mc, 1);
+                phase = 4;
+            }
+            case 4 -> {
+                if (Settings2Test.tickSeq()) {
+                    Settings2Test.seq = new ArrayList<>();
+                    phase = 5;
+                }
+            }
+            case 5 -> { // y con 4
+                if (!AutoTest.joinTo(mc, 4)) return false;
+                chatOverContainerSetup(mc, 4);
+                phase = 6;
+            }
+            case 6 -> {
+                if (Settings2Test.tickSeq()) {
+                    Settings2Test.seq = new ArrayList<>();
+                    phase = 7;
+                }
+            }
+            case 7 -> { // la casilla acaba con P2 dentro (leaveTest lo necesita)
+                if (!AutoTest.leaveTo(mc, 2)) return false;
+                if (!AutoTest.joinTo(mc, 2)) return false;
+                phase = 99;
             }
             default -> {
                 ConsolePad.LOGGER.info("[autotest] RESULTADO cierre de la v1 en conjunto -> {}", Settings2Test.allOk ? "OK" : "FALLO");
@@ -166,5 +193,97 @@ public final class V1Test {
                         });
                     }
                 }, () -> screen.get() == null));
+    }
+
+    // ---------------------------------------------------------------- tarea 2: chat largo sobre el inventario
+
+    private static void sayAll(Minecraft mc, String tag) {
+        var server = mc.getSingleplayerServer();
+        server.execute(() -> {
+            for (int i = 0; i < 6; i++) server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal(tag + " linea " + i + " de un chat largo"), false);
+        });
+    }
+
+    private static void forEachPlayer(Minecraft mc, int n, java.util.function.IntConsumer body) {
+        for (int slot = 0; slot < n; slot++) body.accept(slot);
+    }
+
+    private static int extrasLines(int n) {
+        int min = Integer.MAX_VALUE, max = 0;
+        for (int slot = 1; slot < n; slot++) {
+            PlayerContext c = SecondaryPlayers.context(slot);
+            int v = c == null ? -1 : c.chatLinesDrawn;
+            min = Math.min(min, v);
+            max = Math.max(max, v);
+        }
+        return n == 1 ? 0 : (max == 0 ? 0 : min);
+    }
+
+    private static void chatOverContainerSetup(Minecraft mc, int n) {
+        String who = n + " jugador" + (n > 1 ? "es" : "");
+        int[] base = new int[2];
+        Settings2Test.startSeq(
+                Settings2Test.step(who + ": prepara (sin pantallas) y escribe 6 lineas de chat", 25, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        if (mc.screen != null) mc.setScreen(null);
+                        forEachPlayer(mc, n, slot -> {
+                            PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                            if (c != null && c.screen != null) ContextSwitcher.run(c, () -> mc.setScreen(null));
+                        });
+                        sayAll(mc, "A");
+                    }
+                    if (Settings2Test.seqTick == 12) {
+                        base[0] = SplitDiag.p1ChatShown;
+                        base[1] = SplitDiag.p1ChatHidden;
+                    }
+                }, () -> SplitDiag.p1ChatShown > base[0] && SplitDiag.p1ChatHidden == base[1] && (n == 1 || extrasLines(n) > 0)),
+                Settings2Test.step(who + ": abre el inventario de todos", 4, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        forEachPlayer(mc, n, slot -> {
+                            PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                            if (slot == 0) mc.setScreen(new InventoryScreen(mc.player));
+                            else ContextSwitcher.run(c, () -> mc.setScreen(new InventoryScreen(mc.player)));
+                        });
+                        sayAll(mc, "B");
+                    }
+                }, null),
+                Settings2Test.step(who + ": con un contenedor abierto nadie dibuja el historial", 4, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        base[0] = SplitDiag.p1ChatShown;
+                        base[1] = SplitDiag.p1ChatHidden;
+                    }
+                }, null),
+                Settings2Test.step(who + ": con un contenedor abierto el chat de cada jugador se oculta (P1 oculto en varios fotogramas, 0 dibujado; extras 0 lineas)", 20, () -> { },
+                        () -> SplitDiag.p1ChatShown == base[0] && SplitDiag.p1ChatHidden > base[1] + 5
+                                && (n == 1 || (allExtrasHaveScreen(n) && extrasLinesAll(n, 0)))),
+                Settings2Test.step(who + ": cierra los inventarios", 4, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        forEachPlayer(mc, n, slot -> {
+                            PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                            if (slot == 0) mc.setScreen(null);
+                            else ContextSwitcher.run(c, () -> mc.setScreen(null));
+                        });
+                        sayAll(mc, "C");
+                        base[0] = SplitDiag.p1ChatShown;
+                    }
+                }, null),
+                Settings2Test.step(who + ": sin pantallas el chat vuelve en todos", 20, () -> { },
+                        () -> SplitDiag.p1ChatShown > base[0] + 5 && (n == 1 || extrasLines(n) > 0)));
+    }
+
+    private static boolean allExtrasHaveScreen(int n) {
+        for (int slot = 1; slot < n; slot++) {
+            PlayerContext c = SecondaryPlayers.context(slot);
+            if (c == null || !(c.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) return false;
+        }
+        return true;
+    }
+
+    private static boolean extrasLinesAll(int n, int expected) {
+        for (int slot = 1; slot < n; slot++) {
+            PlayerContext c = SecondaryPlayers.context(slot);
+            if (c == null || c.chatLinesDrawn != expected) return false;
+        }
+        return true;
     }
 }

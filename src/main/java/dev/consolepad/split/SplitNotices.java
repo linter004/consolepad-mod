@@ -57,10 +57,12 @@ public final class SplitNotices {
         int hudW = c.safeW > 0 ? c.safeW : c.hudW, hudH = c.safeH > 0 ? c.safeH : c.hudH; // dentro de su zona segura
         int y = hudH - 62; // por encima de las barras de vida y comida
         int drawn = 0;
+        int chatLines = 0;
         int widest = 0;
+        boolean showChat = !(c.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>); // el historial no se cruza con un contenedor
         int maxWidth = Math.max(40, hudW - 12); // cada aviso se parte en lineas al ancho de la region
         java.util.List<PlayerContext.Notice> lines = new java.util.ArrayList<>(c.notices);
-        for (int i = lines.size() - 1; i >= 0 && drawn < MAX_VISIBLE_LINES && y > 12; i--) {
+        for (int i = lines.size() - 1; showChat && i >= 0 && drawn < MAX_VISIBLE_LINES && y > 12; i--) {
             PlayerContext.Notice n = lines.get(i);
             long age = now - n.tick();
             if (age > CHAT_TICKS) continue;
@@ -72,6 +74,7 @@ public final class SplitNotices {
                 g.drawString(font, parts.get(p), 4, y, 0xFFFFFF | (Math.max(alpha, 4) << 24));
                 y -= 10;
                 drawn++;
+                chatLines++;
             }
         }
         if (c.overlay != null && c.overlayTime > 0) {
@@ -87,6 +90,7 @@ public final class SplitNotices {
             drawn++;
         }
         c.noticesDrawn = drawn;
+        c.chatLinesDrawn = chatLines;
         c.noticeMaxWidth = widest;
         SplitDiag.onHudLayer("avisos", c.player, c.hudW);
     }

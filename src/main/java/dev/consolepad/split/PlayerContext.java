@@ -47,6 +47,8 @@ public final class PlayerContext {
     public net.minecraft.network.chat.Component title;
     public int titleTime;
     public volatile int noticesDrawn;
+    /** Lineas de chat dibujadas en el ultimo fotograma (0 con una pantalla de contenedor abierta: el historial se oculta para no cruzarse con ella). */
+    public volatile int chatLinesDrawn;
     /** Ancho (unidades de su HUD) de la linea de avisos mas ancha dibujada: debe caber en su region. */
     public volatile int noticeMaxWidth;
     /** Estado de la entrada de su mando entre ticks. */
