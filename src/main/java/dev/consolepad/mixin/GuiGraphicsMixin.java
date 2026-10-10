@@ -18,6 +18,14 @@ public abstract class GuiGraphicsMixin {
         dev.consolepad.split.SplitDiag.onItem(stack, x, y);
     }
 
+    /** Diagnostico: tooltips dibujados por jugador (el del contexto activo). */
+    @Inject(method = "renderTooltipInternal", at = @At("HEAD"))
+    private void consolepad$diagTooltip(net.minecraft.client.gui.Font font, java.util.List<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent> components,
+                                        int x, int y, net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner positioner,
+                                        org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (!components.isEmpty()) dev.consolepad.split.SplitDiag.tooltipsDrawn[dev.consolepad.split.ReduceEffects.contextSlot()]++;
+    }
+
     @org.spongepowered.asm.mixin.Shadow
     public abstract com.mojang.blaze3d.vertex.PoseStack pose();
 

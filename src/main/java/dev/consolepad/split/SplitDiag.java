@@ -25,6 +25,8 @@ public final class SplitDiag {
     public static final int[] particlesDrawn = new int[4], particlesForeign = new int[4];
     /** Fotogramas en que el chat de P1 se dibujo / se oculto por tener un contenedor abierto (ChatGuardsMixin). */
     public static volatile int p1ChatShown, p1ChatHidden;
+    /** Veces que se dibujo / se oculto (pantalla abierta) el nombre del objeto seleccionado, y tooltips de objetos dibujados, por jugador. */
+    public static final int[] itemNameShown = new int[4], itemNameHidden = new int[4], tooltipsDrawn = new int[4];
     public static volatile String lastPacketError = "";
 
     public static volatile boolean recording;

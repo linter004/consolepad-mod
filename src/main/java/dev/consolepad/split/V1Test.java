@@ -70,6 +70,13 @@ public final class V1Test {
             case 4 -> {
                 if (Settings2Test.tickSeq()) {
                     Settings2Test.seq = new ArrayList<>();
+                    itemNameSetup(mc, 1);
+                    phase = 40;
+                }
+            }
+            case 40 -> {
+                if (Settings2Test.tickSeq()) {
+                    Settings2Test.seq = new ArrayList<>();
                     phase = 5;
                 }
             }
@@ -79,6 +86,13 @@ public final class V1Test {
                 phase = 6;
             }
             case 6 -> {
+                if (Settings2Test.tickSeq()) {
+                    Settings2Test.seq = new ArrayList<>();
+                    itemNameSetup(mc, 4);
+                    phase = 41;
+                }
+            }
+            case 41 -> {
                 if (Settings2Test.tickSeq()) {
                     Settings2Test.seq = new ArrayList<>();
                     phase = 7;
@@ -265,6 +279,112 @@ public final class V1Test {
             max = Math.max(max, v);
         }
         return n == 1 ? 0 : (max == 0 ? 0 : min);
+    }
+
+    // ---------------------------------------------------------------- nombre del objeto seleccionado y tooltips con pantalla abierta
+
+    /** Fuerza el nombre del objeto seleccionado visible en el HUD de cada jugador (el tick de vanilla lo apaga si la mano esta vacia). */
+    private static void forceItemName(Minecraft mc, int n) {
+        ItemStack show = new ItemStack(Items.DIAMOND_PICKAXE);
+        var gs = (dev.consolepad.mixin.GuiStateAccessor) mc.gui;
+        gs.consolepad$setLastToolHighlight(show);
+        gs.consolepad$setToolHighlightTimer(100);
+        for (int slot = 1; slot < n; slot++) {
+            PlayerContext c = SecondaryPlayers.context(slot);
+            if (c == null) continue;
+            c.hud.lastToolHighlight = show;
+            c.hud.toolHighlightTimer = 100;
+        }
+    }
+
+    private static boolean itemNameAll(int n, int[] counter, int[] base, boolean grew) {
+        for (int slot = 0; slot < n; slot++) if (grew ? counter[slot] <= base[slot] : counter[slot] != base[slot]) return false;
+        return true;
+    }
+
+    /**
+     * El nombre del objeto seleccionado no atraviesa las pantallas: sin pantalla se dibuja en el HUD de cada jugador; con el inventario
+     * abierto no se dibuja (ni en P1 ni en los extra), y vuelve al cerrarlo. El tooltip de un objeto bajo el cursor si se dibuja.
+     */
+    private static void itemNameSetup(Minecraft mc, int n) {
+        String who = n + " jugador" + (n > 1 ? "es" : "");
+        int[] shownBase = new int[4], hiddenBase = new int[4], tipBase = new int[4];
+        ItemStack[][] saved = new ItemStack[n][];
+        Runnable snap = () -> {
+            System.arraycopy(SplitDiag.itemNameShown, 0, shownBase, 0, 4);
+            System.arraycopy(SplitDiag.itemNameHidden, 0, hiddenBase, 0, 4);
+            System.arraycopy(SplitDiag.tooltipsDrawn, 0, tipBase, 0, 4);
+        };
+        Runnable closeAll = () -> forEachPlayer(mc, n, slot -> {
+            PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+            if (slot == 0) mc.setScreen(null);
+            else ContextSwitcher.run(c, () -> mc.setScreen(null));
+        });
+        Settings2Test.startSeq(
+                Settings2Test.step(who + ": prepara (sin pantallas, un diamante en el hueco 20 de cada uno)", 12, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        closeAll.run();
+                        var server = mc.getSingleplayerServer();
+                        server.execute(() -> {
+                            for (int slot = 0; slot < n; slot++) {
+                                PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                                ServerPlayer sp = server.getPlayerList().getPlayer(slot == 0 ? mc.player.getUUID() : c.player.getUUID());
+                                saved[slot] = new ItemStack[] {sp.getInventory().getItem(20).copy()};
+                                sp.getInventory().setItem(20, new ItemStack(Items.DIAMOND));
+                            }
+                        });
+                    }
+                    forceItemName(mc, n);
+                }, null),
+                Settings2Test.step(who + ": sin pantalla el nombre del objeto se dibuja en el HUD de todos", 20, () -> {
+                    if (Settings2Test.seqTick == 0) snap.run();
+                    forceItemName(mc, n);
+                }, () -> itemNameAll(n, SplitDiag.itemNameShown, shownBase, true) && itemNameAll(n, SplitDiag.itemNameHidden, hiddenBase, false)),
+                Settings2Test.step(who + ": abre el inventario de todos", 6, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        forEachPlayer(mc, n, slot -> {
+                            PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                            if (slot == 0) mc.setScreen(new InventoryScreen(mc.player));
+                            else ContextSwitcher.run(c, () -> mc.setScreen(new InventoryScreen(mc.player)));
+                        });
+                    }
+                    forceItemName(mc, n);
+                }, null),
+                Settings2Test.step(who + ": con el inventario abierto el nombre del objeto no se dibuja en ninguno (se oculta en todos)", 20, () -> {
+                    if (Settings2Test.seqTick == 0) snap.run();
+                    forceItemName(mc, n);
+                }, () -> itemNameAll(n, SplitDiag.itemNameShown, shownBase, false) && itemNameAll(n, SplitDiag.itemNameHidden, hiddenBase, true)),
+                Settings2Test.step(who + ": el cursor sobre el diamante: el tooltip del objeto si se dibuja en todos", 20, () -> {
+                    if (Settings2Test.seqTick == 0) snap.run();
+                    forceItemName(mc, n);
+                    forEachPlayer(mc, n, slot -> {
+                        PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                        Screen sc = slot == 0 ? mc.screen : c.screen;
+                        if (!(sc instanceof AbstractContainerScreen<?> s)) return;
+                        var sl = s.getMenu().slots.get(20);
+                        double gx = s.getGuiLeft() + sl.x + 8, gy = s.getGuiTop() + sl.y + 8;
+                        if (slot == 0) p1CursorTo(mc, gx, gy);
+                        else {
+                            c.cursorX = gx;
+                            c.cursorY = gy;
+                        }
+                    });
+                }, () -> itemNameAll(n, SplitDiag.tooltipsDrawn, tipBase, true) && itemNameAll(n, SplitDiag.itemNameShown, shownBase, false)),
+                Settings2Test.step(who + ": cierra los inventarios y restaura el hueco 20; el nombre vuelve", 20, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        closeAll.run();
+                        var server = mc.getSingleplayerServer();
+                        server.execute(() -> {
+                            for (int slot = 0; slot < n; slot++) {
+                                PlayerContext c = slot == 0 ? null : SecondaryPlayers.context(slot);
+                                ServerPlayer sp = server.getPlayerList().getPlayer(slot == 0 ? mc.player.getUUID() : c.player.getUUID());
+                                if (saved[slot] != null) sp.getInventory().setItem(20, saved[slot][0]);
+                            }
+                        });
+                        snap.run();
+                    }
+                    forceItemName(mc, n);
+                }, () -> itemNameAll(n, SplitDiag.itemNameShown, shownBase, true)));
     }
 
     private static void chatOverContainerSetup(Minecraft mc, int n) {

@@ -34,6 +34,27 @@ public abstract class GuiGuardsMixin {
         if (c != null) cir.setReturnValue(c.bossOverlay());
     }
 
+    @org.spongepowered.asm.mixin.Shadow
+    private int toolHighlightTimer;
+    @org.spongepowered.asm.mixin.Shadow
+    private net.minecraft.world.item.ItemStack lastToolHighlight;
+
+    /**
+     * El nombre del objeto seleccionado (el que sale sobre la barra al cambiar de casilla) no se dibuja mientras el jugador del contexto activo
+     * tiene una pantalla abierta: atravesaba el inventario y los contenedores. Contadores por jugador en SplitDiag para medirlo.
+     */
+    @Inject(method = "renderSelectedItemName(Lnet/minecraft/client/gui/GuiGraphics;I)V", at = @At("HEAD"), cancellable = true)
+    private void consolepad$hideItemNameOverScreen(net.minecraft.client.gui.GuiGraphics graphics, int shift, CallbackInfo ci) {
+        boolean visible = toolHighlightTimer > 0 && !lastToolHighlight.isEmpty();
+        int slot = dev.consolepad.split.ReduceEffects.contextSlot();
+        if (net.minecraft.client.Minecraft.getInstance().screen != null) {
+            if (visible) dev.consolepad.split.SplitDiag.itemNameHidden[slot]++;
+            ci.cancel();
+        } else if (visible) {
+            dev.consolepad.split.SplitDiag.itemNameShown[slot]++;
+        }
+    }
+
     @Inject(method = "setSubtitle", at = @At("HEAD"), cancellable = true)
     private void consolepad$noSubtitle(Component subtitle, CallbackInfo ci) {
         if (ContextSwitcher.isSecondaryActive()) ci.cancel();
