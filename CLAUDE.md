@@ -99,3 +99,10 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **En el autotest puede haber mandos reales (slots 0 y 1):** para probar una desconexion usar `PadManager.simulateDisconnect/simulateReconnect`, que esconden el mando del slot sin desenchufar nada.
 - **Probar el apuntar con arco necesita `keyUse` pulsada** (si no, `Minecraft.handleKeybinds` suelta el objeto al instante) y el arco ya en la mano del cliente antes de tensarlo.
 - **Los parches de Python con comillas triples y apostrofes se escriben con Write a un archivo y se ejecutan con `python archivo.py`;** los `replace(..., 1)` que no encuentran el texto fallan en silencio: aserta que el texto esta.
+
+### Reglas aprendidas del cierre de la v1 (2026-10-10)
+
+- **Un efecto "que no se ve" en un jugador extra puede tener VARIOS filtros en cadena** (aqui `ParticleEngineMixin` y `SplitLevelRenderer.addParticle`): comprobar cada paso de la ruta (crear -> anadir -> dibujar) con una medida antes de dar el arreglo por bueno.
+- **Las particulas pertenecen a un nivel** (`Particle.level`): el motor es uno, `ContextSwitcher` le cambia el nivel al entrar en un contexto y la pasada de dibujo filtra por `Minecraft.level`. Las pruebas de particulas cuentan solo la clase que miden (`TerrainParticle`): la lluvia (`WaterDropParticle`) y los efectos de otros jugadores aparecen cerca de cualquiera.
+- **Un paquete de un extra puede procesarse despues de que su jugador salga:** `PlayerContext.released` lo descarta. `tools/check-clean-exit.sh <log>` es el juez del cierre; `CONSOLEPAD_EXIT_PLAYERS=1|4` hace que la casilla 49 cierre el mundo con ese numero de jugadores.
+- **Las pruebas que cambian el inventario o dejan objetos sueltos deben guardar y restaurar las 36 casillas y quitar los objetos:** el mundo "New World" es compartido y otras pruebas (`actionsTest`) cuentan la tierra de la barra.
