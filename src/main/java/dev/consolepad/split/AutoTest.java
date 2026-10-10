@@ -74,6 +74,7 @@ public final class AutoTest {
 
     /** Al terminar cada frame (RenderFrameEvent.Post): aqui se hace la captura, con el frame ya dibujado. */
     public static void frameEnd() {
+        if (ShotsTest.ENABLED) ShotsTest.frame();
         sampleLook();
         if (pixelProbe != null) {
             var probe = pixelProbe;
@@ -4889,6 +4890,10 @@ public final class AutoTest {
     }
 
     public static void tick() {
+        if (ShotsTest.ENABLED) {
+            ShotsTest.tick();
+            return;
+        }
         if (WORLD == null) return;
         SecondaryTick.autoRespawn = deathTestPhase == 0; // las pruebas dejan reaparecer solos a los extra, salvo la de la pantalla de muerte
         Minecraft mc = Minecraft.getInstance();
