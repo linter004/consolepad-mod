@@ -4972,6 +4972,9 @@ public final class AutoTest {
             case 48 -> {
                 if (Settings2Test.run(mc)) next();
             }
+            case 49 -> {
+                if (V1Test.run(mc)) next();
+            }
             case 50 -> leaveTest(mc);
             default -> {
                 if (state > 2 && state < 50) next(); // casilla libre entre las pruebas y la salida

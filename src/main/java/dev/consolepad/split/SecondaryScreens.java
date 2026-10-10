@@ -154,8 +154,11 @@ public final class SecondaryScreens {
             int closing = 0;
             if (s.pressed(PadState.B)) closing |= 1 << PadState.B;
             if (s.pressed(PadState.START)) closing |= 1 << PadState.START;
+            // En pantallas de contenedor el boton de inventario (Y) solo mueve rapido: cerrar es B o Start (o la pausa). En el resto de pantallas propias sigue cerrando.
+            boolean container = screen instanceof AbstractContainerScreen<?>;
             for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
-                if ((e.getValue() == PadAction.INVENTORY || e.getValue() == PadAction.PAUSE) && s.pressed(e.getKey())) closing |= 1 << e.getKey();
+                boolean closer = e.getValue() == PadAction.PAUSE || (e.getValue() == PadAction.INVENTORY && !container);
+                if (closer && s.pressed(e.getKey())) closing |= 1 << e.getKey();
             }
             if (closing != 0 && screen.shouldCloseOnEsc()) {
                 ctx.buttonDown[0] = ctx.buttonDown[1] = false;

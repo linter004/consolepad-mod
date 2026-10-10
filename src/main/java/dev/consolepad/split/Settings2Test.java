@@ -24,7 +24,7 @@ import java.util.function.BooleanSupplier;
  */
 public final class Settings2Test {
     private static final Gson GSON = new Gson();
-    private static boolean allOk = true;
+    static boolean allOk = true;
     private static int phase;
     private static int calls;
 
@@ -42,23 +42,23 @@ public final class Settings2Test {
     // ---------------------------------------------------------------- secuencias por ticks
 
     /** Paso de una secuencia: {@code each} se ejecuta en cada tick del paso; en el ultimo se evalua {@code check} (si hay). */
-    private record Step(String name, int ticks, Runnable each, BooleanSupplier check) {}
+    record Step(String name, int ticks, Runnable each, BooleanSupplier check) {}
 
-    private static List<Step> seq = new ArrayList<>();
-    private static int seqIdx, seqTick;
+    static List<Step> seq = new ArrayList<>();
+    static int seqIdx, seqTick;
 
-    private static Step step(String name, int ticks, Runnable each, BooleanSupplier check) {
+    static Step step(String name, int ticks, Runnable each, BooleanSupplier check) {
         return new Step(name, ticks, each, check);
     }
 
-    private static void startSeq(Step... steps) {
+    static void startSeq(Step... steps) {
         seq = Arrays.asList(steps);
         seqIdx = 0;
         seqTick = 0;
     }
 
     /** Avanza la secuencia un tick; true cuando termina. */
-    private static boolean tickSeq() {
+    static boolean tickSeq() {
         if (seqIdx >= seq.size()) return true;
         Step st = seq.get(seqIdx);
         st.each().run();
