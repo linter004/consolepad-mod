@@ -26,6 +26,12 @@ import java.util.function.Supplier;
 public final class V1Test {
     private static int phase;
     private static int calls;
+    private static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
+
+    private static int envInt(String name, int def) {
+        String v = System.getenv(name);
+        return v == null || v.isBlank() ? def : Integer.parseInt(v.trim());
+    }
 
     private V1Test() {}
 
@@ -101,8 +107,29 @@ public final class V1Test {
             case 10 -> {
                 if (Settings2Test.tickSeq()) {
                     Settings2Test.seq = new ArrayList<>();
-                    phase = 99;
+                    phase = 12;
                 }
+            }
+            case 12 -> { // tarea 4: salir con 4 jugadores y paquetes de sonido y dano todavia en camino
+                if (!AutoTest.joinTo(mc, 4)) return false;
+                closeRaceSetup(mc);
+                phase = 13;
+            }
+            case 13 -> {
+                if (Settings2Test.tickSeq()) {
+                    Settings2Test.seq = new ArrayList<>();
+                    phase = 14;
+                }
+            }
+            case 14 -> {
+                if (!AutoTest.leaveTo(mc, 2)) return false;
+                if (!AutoTest.joinTo(mc, 2)) return false;
+                phase = 11;
+            }
+            case 11 -> { // CONSOLEPAD_EXIT_PLAYERS=4: la casilla acaba con 4 jugadores dentro para medir el cierre del mundo (leaveTest sale con ellos)
+                int n = EXIT_PLAYERS;
+                if (n > 2 && !AutoTest.joinTo(mc, n)) return false;
+                phase = 99;
             }
             default -> {
                 ConsolePad.LOGGER.info("[autotest] RESULTADO cierre de la v1 en conjunto -> {}", Settings2Test.allOk ? "OK" : "FALLO");
@@ -482,5 +509,42 @@ public final class V1Test {
                     });
                     return true;
                 }));
+    }
+
+    // ---------------------------------------------------------------- tarea 4: cierre sin excepciones
+
+    /**
+     * Los paquetes de un jugador extra se pasan al hilo principal con {@code mc.execute}; si el jugador sale (o P1 sale del mundo) entre medias, el contexto
+     * ya esta liberado cuando el paquete se procesa (nivel y jugador nulos) y salian NullPointerException (handleSoundEvent, hurtTo). Aqui el servidor manda
+     * sonidos y dano a P2-P4 y, en la misma cola, P2-P4 salen: no debe quedar ningun error de paquete.
+     */
+    private static void closeRaceSetup(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        int[] errors = new int[1];
+        net.minecraft.network.protocol.game.ClientGamePacketListener[] listeners = new net.minecraft.network.protocol.game.ClientGamePacketListener[4];
+        PlayerContext[] ctxs = new PlayerContext[4];
+        Settings2Test.startSeq(
+                Settings2Test.step("salen P2-P4 (guardo su conexion y su contexto)", 40, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        errors[0] = SplitDiag.packetErrors;
+                        for (int slot = 1; slot <= 3; slot++) {
+                            ctxs[slot] = SecondaryPlayers.context(slot);
+                            listeners[slot] = (net.minecraft.network.protocol.game.ClientGamePacketListener) SecondaryPlayers.listenerOf(slot);
+                            SecondaryPlayers.leave(mc, slot);
+                        }
+                    }
+                }, () -> ctxs[1] != null && ctxs[1].level == null && ctxs[3].level == null && !SecondaryPlayers.isActive(3)),
+                Settings2Test.step("paquetes de sonido y dano que llegan DESPUES de salir se descartan sin errores (nivel y jugador ya nulos)", 25, () -> {
+                    if (Settings2Test.seqTick == 0) {
+                        for (int slot = 1; slot <= 3; slot++) {
+                            for (int i = 0; i < 5; i++) {
+                                listeners[slot].handleSoundEvent(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
+                                        net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.wrapAsHolder(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP),
+                                        net.minecraft.sounds.SoundSource.PLAYERS, 0, 64, 0, 1f, 1f, i));
+                                listeners[slot].handleHurtAnimation(new net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket(1, 0f));
+                            }
+                        }
+                    }
+                }, () -> SplitDiag.packetErrors == errors[0]));
     }
 }

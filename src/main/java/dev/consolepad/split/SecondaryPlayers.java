@@ -181,6 +181,12 @@ public final class SecondaryPlayers {
         }
     }
 
+    /** Solo pruebas: el listener de paquetes (el proxy de wrapGameListener) de la conexion del jugador extra del slot, o null. */
+    public static PacketListener listenerOf(int slot) {
+        Connection c = slot >= 1 && slot <= MAX_EXTRA ? ENTRIES[slot].connection : null;
+        return c == null ? null : c.getPacketListener();
+    }
+
     /** Llamado por ConnectionMixin al instalar el listener de juego de una conexion extra. */
     public static PacketListener wrapGameListener(Connection c, ClientPacketListener real) {
         Entry entry = entryOf(c);
@@ -201,7 +207,11 @@ public final class SecondaryPlayers {
                 // nombre (setTitleText, setSubtitleText, setTitlesAnimation, setActionBarText) y se procesarian con los datos de P1.
                 if (args != null && args.length == 1 && args[0] instanceof net.minecraft.network.protocol.Packet<?> && !n.equals("shouldHandleMessage")) {
                     // Hilo de red -> hilo principal, dentro del contexto del jugador. El orden de llegada se conserva.
-                    mc.execute(() -> ContextSwitcher.run(ctx, () -> handle(real, method, args)));
+                    if (ctx != null && ctx.released) return null; // el jugador ya salio
+                    mc.execute(() -> {
+                        if (ctx != null && ctx.released) return; // salio mientras el paquete esperaba en la cola del hilo principal
+                        ContextSwitcher.run(ctx, () -> handle(real, method, args));
+                    });
                     return null;
                 }
                 // shouldHandleMessage, flow, protocol, isAcceptingMessages...: consultas sin estado global.
@@ -238,6 +248,7 @@ public final class SecondaryPlayers {
         int slot = entry.context == null ? 0 : entry.context.slotIndex;
         entry.connection = null;
         PlayerContext ctx = entry.context;
+        if (ctx != null) ctx.released = true;
         entry.context = null;
         if (slot == 1) SecondaryTick.reset();
         PlayerLabels.refreshAll(Minecraft.getInstance()); // sin extras P1 recupera su nombre

@@ -49,6 +49,8 @@ public final class PlayerContext {
     public volatile int noticesDrawn;
     /** Lineas de chat dibujadas en el ultimo fotograma (0 con una pantalla de contenedor abierta: el historial se oculta para no cruzarse con ella). */
     public volatile int chatLinesDrawn;
+    /** El jugador ya salio (SecondaryPlayers.forget): los paquetes que aun estaban en cola del hilo de red se descartan, no hay nivel ni jugador con que procesarlos. */
+    public volatile boolean released;
     /** Ancho (unidades de su HUD) de la linea de avisos mas ancha dibujada: debe caber en su region. */
     public volatile int noticeMaxWidth;
     /** Estado de la entrada de su mando entre ticks. */
