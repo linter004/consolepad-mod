@@ -303,6 +303,7 @@ public final class AutoTest {
             }
             case 4 -> {
                 if (ticks < 40) return;
+                if (V1Test.EXIT_PLAYERS == 1 && !leaveTo(mc, 1)) return; // CONSOLEPAD_EXIT_PLAYERS=1: se cierra el mundo con P1 solo
                 var srv = mc.getSingleplayerServer();
                 if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
                 if (prevGuiScale >= 0) mc.options.guiScale().set(prevGuiScale);

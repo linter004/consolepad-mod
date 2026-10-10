@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 public final class V1Test {
     private static int phase;
     private static int calls;
-    private static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
+    static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
 
     private static int envInt(String name, int def) {
         String v = System.getenv(name);
