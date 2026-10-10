@@ -390,6 +390,7 @@ public final class V1Test {
         Mining m = new Mining();
         PadManager.Device padDev = ConsolePad.PADS.slot(slot).device;
         GameType[] prev = new GameType[1];
+        ItemStack[] kept = new ItemStack[36];
         Runnable aim = () -> {
             me.setYRot(0f);
             me.setXRot((float) Math.toDegrees(Math.atan2(me.getEyeY() - tc.y, tc.z - me.getZ())));
@@ -399,8 +400,10 @@ public final class V1Test {
                     if (Settings2Test.seqTick == 0) {
                         if (slot == 0 && mc.screen != null) mc.setScreen(null);
                         prev[0] = sp.gameMode.getGameModeForPlayer();
+                        for (int i = 0; i < 36; i++) kept[i] = sp.getInventory().getItem(i).copy();
                         server.execute(() -> {
                             var lv = sp.serverLevel();
+                            clearDrops(lv, tgt);
                             sp.setGameMode(GameType.SURVIVAL);
                             for (int dy = 0; dy <= 2; dy++) for (int dz = 1; dz <= 2; dz++) lv.setBlock(feet.offset(0, dy, dz), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
                             lv.setBlock(tgt, net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 3);
@@ -440,13 +443,22 @@ public final class V1Test {
                     double apart = me.position().distanceTo(them.position());
                     check(who + " rompe: " + m.ownMax + " particulas de su mundo cerca del bloque (>= 8) y " + m.crossMax + " junto al otro jugador (restos previos " + m.crossBase + "; estan a "
                             + Math.round(apart) + " bloques)", m.ownMax >= 8 && (m.crossMax <= m.crossBase || apart < 10));
-                    check(who + " rompe: su region dibujo " + (SplitDiag.particlesDrawn[slot] - m.drawnBase) + " particulas y la del otro jugador se salto "
-                            + (SplitDiag.particlesForeign[other] - m.foreignBase) + " ajenas", SplitDiag.particlesDrawn[slot] > m.drawnBase && SplitDiag.particlesForeign[other] > m.foreignBase);
+                    check(who + " rompe: su region dibujo " + (SplitDiag.particlesDrawn[slot] - m.drawnBase) + " particulas (la del otro jugador se salto "
+                            + (SplitDiag.particlesForeign[other] - m.foreignBase) + " ajenas dentro de su campo de vision)", SplitDiag.particlesDrawn[slot] > m.drawnBase);
                     check(who + " rompe: progreso de rotura propio en su dibujante de mundo", m.crack);
                     check(who + " rompe: gesto de golpear propio=" + m.swingOwn + " y visto por el otro jugador=" + m.swingSeenByOther, m.swingOwn && m.swingSeenByOther);
-                    server.execute(() -> sp.setGameMode(prev[0]));
+                    server.execute(() -> {
+                        clearDrops(sp.serverLevel(), tgt);
+                        sp.setGameMode(prev[0]);
+                        for (int i = 0; i < 36; i++) sp.getInventory().setItem(i, kept[i]);
+                    });
                     return true;
                 }));
+    }
+
+    /** Quita los objetos sueltos (la tierra que suelta el bloque roto) para que ni este jugador ni otra prueba los recojan. */
+    private static void clearDrops(net.minecraft.server.level.ServerLevel lv, net.minecraft.core.BlockPos around) {
+        for (var item : lv.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(around).inflate(8))) item.discard();
     }
 
     private static void eatPickupSetup(Minecraft mc) {
@@ -457,12 +469,14 @@ public final class V1Test {
         var seenByP1 = mc.level.getPlayerByUUID(me.getUUID());
         GameType[] prev = new GameType[1];
         int[] eat = new int[3];
+        ItemStack[] kept = new ItemStack[36];
         PadManager.Device mc2dev = ConsolePad.PADS.slot(1).device;
         boolean[] flags = new boolean[3];
         Settings2Test.startSeq(
                 Settings2Test.step("P2 prepara: una manzana dorada en la mano", 12, () -> {
                     if (Settings2Test.seqTick == 0) {
                         prev[0] = sp.gameMode.getGameModeForPlayer();
+                        for (int i = 0; i < 36; i++) kept[i] = sp.getInventory().getItem(i).copy();
                         server.execute(() -> {
                             sp.setGameMode(GameType.SURVIVAL);
                             sp.getInventory().setItem(sp.getInventory().selected, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.GOLDEN_APPLE));
@@ -505,7 +519,9 @@ public final class V1Test {
                     check("P2 recoge un objeto: animacion de recogida (ItemPickupParticle) en su mundo=" + flags[2], flags[2]);
                     server.execute(() -> {
                         sp.setGameMode(prev[0]);
-                        sp.getInventory().setItem(sp.getInventory().selected, net.minecraft.world.item.ItemStack.EMPTY);
+                        clearDrops(sp.serverLevel(), sp.blockPosition());
+                        for (int i = 0; i < 36; i++) sp.getInventory().setItem(i, kept[i]);
+                        sp.removeAllEffects(); // la manzana dorada deja regeneracion y absorcion
                     });
                     return true;
                 }));

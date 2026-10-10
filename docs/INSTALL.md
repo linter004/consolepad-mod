@@ -64,7 +64,9 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 
 - **Sodium e Iris:** sin verificar. El mod sustituye partes del dibujo del mundo para cada jugador; con mods que cambian el renderizador puede no funcionar. Prueba sin ellos.
 - **Solo mundos locales, LAN o servidores sin autenticación:** los jugadores extra se conectan por dentro del juego. En un servidor con autenticación no pueden entrar.
-- **Tres excepciones al cerrar el mundo** (`NullPointerException` en `handleSoundEvent` y `hurtTo` cuando se libera a un jugador extra): siguen pendientes. Salen en el log justo al cerrar el mundo, el mod las captura y no afectan a la partida ni a los datos guardados.
+- **Cierre del mundo:** las tres excepciones (`NullPointerException` en `handleSoundEvent` y `hurtTo` al salir un jugador extra con paquetes todavía en cola) están corregidas; el cierre con 1 y con 4 jugadores no deja ningún `ERROR` en el log.
+- **Un fallo raro del servidor al entrar un jugador extra** (`IndexOutOfBoundsException` al preparar un chunk, visto 1 vez en unas 20 pruebas, justo cuando cambiaba la distancia de visión): el informe queda en `crash-reports`. Si te pasa, guarda el informe y avisa.
+- **Partículas ambientales** (antorchas, lava, portales) cerca de P2 a P4: todavía no se generan; las de romper, golpear, comer, pociones y recoger objetos sí.
 - **Sin vibración del mando ni volumen por jugador:** el sonido es el de P1 (ver `docs/splitscreen-roadmap.md`).
 - **Un jugador extra con el mando desconectado** queda en pausa con un aviso hasta que el mando vuelva; no hay forma de sacarlo desde P1.
 - **Skins:** todos los jugadores locales usan el perfil del servidor; se distinguen por la etiqueta con nombre (y color) sobre la cabeza.

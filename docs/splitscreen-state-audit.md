@@ -20,4 +20,24 @@ Motivo: con 2 a 4 jugadores, `GameRenderer`, `Camera`, `LevelRenderer` y `Minecr
 - **Animación del tótem por región:** hoy no se dibuja para los extra; dibujarla exige moverla a `SplitHud` con su propio temporizador.
 - **Efectos de pantalla completa de `GameRenderer.postEffect`** (visión de araña/creeper, espectador): solo P1.
 - **Partículas ambientales (`ClientLevel.animateTick`: antorchas, lava, portales) cerca de cada extra:** no se generan; se generarían duplicadas con las de P1 si están cerca. Hay que decidir por distancia a P1.
-- **Sonido por jugador** (elytra, lluvia, ambiente) y **partículas propias de los extra** (rotura, andar, golpes): siguen silenciados por los guardas.
+- **Sonido por jugador** (elytra, lluvia, ambiente): sigue silenciado por los guardas. Las partículas propias de los extra ya funcionan (ver abajo).
+
+## Particulas y animaciones por jugador (2026-10-10)
+
+**Hipotesis del usuario: confirmada, y habia DOS filtros.** `ParticleEngineMixin` descartaba `add`/`createParticle`/`createTrackingEmitter` mientras corria el contexto de un extra, y `SplitLevelRenderer.addParticle` descartaba todo menos lluvia y humo. Resultado: P2 a P4 no veian ninguna particula suya (rotura, golpes, comer, pociones, recoger objetos) y nada las sustituia (el servidor manda los efectos de bloque a cada cliente, pero las particulas que generaba el propio cliente del extra se perdian).
+
+Arreglo: el `ParticleEngine` sigue siendo uno (texturas y listas de P1) pero cada particula pertenece a un nivel. `ContextSwitcher.run` le pone al motor el nivel del jugador activo (campo `level`, que usan `destroy`, `crack` y los proveedores) y lo restaura; `ParticleEngineMixin` hace que cada pasada de dibujo solo pinte las particulas de `Minecraft.level` (el de la pasada). Los dos filtros de descarte se quitaron.
+
+| Efecto | Quien lo genera | Estado | Medida (casilla 49) |
+|---|---|---|---|
+| Particulas al romper o golpear un bloque | `MultiPlayerGameMode.destroyBlock/continueDestroyBlock` -> `ParticleEngine.destroy/crack` en el tick del jugador | por jugador | P2: 74 `TerrainParticle` de su mundo cerca del bloque, 0 junto a P1 (a 24 bloques); P1 igual al reves |
+| Progreso de rotura (grietas) | `LevelRenderer.destroyBlockProgress` del dibujante de ese jugador | por jugador (ya lo era) | la entrada con el id del jugador esta en SU dibujante |
+| Comer y beber | `LivingEntity.triggerItemUseEffects` -> `level.addParticle` | por jugador | P2: 26 `BreakingItemParticle` en su mundo |
+| Pociones | `LivingEntity.tickEffects` | por jugador | P2: 6 `SpellParticle` |
+| Recoger objetos | `ClientPacketListener.handleTakeItemEntity` -> `ItemPickupParticle` | por jugador | aparece en el nivel de P2 |
+| Dano y criticos | paquetes de evento/particulas, procesados en el contexto del jugador | por jugador | misma ruta que los anteriores [S] |
+| Gesto de golpear (mano y cuerpo) | `LocalPlayer.swing`, `ClientboundAnimatePacket` | por jugador | el jugador la ve (`swinging`) y el otro jugador ve la del primero |
+| Usar objeto y agacharse | estado de entidad sincronizado | por jugador | P1 ve a P2 usando el objeto y agachado |
+| Balanceo de la mano / de la camara | `ItemInHandRenderer` y `bobView` de la pasada de ese jugador | por jugador (tanda anterior) | sin cambios |
+
+Pendiente: particulas ambientales de bloques (`ClientLevel.animateTick`: antorchas, lava, portales) cerca de cada extra siguen sin generarse (hay que decidir por distancia a P1 para no duplicarlas); el coste de las particulas crece con el numero de jugadores porque comparten motor y limites (`MAX_PARTICLES_PER_LAYER`).
