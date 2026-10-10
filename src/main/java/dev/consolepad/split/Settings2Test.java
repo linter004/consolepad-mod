@@ -76,7 +76,7 @@ public final class Settings2Test {
     }
 
     /** Entrada simulada de P2: estas acciones pulsadas (las del servidor de pruebas de SecondaryTick). */
-    private static void scriptP2(PadAction... actions) {
+    static void scriptP2(PadAction... actions) {
         SecondaryTick.scriptActive = true;
         EnumSet<PadAction> set = EnumSet.noneOf(PadAction.class);
         set.addAll(Arrays.asList(actions));

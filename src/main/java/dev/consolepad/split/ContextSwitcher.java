@@ -3,6 +3,7 @@ package dev.consolepad.split;
 import dev.consolepad.ConsolePad;
 import dev.consolepad.mixin.GameRendererAccessor;
 import dev.consolepad.mixin.MinecraftInvoker;
+import dev.consolepad.mixin.ParticleEngineAccessor;
 import dev.consolepad.mixin.OptionsAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -80,8 +81,11 @@ public final class ContextSwitcher {
         float p1Fov = gr.consolepad$getFov();
         float p1OldFov = gr.consolepad$getOldFov();
 
+        ParticleEngineAccessor particles = (ParticleEngineAccessor) mc.particleEngine;
+        ClientLevel p1ParticleLevel = particles.consolepad$getLevel();
         active = true;
         current = ctx;
+        particles.consolepad$setLevel(ctx.level); // las particulas que cree este jugador nacen en su mundo
         mc.player = ctx.player;
         mc.level = ctx.level;
         mc.gameMode = ctx.gameMode;
@@ -114,6 +118,7 @@ public final class ContextSwitcher {
             ctx.oldFov = gr.consolepad$getOldFov();
             gr.consolepad$setFov(p1Fov);
             gr.consolepad$setOldFov(p1OldFov);
+            particles.consolepad$setLevel(p1ParticleLevel);
             mc.hitResult = p1Hit;
             mc.crosshairPickEntity = p1Cross;
             inv.consolepad$setMissTime(p1Miss);

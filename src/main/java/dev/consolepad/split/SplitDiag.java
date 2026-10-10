@@ -21,6 +21,8 @@ public final class SplitDiag {
     public static final int[] rainSpawned = new int[4];
     /** Errores al procesar paquetes de jugadores extra (suprimidos en el log) y el ultimo, con los chunks del paquete. */
     public static volatile int packetErrors;
+    /** Particulas dibujadas / saltadas por ser de otro nivel, por pasada de dibujo (slot del jugador). */
+    public static final int[] particlesDrawn = new int[4], particlesForeign = new int[4];
     /** Fotogramas en que el chat de P1 se dibujo / se oculto por tener un contenedor abierto (ChatGuardsMixin). */
     public static volatile int p1ChatShown, p1ChatHidden;
     public static volatile String lastPacketError = "";

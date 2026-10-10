@@ -37,7 +37,9 @@
     "FogStateAccessor",
     "RecipeBookComponentAccessor",
     "RecipeBookPageAccessor",
-    "ReduceFovMixin"
+    "ReduceFovMixin",
+    "ParticleEngineAccessor",
+    "ParticleAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

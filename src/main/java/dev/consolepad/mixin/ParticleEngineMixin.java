@@ -1,31 +1,30 @@
 package dev.consolepad.mixin;
 
-import dev.consolepad.split.ContextSwitcher;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleEngine;
-import net.minecraft.core.particles.ParticleOptions;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
-/** El ParticleEngine es de P1: las particulas que genera el cliente de P2 no deben entrar en el. */
+/**
+ * Particulas por jugador. El ParticleEngine es uno solo (sus texturas y sus listas son de P1), pero cada particula recuerda el nivel en que se creo:
+ * ContextSwitcher le pone al motor el nivel del jugador activo mientras corre su contexto (asi rotura, golpes, comer, pociones o recoger objetos de
+ * P2 a P4 nacen en SU mundo) y cada pasada de dibujo solo pinta las particulas del nivel que se esta dibujando. Antes se descartaban todas las de los
+ * extra y no se veia ninguna.
+ */
 @Mixin(ParticleEngine.class)
 public abstract class ParticleEngineMixin {
-    @Inject(method = "add(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
-    private void consolepad$noAdd(Particle particle, CallbackInfo ci) {
-        if (ContextSwitcher.isSecondaryActive() && !dev.consolepad.split.SplitView.particleBypass) ci.cancel();
-    }
-
-    @Inject(method = "createParticle", at = @At("HEAD"), cancellable = true)
-    private void consolepad$noCreate(ParticleOptions options, double x, double y, double z, double xs, double ys, double zs,
-                                     CallbackInfoReturnable<Particle> cir) {
-        if (ContextSwitcher.isSecondaryActive() && !dev.consolepad.split.SplitView.particleBypass) cir.setReturnValue(null);
-    }
-
-    @Inject(method = "createTrackingEmitter", at = @At("HEAD"), cancellable = true)
-    private void consolepad$noEmitter(CallbackInfo ci) {
-        if (ContextSwitcher.isSecondaryActive()) ci.cancel();
+    @Redirect(method = "render(Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;Ljava/util/function/Predicate;)V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/Particle;render(Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/Camera;F)V"))
+    private void consolepad$ownWorldOnly(Particle particle, com.mojang.blaze3d.vertex.VertexConsumer consumer, Camera camera, float partialTick) {
+        int slot = dev.consolepad.split.SplitRender.passSlot;
+        if (((ParticleAccessor) particle).consolepad$getLevel() == Minecraft.getInstance().level) {
+            if (slot >= 0 && slot < 4) dev.consolepad.split.SplitDiag.particlesDrawn[slot]++;
+            particle.render(consumer, camera, partialTick);
+        } else if (slot >= 0 && slot < 4) {
+            dev.consolepad.split.SplitDiag.particlesForeign[slot]++;
+        }
     }
 }

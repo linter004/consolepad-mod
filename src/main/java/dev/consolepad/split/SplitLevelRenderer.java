@@ -78,8 +78,9 @@ public final class SplitLevelRenderer extends LevelRenderer {
     volatile boolean rainForward;
     volatile int slot;
 
-    // Las particulas del cliente de un extra no se muestran (el ParticleEngine es de P1 y el servidor ya manda a todos los efectos de bloques y
-    // entidades, que saldrian duplicados); solo se dejan pasar las gotas de su lluvia, que nadie mas genera cerca de el.
+    // Las particulas del cliente de un extra (comer, pociones, golpes, recoger objetos, lluvia...) pasan al ParticleEngine: ContextSwitcher le pone el
+    // nivel del jugador y cada pasada de dibujo solo pinta las de su nivel (ParticleEngineMixin). Los efectos de bloque que manda el servidor
+    // (levelEvent) llegan a cada cliente por su propia conexion y nacen en el nivel de ese cliente, asi que tampoco se duplican.
     @Override public void addParticle(ParticleOptions options, boolean force, double x, double y, double z,
                                       double xSpeed, double ySpeed, double zSpeed) {
         addParticle(options, force, false, x, y, z, xSpeed, ySpeed, zSpeed);
@@ -87,15 +88,9 @@ public final class SplitLevelRenderer extends LevelRenderer {
 
     @Override public void addParticle(ParticleOptions options, boolean force, boolean decreased, double x, double y, double z,
                                       double xSpeed, double ySpeed, double zSpeed) {
-        if (!rainForward) return;
-        if (options.getType() != net.minecraft.core.particles.ParticleTypes.RAIN && options.getType() != net.minecraft.core.particles.ParticleTypes.SMOKE) return;
-        SplitView.particleBypass = true;
-        try {
-            super.addParticle(options, force, decreased, x, y, z, xSpeed, ySpeed, zSpeed);
-            SplitDiag.rainSpawned[slot]++;
-        } finally {
-            SplitView.particleBypass = false;
-        }
+        if (!live) return;
+        super.addParticle(options, force, decreased, x, y, z, xSpeed, ySpeed, zSpeed);
+        if (rainForward && options.getType() == net.minecraft.core.particles.ParticleTypes.RAIN) SplitDiag.rainSpawned[slot]++;
     }
 
     /** Tick de este renderer (nubes, lluvia, progreso de rotura) y de su lluvia, dentro del contexto de su jugador (camara propia). */
