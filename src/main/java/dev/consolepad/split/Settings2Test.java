@@ -93,6 +93,22 @@ public final class Settings2Test {
                 layoutsTest();
                 holdToggleLogic();
                 copyResetLogic();
+                {
+                    var cfgT = new dev.consolepad.pad.PadSettings();
+                    var cow = net.minecraft.world.entity.EntityType.COW;
+                    float on = dev.consolepad.pad.LookControl.targetFactor(cfgT, new net.minecraft.world.entity.animal.Cow(cow, Minecraft.getInstance().level));
+                    float off = dev.consolepad.pad.LookControl.targetFactor(cfgT, null);
+                    cfgT.targetSlowdown = 1f;
+                    float none = dev.consolepad.pad.LookControl.targetFactor(cfgT, new net.minecraft.world.entity.animal.Cow(cow, Minecraft.getInstance().level));
+                    check("apuntado: con un ser vivo bajo la mira el giro baja al 80 % por defecto, sin nada o apagada no cambia (" + on + ", " + off + ", " + none + ")", on == 0.8f && off == 1f && none == 1f);
+                }
+                { String so = SoundOcclusion.selfTest(); check("sonido: cada bloque entre el oyente y un mob baja el volumen a 0.55x (minimo 0.12) y sin bloques no cambia - " + so, so.startsWith("OK")); }
+                { String ct = Companions.selfTest(); check("companero: angulo hacia el companero (0 delante, +90 derecha) y fila de la barra de experiencia - " + (ct == null ? "OK" : ct), ct == null); }
+                { String it = interactLogic(mc); check("avisos de interaccion: cofre Abrir, puerta Abrir/Cerrar, cama Dormir, aldeano Comerciar, caballo Montar, comida Comer... - " + (it == null ? "OK" : it), it == null); }
+                { String sr = SoundRouting.selfTest(); check("sonido por jugador: el mas cercano lo oye, los empates son del menor numero, la direccion se conserva al moverlo al marco de P1 - " + (sr == null ? "OK" : sr), sr == null); }
+                { String wt = workstationTargets(mc); check("estaciones de trabajo: la cruceta llega a las recetas de la mesa de corte y a los patrones del telar - " + (wt == null ? "OK" : wt), wt == null); }
+                { String fc = FovComp.selfTest(); check("campo de vision al dividir: la compensacion sube el FOV vertical en regiones estrechas hasta recuperar parte o todo el horizontal, y no toca las anchas - " + (fc == null ? "OK" : fc), fc == null); }
+                { String ap = AdaptivePerf.selfTest(); check("rendimiento automatico: sube un nivel con FPS bajos (maximo 3), espera una ventana tras cada cambio y baja con 3 ventanas muy por encima del objetivo - " + (ap == null ? "OK" : ap), ap == null); }
                 lookLogic();
                 viewLogic();
                 phase = 1;
@@ -362,6 +378,7 @@ public final class Settings2Test {
         PadSettings aKeep = GSON.fromJson(GSON.toJson(a), PadSettings.class);
         aKeep.playerName = b.playerName;
         aKeep.labelColor = b.labelColor;
+        aKeep.profileId = b.profileId;
         check("copiar: trae TODOS los demas ajustes (comparacion completa en JSON, campos cambiados uno a uno)", GSON.toJson(aKeep).equals(GSON.toJson(b)));
         a.bindings.put(PadState.X, PadAction.JUMP);
         check("copiar: los botones son una copia profunda (cambiar el original no cambia la copia)", ButtonLayouts.detect(b) == ButtonLayouts.Layout.LEFTY);
@@ -490,6 +507,63 @@ public final class Settings2Test {
 
     // ---------------------------------------------------------------- paso 6: informacion extra por jugador
 
+    /** Pruebas de los textos contextuales del boton de usar: null si bien. */
+    private static String interactLogic(Minecraft mc) {
+        var lvl = mc.level;
+        var pos = net.minecraft.core.BlockPos.ZERO;
+        var door = net.minecraft.world.level.block.Blocks.OAK_DOOR.defaultBlockState();
+        String[][] got = {
+                {"cofre", Interact.forBlock(net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), lvl, pos), "Abrir"},
+                {"puerta cerrada", Interact.forBlock(door, lvl, pos), "Abrir"},
+                {"puerta abierta", Interact.forBlock(door.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN, true), lvl, pos), "Cerrar"},
+                {"cama", Interact.forBlock(net.minecraft.world.level.block.Blocks.RED_BED.defaultBlockState(), lvl, pos), "Dormir"},
+                {"mesa de crafteo", Interact.forBlock(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE.defaultBlockState(), lvl, pos), "Usar"},
+                {"boton", Interact.forBlock(net.minecraft.world.level.block.Blocks.STONE_BUTTON.defaultBlockState(), lvl, pos), "Pulsar"},
+                {"tierra", Interact.forBlock(net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), lvl, pos), null},
+                {"aldeano", Interact.forEntity(net.minecraft.world.entity.EntityType.VILLAGER.create(lvl), net.minecraft.world.item.ItemStack.EMPTY), "Comerciar"},
+                {"caballo", Interact.forEntity(net.minecraft.world.entity.EntityType.HORSE.create(lvl), net.minecraft.world.item.ItemStack.EMPTY), "Montar"},
+                {"vaca con cubo", Interact.forEntity(net.minecraft.world.entity.EntityType.COW.create(lvl), new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BUCKET)), "Ordeñar"},
+                {"cerdo con zanahoria", Interact.forEntity(net.minecraft.world.entity.EntityType.PIG.create(lvl), new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.CARROT)), "Dar de comer"},
+                {"oveja con tijeras", Interact.forEntity(net.minecraft.world.entity.EntityType.SHEEP.create(lvl), new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SHEARS)), "Esquilar"},
+                {"zombi", Interact.forEntity(net.minecraft.world.entity.EntityType.ZOMBIE.create(lvl), net.minecraft.world.item.ItemStack.EMPTY), null},
+                {"pan", Interact.forItem(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BREAD)), "Comer"},
+                {"tierra en la mano", Interact.forItem(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIRT)), "Colocar bloque"},
+                {"palo", Interact.forItem(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK)), "Usar objeto"},
+                {"arco", Interact.forItem(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BOW)), "Tensar"},
+        };
+        for (String[] g : got) {
+            if (g[2] == null ? g[1] != null : !g[2].equals(g[1])) return g[0] + " dio '" + g[1] + "' (esperado '" + g[2] + "')";
+        }
+        return null;
+    }
+
+    /** Mesa de corte y telar con objetos dentro (menus solo de cliente): cada receta o patron visible es un destino de la cruceta. null si bien. */
+    private static String workstationTargets(Minecraft mc) {
+        var inv = mc.player.getInventory();
+        var sm = new net.minecraft.world.inventory.StonecutterMenu(901, inv);
+        var ss = new net.minecraft.client.gui.screens.inventory.StonecutterScreen(sm, inv, net.minecraft.network.chat.Component.literal("t"));
+        ss.init(mc, 427, 240);
+        int empty = SecondaryScreens.targets(ss).size();
+        sm.getSlot(0).set(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
+        int withStone = SecondaryScreens.targets(ss).size();
+        int recipes = Math.min(12, sm.getNumRecipes());
+        if (recipes < 4 || withStone - empty != recipes) return "mesa de corte: " + recipes + " recetas, destinos " + empty + " -> " + withStone;
+        var lm = new net.minecraft.world.inventory.LoomMenu(902, inv);
+        var ls = new net.minecraft.client.gui.screens.inventory.LoomScreen(lm, inv, net.minecraft.network.chat.Component.literal("t"));
+        ls.init(mc, 427, 240);
+        int loomEmpty = SecondaryScreens.targets(ls).size();
+        lm.getSlot(0).set(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHITE_BANNER));
+        lm.getSlot(1).set(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BLACK_DYE));
+        int loomWith = SecondaryScreens.targets(ls).size();
+        int patterns = Math.min(16, lm.getSelectablePatterns().size());
+        if (patterns < 4 || loomWith - loomEmpty != patterns) return "telar: " + patterns + " patrones, destinos " + loomEmpty + " -> " + loomWith;
+        return null;
+    }
+
+    private static int soundsRouted0, soundsPlayed0;
+    private static int rumbleBefore;
+    private static float rumbleVib;
+
     private static boolean infoTest(Minecraft mc) {
         PlayerContext c = SecondaryPlayers.context(1);
         PadSettings s0 = ConsolePad.PADS.slot(0).settings, s1 = ConsolePad.PADS.slot(1).settings;
@@ -498,6 +572,28 @@ public final class Settings2Test {
             s1.showCoords = true;
             s1.showDirection = true;
             s0.showFps = true;
+            Companions.minDistanceOverride = 0; // P2 esta cerca: se baja el minimo para ver la flecha
+            soundsRouted0 = SplitDiag.soundsRouted;
+            soundsPlayed0 = SplitDiag.soundsPlayed;
+            {
+                var spSound = mc.getSingleplayerServer().getPlayerList().getPlayer(c.player.getUUID());
+                mc.getSingleplayerServer().execute(() -> spSound.serverLevel().playSound(null, spSound.getX(), spSound.getY(), spSound.getZ(),
+                        net.minecraft.sounds.SoundEvents.COW_AMBIENT, net.minecraft.sounds.SoundSource.NEUTRAL, 1f, 1f)); // junto a P2 y lejos de P1: solo lo recibe P2
+            }
+            s0.autoJump = 2;
+            s1.autoJump = 1;
+            check("salto automatico por jugador: P1 'no' (" + mc.player.isAutoJumpEnabled() + ") y P2 'si' (" + c.player.isAutoJumpEnabled() + ") a la vez", !mc.player.isAutoJumpEnabled() && c.player.isAutoJumpEnabled());
+            s0.autoJump = 0;
+            s1.autoJump = 0;
+            PaperDoll.forceForTest(0);
+            PaperDoll.forceForTest(1);
+            rumbleBefore = dev.consolepad.pad.Rumble.pulses[1];
+            rumbleVib = s1.vibration;
+            s1.vibration = 1f;
+            var spP2 = mc.getSingleplayerServer().getPlayerList().getPlayer(c.player.getUUID());
+            mc.getSingleplayerServer().execute(() -> spP2.hurt(spP2.damageSources().generic(), 3f)); // dano real a P2 en el servidor
+            ConsolePad.PADS.slot(0).settings.showCompanions = true;
+            s1.showCompanions = true;
             return false;
         }
         if (calls < 25) return false;
@@ -509,6 +605,36 @@ public final class Settings2Test {
         check("direccion de P2 en su region: '" + t1 + "'", t1.contains("Mira al"));
         check("P1 solo muestra lo suyo (FPS) y no las coordenadas de P2: '" + t0 + "'", t0.contains("FPS") && !t0.contains("XYZ") && !t0.contains("Mira al"));
         check("P3 (no esta dentro) no muestra nada: '" + PlayerInfo.lastText[2] + "'", PlayerInfo.lastText[2].isEmpty());
+        String c0 = Companions.lastText[0], c1 = Companions.lastText[1];
+        check("indicador del companero: P1 ve a P2 con su nombre ('" + c0 + "') y P2 ve a P1 ('" + c1 + "')",
+                c0.startsWith(PlayerLabels.labelOf(1) + " ") && c0.contains(" m") && c1.startsWith(PlayerLabels.labelOf(0) + " ") && c1.contains(" m"));
+        check("muñeco del jugador: P1 y P2 lo dibujan en su region tras correr (" + java.util.Arrays.toString(PaperDoll.lastBox[0]) + ", " + java.util.Arrays.toString(PaperDoll.lastBox[1]) + ")",
+                PaperDoll.lastBox[0][2] > 0 && PaperDoll.lastBox[1][2] > 0);
+        {
+            int[][] d1 = Companions.lastDots[1];
+            boolean onBar = d1 != null && d1.length == 1 && d1[0][1] == Companions.barY(c.safeH);
+            check("indicador del companero: el punto de P2 esta sobre su barra de experiencia (fila " + (d1 != null && d1.length > 0 ? d1[0][1] : -1) + ", esperada " + Companions.barY(c.safeH) + ")", onBar);
+        }
+        check("sonido por jugador: un sonido junto a P2 y lejos de P1 lo oye P2 (movido al oyente de P1: " + (SplitDiag.soundsRouted - soundsRouted0) + " veces; los sonidos propios de P1 en ese rato: " + (SplitDiag.soundsPlayed - soundsPlayed0) + ")",
+                SplitDiag.soundsRouted > soundsRouted0);
+        s1.showCompanions = false;
+        Companions.render(mc, null, 1, 200, 120); // apagada: sale antes de dibujar
+        check("indicador del companero: apagado en los ajustes de P2 no dibuja nada ('" + Companions.lastText[1] + "')", Companions.lastText[1].isEmpty());
+        s1.showCompanions = true;
+        Companions.minDistanceOverride = -1;
+        check("vibracion: el dano recibido por P2 pide un impulso a SU mando (" + rumbleBefore + " -> " + dev.consolepad.pad.Rumble.pulses[1] + ", fuerza " + dev.consolepad.pad.Rumble.lastLow[1] + ")",
+                dev.consolepad.pad.Rumble.pulses[1] > rumbleBefore && dev.consolepad.pad.Rumble.lastLow[1] > 0f);
+        s1.vibration = 0f;
+        int p0 = dev.consolepad.pad.Rumble.pulses[1];
+        dev.consolepad.pad.Rumble.pulse(1, 1f, 1f, 100);
+        check("vibracion: con la fuerza en 0 el impulso queda en 0 y no llega al mando (" + dev.consolepad.pad.Rumble.lastLow[1] + ")",
+                dev.consolepad.pad.Rumble.pulses[1] == p0 + 1 && dev.consolepad.pad.Rumble.lastLow[1] == 0f && !dev.consolepad.pad.Rumble.isActive(1));
+        s1.vibration = 0.5f;
+        dev.consolepad.pad.Rumble.pulse(1, 1f, 0.4f, 1);
+        check("vibracion: la fuerza del jugador escala el impulso (" + dev.consolepad.pad.Rumble.lastLow[1] + ", " + dev.consolepad.pad.Rumble.lastHigh[1] + ")",
+                Math.abs(dev.consolepad.pad.Rumble.lastLow[1] - 0.5f) < 0.01f && Math.abs(dev.consolepad.pad.Rumble.lastHigh[1] - 0.2f) < 0.01f);
+        s1.vibration = rumbleVib;
+        dev.consolepad.pad.Rumble.stopAll();
         s1.showCoords = false;
         s1.showDirection = false;
         s0.showFps = false;

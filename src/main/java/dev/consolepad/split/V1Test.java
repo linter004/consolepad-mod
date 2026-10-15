@@ -25,6 +25,7 @@ import java.util.function.Supplier;
  */
 public final class V1Test {
     private static int phase;
+    private static boolean dropCursorDone, wheelDone, profilesDone, lostDone, rideDone, rumbleDone, dragDone, ambientDone, kickDone;
     private static int calls;
     static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
 
@@ -44,7 +45,43 @@ public final class V1Test {
         calls++;
         switch (phase) {
             case 0 -> {
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && !kickDone) { // P1 saca a P2 desde su menu y luego se vuelve a meter
+                    kickDone = KickTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && !ambientDone) { // particulas ambientales de P2
+                    ambientDone = AmbientTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && !dragDone) { // repartir con X mantenido y la cruceta
+                    dragDone = DragTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && !rumbleDone) { // vibracion de acciones de P2
+                    rumbleDone = RumbleTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && !rideDone) { // montura: barra de salto y corazones de P2
+                    rideDone = RideTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && profilesDone && !lostDone) { // mando perdido y entrada al mundo: sacan y meten a P2
+                    lostDone = LostLeaveTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && !profilesDone) { // perfiles locales: saca y mete a P2 con distintas cuentas, por eso va antes de "volver a meter a P2"
+                    profilesDone = ProfileTest.run(mc);
+                    return false;
+                }
                 if (!AutoTest.joinTo(mc, 2)) return false;
+                if (!dropCursorDone) { // soltar mantenido y cursor de P1 (con P2 dentro), antes del resto
+                    dropCursorDone = DropCursorTest.run(mc);
+                    return false;
+                }
+                if (!wheelDone) { // rueda de acciones rapidas
+                    wheelDone = WheelTest.run(mc);
+                    return false;
+                }
                 Settings2Test.seq = new ArrayList<>();
                 yButtonSetup(mc, 0);
                 phase = 1;
@@ -457,14 +494,14 @@ public final class V1Test {
 
     // ---------------------------------------------------------------- tarea 3: particulas y animaciones por jugador
 
-    private static java.util.List<net.minecraft.client.particle.Particle> allParticles(Minecraft mc) {
+    static java.util.List<net.minecraft.client.particle.Particle> allParticles(Minecraft mc) {
         java.util.List<net.minecraft.client.particle.Particle> out = new java.util.ArrayList<>();
         var map = ((dev.consolepad.mixin.ParticleEngineAccessor) mc.particleEngine).consolepad$getParticles();
         for (var q : map.values()) out.addAll(q);
         return out;
     }
 
-    private static net.minecraft.client.multiplayer.ClientLevel levelOf(net.minecraft.client.particle.Particle p) {
+    static net.minecraft.client.multiplayer.ClientLevel levelOf(net.minecraft.client.particle.Particle p) {
         return ((dev.consolepad.mixin.ParticleAccessor) p).consolepad$getLevel();
     }
 
@@ -603,7 +640,7 @@ public final class V1Test {
                         });
                     }
                 }, null),
-                Settings2Test.step("P2 come (mantiene usar) y se agacha", 50, () -> {
+                Settings2Test.step("P2 come (mantiene usar) y se agacha", 90, () -> {
                     mc2dev.state.simDown = bitOf(1, dev.consolepad.pad.PadAction.USE) | bitOf(1, dev.consolepad.pad.PadAction.SNEAK_TOGGLE);
                     int item = 0, spell = 0;
                     for (var part : allParticles(mc)) {

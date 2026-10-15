@@ -36,6 +36,8 @@ public final class PadLostScreen extends Screen implements PlayerScreen {
         g.drawCenteredString(this.font, "Mando del jugador " + (slot + 1) + " desconectado", this.width / 2, this.height / 2 - 24, 0xFFFFAA33);
         g.drawCenteredString(this.font, "Jugador en pausa: no se mueve ni recibe daño", this.width / 2, this.height / 2 - 10, 0xFFFFFFFF);
         g.drawCenteredString(this.font, "Vuelve a conectar el mando para seguir jugando", this.width / 2, this.height / 2 + 2, 0xFFFFFFFF);
+        int left = PadLost.secondsLeft(slot);
+        if (left >= 0) g.drawCenteredString(this.font, "Si no vuelve, sale de la partida en " + left + " s", this.width / 2, this.height / 2 + 16, 0xFFFFD84A);
     }
 
     @Override

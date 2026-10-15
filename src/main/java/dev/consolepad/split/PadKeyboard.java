@@ -74,10 +74,30 @@ public final class PadKeyboard {
 
     /** Cada fotograma con la pantalla actual del jugador (o null): se abre en las pantallas de texto y se cierra si la pantalla cambia. */
     public void sync(Screen screen) {
+        watchCreativeSearch(screen);
         if (screen == lastScreen) return;
         lastScreen = screen;
         if (screen != null && wantsKeyboard(screen)) open();
         else active = false;
+    }
+
+    private boolean wasSearchTab;
+
+    /** Creativo: al elegir la pestana de busqueda con el cursor (no con LB/RB, que pasan por ella) se abre el teclado en pantalla. */
+    private void watchCreativeSearch(Screen screen) {
+        if (!(screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen)) {
+            wasSearchTab = false;
+            return;
+        }
+        boolean search = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$selectedTab().hasSearchBar();
+        if (search && !wasSearchTab && !active && System.nanoTime() - TabNav.lastPadTabNanos > 400_000_000L) {
+            var box = ((dev.consolepad.mixin.CreativeScreenAccessor) screen).consolepad$searchBox();
+            if (box != null) {
+                box.setFocused(true);
+                open();
+            }
+        }
+        wasSearchTab = search;
     }
 
     /** Tras pulsar A: si hay un campo de texto enfocado bajo el cursor, abre el teclado. */
@@ -85,6 +105,15 @@ public final class PadKeyboard {
         if (active || screen == null) return;
         lastClickInfo = "foco=" + screen.getFocused() + (screen.getFocused() instanceof EditBox b ? " activo=" + b.isActive() + " encima=" + b.isHovered() : "");
         boolean ok = screen.getFocused() instanceof EditBox box && box.isActive() && box.isHovered();
+        if (!ok && screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen c) { // el campo de busqueda del creativo no es hijo enfocable
+            var sb = ((dev.consolepad.mixin.CreativeScreenAccessor) c).consolepad$searchBox();
+            ok = sb != null && sb.isVisible() && sb.isHovered();
+            if (ok) sb.setFocused(true);
+        }
+        if (!ok && ConsoleCraft.bookVisible(screen)) { // el buscador del libro de recetas tampoco es hijo enfocable de la pantalla
+            var sb = ((dev.consolepad.mixin.RecipeBookComponentAccessor) ((net.minecraft.client.gui.screens.recipebook.RecipeUpdateListener) screen).getRecipeBookComponent()).consolepad$searchBox();
+            ok = sb != null && sb.isVisible() && sb.isFocused() && sb.isHovered();
+        }
         if (ok) open();
     }
 

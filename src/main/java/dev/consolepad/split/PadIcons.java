@@ -85,6 +85,17 @@ public final class PadIcons {
         return has(code, type) ? ADVANCE : 0;
     }
 
+    /** Dibuja el icono centrado en (cx, cy) con un disco de `size` unidades (el diagrama del mando usa tamanos distintos); 0 si el boton no tiene icono. */
+    public static int drawCentered(GuiGraphics g, int cx, int cy, int size, int code, PadType type) {
+        Icon icon = icon(code);
+        if (icon == null) return 0;
+        int cellSize = Math.round(size * (float) SIZE / H);
+        int idx = cell(type, icon);
+        g.blit(atlas(SplitSettings.promptStyle()), cx - cellSize / 2, cy - cellSize / 2, cellSize, cellSize, (idx % COLS) * CELL, (idx / COLS) * CELL, CELL, CELL, ATLAS, ATLAS);
+        drawn++;
+        return size;
+    }
+
     /** Dibuja el icono con su esquina superior izquierda en (x, y) y devuelve su ancho (0 si el boton no tiene icono). */
     public static int draw(GuiGraphics g, Font font, int x, int y, int code, PadType type) {
         Icon icon = icon(code);

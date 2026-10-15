@@ -20,6 +20,8 @@ import net.minecraft.world.item.ItemStack;
  */
 public final class SplitHud {
     private static int lastChatWidth;
+    /** Cuantas veces se ha dibujado a cada jugador extra la barra de salto y los corazones de su montura (pruebas). */
+    public static final int[] jumpMeters = new int[4], vehicleHearts = new int[4];
 
     private SplitHud() {}
 
@@ -90,8 +92,12 @@ public final class SplitHud {
                                         SplitDiag.onHudLayer("superposiciones", mc.player, graphics.guiWidth());
                                         invoker.consolepad$renderCrosshair(graphics, deltaTracker);
                                         invoker.consolepad$renderHotbar(graphics, deltaTracker);
+                                        if (mc.player.jumpableVehicle() != null) jumpMeters[p.slotIndex]++;
+                                        invoker.consolepad$renderJumpMeter(graphics, deltaTracker);
                                         invoker.consolepad$renderExperienceBar(graphics, deltaTracker);
                                         invoker.consolepad$renderPlayerHealth(graphics, deltaTracker);
+                                        if (mc.player.getVehicle() instanceof net.minecraft.world.entity.LivingEntity) vehicleHearts[p.slotIndex]++;
+                                        invoker.consolepad$renderVehicleHealth(graphics, deltaTracker);
                                         invoker.consolepad$renderExperienceLevel(graphics, deltaTracker);
                                         invoker.consolepad$renderSelectedItemName(graphics, deltaTracker);
                                         invoker.consolepad$renderEffects(graphics, deltaTracker);
@@ -100,7 +106,10 @@ public final class SplitHud {
                                 }
                                 SplitNotices.render(mc, p, graphics);
                                 if (cfg.showHud) PadHints.renderHud(mc, graphics, p.slotIndex, fw, fh);
+                                QuickWheel.render(mc, graphics, p.slotIndex, fw, fh);
                                 PlayerInfo.render(mc, graphics, p.slotIndex);
+                                PaperDoll.render(mc, graphics, p.slotIndex, fw, fh);
+                                Companions.render(mc, graphics, p.slotIndex, fw, fh);
                             } finally {
                                 endAlpha(graphics);
                                 pose.popPose();
@@ -131,6 +140,7 @@ public final class SplitHud {
         int fw = w - 2 * mx, fh = h - 2 * my;
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
         boolean oldHide = mc.options.hideGui;
+        SplitView.p1HudInset = mx > 0 || my > 0;
         if (mx > 0 || my > 0) {
             SplitView.guiWidth = fw;
             SplitView.guiHeight = fh;
@@ -144,9 +154,13 @@ public final class SplitHud {
             mc.options.hideGui = oldHide;
             JoinPrompt.render(mc, graphics, fw, fh);
             if (cfg.showHud) PadHints.renderHud(mc, graphics, 0, fw, fh);
+            QuickWheel.render(mc, graphics, 0, fw, fh);
             PlayerInfo.render(mc, graphics, 0);
+            PaperDoll.render(mc, graphics, 0, fw, fh);
+            Companions.render(mc, graphics, 0, fw, fh);
         } finally {
             mc.options.hideGui = oldHide;
+            SplitView.p1HudInset = false;
             endAlpha(graphics);
             graphics.pose().popPose();
             SplitView.guiWidth = oldW;

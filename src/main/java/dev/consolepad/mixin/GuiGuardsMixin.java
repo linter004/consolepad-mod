@@ -63,6 +63,10 @@ public abstract class GuiGuardsMixin {
     /** Accesibilidad: sin vineta en la region del jugador que lo pida (el contexto activo es el suyo; P1 si no hay ninguno). */
     @Inject(method = "renderVignette", at = @At("HEAD"), cancellable = true)
     private void consolepad$noVignette(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.world.entity.Entity entity, CallbackInfo ci) {
+        if (dev.consolepad.split.SplitView.p1HudInset && !dev.consolepad.split.ContextSwitcher.isSecondaryActive()) {
+            ci.cancel(); // dentro de una zona segura la vineta saldria como un rectangulo claro
+            return;
+        }
         if (dev.consolepad.split.ReduceEffects.contextOn()) {
             dev.consolepad.split.ReduceEffects.skippedVignette[dev.consolepad.split.ReduceEffects.contextSlot()]++;
             ci.cancel();

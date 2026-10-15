@@ -32,6 +32,16 @@ public final class SplitSettings {
         String promptStyle = DEFAULT_PROMPT_STYLE;
         Boolean autoViewDistance = Boolean.TRUE;
         Boolean playerLimits = Boolean.TRUE;
+        String compat = "auto";
+        Boolean welcomeSeen = Boolean.FALSE;
+        Boolean keepShaders = Boolean.FALSE;
+        Boolean soundOcclusion = Boolean.TRUE;
+        Boolean soundPerPlayer = Boolean.TRUE;
+        Boolean adaptivePerformance = Boolean.TRUE;
+        Integer targetFps = 40;
+        Integer padLostLeaveSeconds = 30;
+        Boolean askPlayers = Boolean.TRUE;
+        java.util.Map<String, String> worldOrientation = new java.util.HashMap<>();
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -59,6 +69,26 @@ public final class SplitSettings {
                         if (read.autoViewDistance != null) d.autoViewDistance = read.autoViewDistance;
                         else complete = false;
                         if (read.playerLimits != null) d.playerLimits = read.playerLimits;
+                        else complete = false;
+                        if (read.compat != null && java.util.List.of("auto", "on", "off").contains(read.compat)) d.compat = read.compat;
+                        else complete = false;
+                        if (read.welcomeSeen != null) d.welcomeSeen = read.welcomeSeen;
+                        else complete = false;
+                        if (read.keepShaders != null) d.keepShaders = read.keepShaders;
+                        else complete = false;
+                        if (read.soundOcclusion != null) d.soundOcclusion = read.soundOcclusion;
+                        else complete = false;
+                        if (read.soundPerPlayer != null) d.soundPerPlayer = read.soundPerPlayer;
+                        else complete = false;
+                        if (read.adaptivePerformance != null) d.adaptivePerformance = read.adaptivePerformance;
+                        else complete = false;
+                        if (read.targetFps != null) d.targetFps = Math.max(15, Math.min(240, read.targetFps));
+                        else complete = false;
+                        if (read.padLostLeaveSeconds != null) d.padLostLeaveSeconds = Math.max(0, read.padLostLeaveSeconds);
+                        else complete = false;
+                        if (read.askPlayers != null) d.askPlayers = read.askPlayers;
+                        else complete = false;
+                        if (read.worldOrientation != null) d.worldOrientation = read.worldOrientation;
                         else complete = false;
                         if (read.promptStyle != null && java.util.Arrays.asList(PROMPT_STYLES).contains(read.promptStyle)) d.promptStyle = read.promptStyle;
                     }
@@ -101,6 +131,81 @@ public final class SplitSettings {
     public static boolean playerLimits() {
         Boolean o = playerLimitsOverride;
         return o != null ? o : data().playerLimits;
+    }
+
+    /** Modo compatibilidad con Controlify: "auto" (activo si esta instalado), "on" o "off" (editando "compat" en split.json). */
+    public static String compat() {
+        return data().compat;
+    }
+
+    /** Verdadero si no se deben apagar los shaders de Iris al jugar varios (por defecto falso: con shaders la pantalla dividida sale rota). */
+    /** Los mobs suenan mas bajo si hay bloques entre ellos y el jugador 1 (opcion "soundOcclusion" de split.json). */
+    public static boolean soundOcclusion() {
+        return data().soundOcclusion;
+    }
+
+    /** Cada sonido lo oye el jugador local mas cercano (los de los extra se mueven al oyente de P1; opcion "soundPerPlayer" de split.json). */
+    public static boolean soundPerPlayer() {
+        return data().soundPerPlayer;
+    }
+
+    /** Regulador de rendimiento automatico con varios jugadores (opcion "adaptivePerformance" de split.json). */
+    public static boolean adaptivePerformance() {
+        return data().adaptivePerformance;
+    }
+
+    /** FPS objetivo del regulador automatico ("targetFps" de split.json, entre 15 y 240). */
+    public static int targetFps() {
+        return data().targetFps;
+    }
+
+    /** Segundos que un jugador extra puede estar sin mando antes de salir de la partida (0 = nunca; "padLostLeaveSeconds" de split.json). */
+    public static int padLostLeaveSeconds() {
+        return data().padLostLeaveSeconds;
+    }
+
+    /** Preguntar cuantos jugadores son al entrar en un mundo con varios mandos ("askPlayers" de split.json). */
+    public static boolean askPlayers() {
+        return data().askPlayers;
+    }
+
+    public static void setAskPlayers(boolean on) {
+        data().askPlayers = on;
+        save();
+    }
+
+    /** Reparto de pantalla guardado para un mundo (null si no se ha tocado en ese mundo). */
+    public static Orientation worldOrientation(String level) {
+        String v = level == null ? null : data().worldOrientation.get(level);
+        try {
+            return v == null ? null : Orientation.valueOf(v);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public static void forgetWorldOrientation(String level) {
+        if (data().worldOrientation.remove(level) != null) save();
+    }
+
+    public static void rememberWorldOrientation(String level, Orientation o) {
+        if (level == null || level.isEmpty()) return;
+        data().worldOrientation.put(level, o.name());
+        save();
+    }
+
+    public static boolean keepShaders() {
+        return data().keepShaders;
+    }
+
+    /** Pruebas: la bienvenida ya se mostro. */
+    public static boolean welcomeSeen() {
+        return data().welcomeSeen;
+    }
+
+    public static void setWelcomeSeen(boolean seen) {
+        data().welcomeSeen = seen;
+        save();
     }
 
     public static Orientation orientation() {

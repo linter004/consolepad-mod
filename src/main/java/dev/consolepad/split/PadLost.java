@@ -15,9 +15,28 @@ public final class PadLost {
     private static final boolean[] dismissed = new boolean[4];
     private static final boolean[] wasShowing = new boolean[4];
     private static final boolean[] protectedNow = new boolean[4];
-    private static final boolean[] prevInvulnerable = new boolean[4];
+    /** El servidor ya tiene el estado de protectedNow para ese slot (al entrar se fuerza una vez: limpia una invulnerabilidad guardada en el mundo). */
+    private static final boolean[] synced = new boolean[4];
+
+    /** Desde cuando (nanoTime) lleva cada jugador extra sin mando; 0 = con mando. */
+    private static final long[] lostSince = new long[4];
+    /** Pruebas: segundos de espera en lugar de los de split.json (-1 = los de split.json). */
+    public static volatile double leaveSecondsOverride = -1;
 
     private PadLost() {}
+
+    /** Segundos de espera antes de sacar a un jugador extra sin mando (0 = nunca). En el autotest solo si una prueba lo pide. */
+    private static double leaveSeconds() {
+        if (leaveSecondsOverride >= 0) return leaveSecondsOverride;
+        return AutoTest.running() ? 0 : SplitSettings.padLostLeaveSeconds();
+    }
+
+    /** Segundos que le quedan a un jugador extra sin mando antes de salir de la partida (-1 si no cuenta atras). */
+    public static int secondsLeft(int slot) {
+        double total = leaveSeconds();
+        if (slot < 1 || slot > 3 || total <= 0 || lostSince[slot] == 0) return -1;
+        return (int) Math.max(0, Math.ceil(total - (System.nanoTime() - lostSince[slot]) / 1e9));
+    }
 
     private static Screen screenOf(Minecraft mc, int slot) {
         if (slot == 0) return mc.screen;
@@ -32,6 +51,8 @@ public final class PadLost {
             java.util.Arrays.fill(dismissed, false);
             java.util.Arrays.fill(wasShowing, false);
             java.util.Arrays.fill(protectedNow, false);
+            java.util.Arrays.fill(synced, false);
+            java.util.Arrays.fill(lostSince, 0L);
             return;
         }
         for (int slot = 0; slot < PadManager.MAX_PLAYERS; slot++) {
@@ -45,6 +66,8 @@ public final class PadLost {
                 dismissed[slot] = false;
                 wasShowing[slot] = false;
                 protectedNow[slot] = false;
+                synced[slot] = false;
+                lostSince[slot] = 0;
                 continue;
             }
             if (wasShowing[slot] && !showing && s.lost && s.device == null) dismissed[slot] = true; // P1 lo cerro con Esc o con el boton
@@ -55,7 +78,16 @@ public final class PadLost {
                     wasShowing[slot] = true;
                 }
                 protect(mc, slot, ctx, !dismissed[slot]);
+                if (slot >= 1 && leaveSeconds() > 0) { // un jugador extra sin mando mucho rato sale de la partida (su inventario se guarda)
+                    if (lostSince[slot] == 0) lostSince[slot] = System.nanoTime();
+                    else if ((System.nanoTime() - lostSince[slot]) / 1e9 >= leaveSeconds()) {
+                        lostSince[slot] = 0;
+                        mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("El jugador " + (slot + 1) + " salió de la partida: su mando lleva " + (int) leaveSeconds() + " s desconectado."), false);
+                        SecondaryPlayers.leave(mc, slot);
+                    }
+                }
             } else {
+                lostSince[slot] = 0;
                 if (showing) close(mc, slot, ctx);
                 dismissed[slot] = false;
                 wasShowing[slot] = false;
@@ -74,22 +106,20 @@ public final class PadLost {
         else ContextSwitcher.run(ctx, () -> mc.setScreen(null));
     }
 
-    /** Invulnerable en el servidor mientras el aviso este puesto; al volver se deja como estaba. */
+    /** Invulnerable en el servidor mientras el aviso este puesto; al volver (o al entrar en la partida) deja de serlo. */
     private static void protect(Minecraft mc, int slot, PlayerContext ctx, boolean on) {
-        if (on == protectedNow[slot]) return;
+        if (synced[slot] && on == protectedNow[slot]) return;
         var server = mc.getSingleplayerServer();
         java.util.UUID id = slot == 0 ? mc.player.getUUID() : ctx != null && ctx.player != null ? ctx.player.getUUID() : null;
         if (server == null || id == null) return;
         protectedNow[slot] = on;
+        synced[slot] = true;
         server.execute(() -> {
             var sp = server.getPlayerList().getPlayer(id);
             if (sp == null) return;
-            if (on) {
-                prevInvulnerable[slot] = sp.isInvulnerable();
-                sp.setInvulnerable(true);
-            } else {
-                sp.setInvulnerable(prevInvulnerable[slot]);
-            }
+            // Un jugador solo es invulnerable (marca de entidad) por este aviso: /data no puede cambiarla en jugadores. Si el juego se cerro con el
+            // aviso puesto, la marca quedo guardada en el mundo; por eso al quitar la proteccion se pone a false y no al valor anterior.
+            sp.setInvulnerable(on);
         });
     }
 }

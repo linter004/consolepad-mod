@@ -45,6 +45,10 @@ public final class PadSettingsStore {
                 loaded.bindings.putAll(seed.bindings);
             }
             loaded.bindings.values().removeIf(a -> a == null); // acciones desconocidas
+            if (!loaded.wheelOffered) { // ajustes de una version sin rueda de acciones rapidas
+                loaded.wheelOffered = true;
+                if (!loaded.bindings.containsValue(PadAction.QUICK_WHEEL) && !loaded.bindings.containsKey(PadState.DPAD_LEFT)) loaded.bindings.put(PadState.DPAD_LEFT, PadAction.QUICK_WHEEL);
+            }
             return loaded;
         } catch (Exception e) {
             ConsolePad.LOGGER.warn("No se pudo leer {} ({}); se usan los valores por defecto", path, e.toString());
@@ -54,6 +58,7 @@ public final class PadSettingsStore {
 
     public static void save(int slot, PadSettings settings) {
         Path path = file(slot);
+        settings.wheelOffered = true; // lo guardado ya sabe de la rueda: no se vuelve a ofrecer
         try {
             Files.createDirectories(path.getParent());
             try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {

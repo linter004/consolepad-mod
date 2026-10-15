@@ -67,6 +67,10 @@ public final class PlayerContext {
     public int safeW, safeH;
     /** Relacion (respecto a la escala de la ventana) con la que se dibujan sus pantallas: la de su HUD, reducida si no cabria un inventario. */
     public float screenScale = 1f;
+    /** Pestana del inventario creativo de este jugador (en vanilla es un campo estatico: la de P1 se veia en P2). */
+    public net.minecraft.world.item.CreativeModeTab creativeTab;
+    /** Lo que muestra la lista de objetos del creativo de este jugador (el contenedor de vanilla es uno solo y se copiaba de un jugador a otro). */
+    public net.minecraft.world.item.ItemStack[] creativeItems;
     /** Tamano logico de sus pantallas (unidades antes de aplicar screenScale). */
     public int logicalW, logicalH;
     /** Renderer latente: recibe los avisos de su ClientLevel sin tocar el de P1. Se sustituye en el paso 4. */
@@ -140,5 +144,8 @@ public final class PlayerContext {
         public int deadTicks;
         public EnumSet<PadAction> prevDown = EnumSet.noneOf(PadAction.class);
         public EnumSet<PadAction> pressedNow = EnumSet.noneOf(PadAction.class);
+        /** Ticks que lleva pulsado el boton de soltar (0 = no cuenta) y si este tick toca repetir. */
+        public int dropTicks;
+        public boolean dropRepeat;
     }
 }

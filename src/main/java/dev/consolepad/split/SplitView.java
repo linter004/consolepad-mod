@@ -18,6 +18,8 @@ public final class SplitView {
     public static volatile boolean enabled = true;
     /** True mientras la pantalla de P1 se encaja en la mitad izquierda (hay un P2 dibujandose); la fija SplitHud. */
     public static volatile boolean p1HalfScreen;
+    /** El HUD de P1 se dibuja dentro de una zona segura (margen > 0): las superposiciones de pantalla completa (vineta) se omiten, pintarian un rectangulo dentro del margen. */
+    public static volatile boolean p1HudInset;
     /** Escala con la que se dibujan las pantallas de P1 para caber en su region (1 = normal; con 4 jugadores < 1). */
     public static volatile float p1ScreenScale = 1f;
     /** Tamano de la region de P1 en unidades de su propia interfaz (lo que ve su HUD) y relacion con la escala de la ventana. */

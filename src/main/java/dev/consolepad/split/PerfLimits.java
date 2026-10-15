@@ -54,8 +54,20 @@ public final class PerfLimits {
 
     private static int scaled(int requested, int min) {
         double f = factor(playerCount);
-        if (f >= 1.0 || !SplitSettings.autoViewDistance()) return requested;
+        if (playerCount <= 1 || !SplitSettings.autoViewDistance()) return requested;
+        if (playerCount > 1) f *= AdaptivePerf.viewFactor(); // el regulador automatico baja un poco mas si los FPS no llegan
         return Math.min(requested, Math.max(min, (int) Math.round(requested * f)));
+    }
+
+    /**
+     * Aplica el factor de entidades a la escala de vista de vanilla (la misma formula que LevelRenderer.setupRender). Se llama justo antes de dibujar las
+     * entidades de cada pasada (RenderLevelStageEvent.AFTER_SKY); con 1 o 2 jugadores no toca nada, asi que no interfiere con otros mods.
+     */
+    public static void applyEntityScale(net.minecraft.client.Minecraft mc) {
+        double f = entityScale() * (playerCount > 1 ? AdaptivePerf.entityFactor() : 1.0);
+        if (f >= 1.0 || mc.options == null) return;
+        net.minecraft.world.entity.Entity.setViewScale(
+                net.minecraft.util.Mth.clamp((double) mc.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * mc.options.entityDistanceScaling().get() * f);
     }
 
     /**
@@ -75,8 +87,13 @@ public final class PerfLimits {
      * Lluvia y nieve: con 3 o 4 jugadores se usa la version "rapida" (radio 5 en vez de 10 al dibujar y la cuarta parte de gotas al crearlas),
      * como con los graficos en rapido. Con 1 o 2 jugadores sigue segun los graficos del usuario.
      */
+    /** Verdadero mientras LevelRenderer dibuja o hace tick del clima (lo pone LevelRendererMixin). */
+    public static volatile boolean inWeather;
+
     public static boolean fancyWeather() {
-        boolean fancy = net.minecraft.client.Minecraft.useFancyGraphics();
+        // La misma cuenta que Minecraft.useFancyGraphics(), sin llamarla (esa llamada ya responde con este metodo dentro del clima).
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        boolean fancy = mc.options == null || mc.options.graphicsMode().get().getId() >= net.minecraft.client.GraphicsStatus.FANCY.getId();
         return fancy && !(SplitSettings.playerLimits() && playerCount >= 3);
     }
 }

@@ -24,6 +24,9 @@ public interface RecipeBookComponentAccessor {
     @Accessor("filterButton")
     StateSwitchingButton consolepad$filter();
 
+    @Accessor("searchBox")
+    net.minecraft.client.gui.components.EditBox consolepad$searchBox();
+
     @Accessor("menu")
     net.minecraft.world.inventory.RecipeBookMenu<?, ?> consolepad$menu();
 }

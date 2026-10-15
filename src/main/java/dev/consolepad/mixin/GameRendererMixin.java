@@ -101,12 +101,14 @@ public abstract class GameRendererMixin {
     @Redirect(method = "render",
             at = @At(value = "INVOKE", target = "Lnet/neoforged/neoforge/client/ClientHooks;drawScreen(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;IIF)V"))
     private void consolepad$scaledP1Screen(net.minecraft.client.gui.screens.Screen screen, net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partial) {
+        if (Minecraft.getInstance().level == null) SplitView.p1HalfScreen = false; // en el titulo no hay region dividida (con extras dentro, al salir quedaba negro)
         float k = SplitView.p1Scale();
         if (!SplitView.p1HalfScreen) {
             net.neoforged.neoforge.client.ClientHooks.drawScreen(screen, graphics, mouseX, mouseY, partial);
             if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX, mouseY, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
+            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, mouseX, mouseY);
             return;
         }
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
@@ -121,6 +123,7 @@ public abstract class GameRendererMixin {
             if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX / k, mouseY / k, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
+            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, Math.round(mouseX / k), Math.round(mouseY / k));
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;
@@ -151,10 +154,15 @@ public abstract class GameRendererMixin {
     private void consolepad$ownFov(net.minecraft.client.Camera camera, float partialTicks, boolean useFovSetting, CallbackInfoReturnable<Double> cir) {
         if (!useFovSetting || dev.consolepad.ConsolePad.PADS == null) return;
         int slot = SplitRender.passSlot;
-        int own = dev.consolepad.ConsolePad.PADS.slot(slot).settings.fov;
-        if (own <= 0) return;
-        int global = Minecraft.getInstance().options.fov().get();
-        if (global > 0) cir.setReturnValue(cir.getReturnValue() * own / global);
+        var cfg = dev.consolepad.ConsolePad.PADS.slot(slot).settings;
+        int own = cfg.fov;
+        if (own > 0) {
+            int global = Minecraft.getInstance().options.fov().get();
+            if (global > 0) cir.setReturnValue(cir.getReturnValue() * own / global);
+        }
+        if (cfg.fovComp > 0f && SplitView.width > 0 && SplitView.height > 0 && dev.consolepad.split.SecondaryPlayers.anyActive()) { // region estrecha: recupera parte del campo horizontal
+            cir.setReturnValue(dev.consolepad.split.FovComp.adjust(cir.getReturnValue(), SplitView.width / (double) SplitView.height, cfg.fovComp));
+        }
     }
 
     /** El aspecto de la proyeccion es el de la region que se dibuja, no el de la ventana entera. */

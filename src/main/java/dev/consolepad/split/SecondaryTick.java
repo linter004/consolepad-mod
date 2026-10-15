@@ -33,7 +33,7 @@ public final class SecondaryTick {
 
     // Contadores de diagnostico: cuantas veces ejecuta P2 cada accion.
     public static volatile int dbgStartAttack, dbgContinueTrue, dbgStartUse, dbgJumpTicks, dbgHotbarSteps;
-    public static volatile int dbgDrop, dbgSwapHands, dbgPerspective, dbgInventoryRequests;
+    public static volatile int dbgDrop, dbgDropRepeat, dbgSwapHands, dbgPerspective, dbgInventoryRequests;
 
     private static final float TICK_SECONDS = 0.05f;
     private static final int MAX_LOGGED_ERRORS = 5;
@@ -52,15 +52,45 @@ public final class SecondaryTick {
      * (LocalPlayer.tick envia la rotacion actual), asi que no pierde sincronizacion. Con menu abierto, muerto o con entrada simulada no gira.
      */
     public static void frameLook(Minecraft mc, PadManager.Slot slot, PlayerContext ctx, float dt) {
+        if (ctx != null && QuickWheel.isOpen(ctx.slotIndex)) return; // con la rueda abierta el stick derecho elige
         if (legacyLook || ctx == null || ctx.player == null || ctx.level == null || ctx.screen != null || slot.device == null) return;
         if (scriptActive && ctx.slotIndex == 1) return;
         if (ctx.player.isDeadOrDying() || ctx.player.getHealth() <= 0f) return;
         PadSettings cfg = slot.settings;
         PadState s = slot.device.state;
-        LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(ctx.player), PadDriver.sensitivityFactor(mc.options), dt, ctx.input.look, TMP);
+        LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(ctx.player), PadDriver.sensitivityFactor(mc.options) * LookControl.targetFactor(cfg, ctx.crosshairPickEntity), dt, ctx.input.look, TMP);
         if (TMP[0] == 0f && TMP[1] == 0f) return;
         float yaw = TMP[0], pitch = TMP[1];
         ContextSwitcher.run(ctx, () -> mc.player.turn(yaw, pitch));
+    }
+
+    /** Rueda de acciones rapidas de un jugador extra, una vez por fotograma. El comando lo envia su propia conexion, dentro de su contexto. */
+    public static void frameWheel(Minecraft mc, PadManager.Slot slot, PlayerContext ctx, float dt) {
+        if (ctx == null) return;
+        if (ctx.player == null || ctx.level == null || slot.device == null || ctx.released) {
+            QuickWheel.closeWheel(ctx.slotIndex);
+            return;
+        }
+        boolean inWorld = ctx.screen == null && !ctx.player.isDeadOrDying();
+        QuickWheel.frame(ctx.slotIndex, slot.device.state, slot.settings, inWorld, dt, cmd -> runCommand(mc, ctx, cmd));
+    }
+
+    /**
+     * Un comando de la rueda de un jugador extra. En un mundo de un jugador solo el anfitrion tiene permisos (con trucos activados), asi que un comando que
+     * enviara el propio jugador extra por su conexion se rechazaria; se ejecuta en el servidor como ese jugador con los permisos del anfitrion si el mundo
+     * tiene los trucos activados (y con los suyos si no).
+     */
+    public static void runCommand(Minecraft mc, PlayerContext ctx, String cmd) {
+        var server = mc.getSingleplayerServer();
+        if (server == null || ctx.player == null) return;
+        java.util.UUID id = ctx.player.getUUID();
+        server.execute(() -> {
+            var sp = server.getPlayerList().getPlayer(id);
+            if (sp == null) return;
+            var source = sp.createCommandSourceStack();
+            if (server.getWorldData().isAllowCommands()) source = source.withPermission(4);
+            server.getCommands().performPrefixedCommand(source, cmd);
+        });
     }
 
     /** P2 sale: la entrada simulada de pruebas se apaga (el resto del estado vive en PlayerContext.input y se descarta con el contexto). */
@@ -143,6 +173,17 @@ public final class SecondaryTick {
         pressed.removeAll(st.prevDown);
         st.prevDown = rawDown;
         st.pressedNow = pressed;
+        // Soltar mantenido: tras 7 ticks repite cada 2 (como Q mantenida). Solo si la pulsacion empezo con el jugador en el mundo.
+        if (pressed.contains(PadAction.DROP)) {
+            st.dropTicks = 1;
+            st.dropRepeat = false;
+        } else if (downSet.contains(PadAction.DROP) && st.dropTicks > 0) {
+            st.dropTicks++;
+            st.dropRepeat = st.dropTicks >= 7 && (st.dropTicks - 7) % 2 == 0;
+        } else {
+            st.dropTicks = 0;
+            st.dropRepeat = false;
+        }
         // Atacar y usar en modo alternar: una pulsacion los deja activos hasta la siguiente (abrir un menu los apaga).
         if (ctx.screen != null) {
             st.attackOn = st.useOn = false;
@@ -168,6 +209,9 @@ public final class SecondaryTick {
             if (errors++ < MAX_LOGGED_ERRORS) ConsolePad.LOGGER.error("[split] error en el tick de " + ctx.label() + " (suprimido)", e);
         }
     }
+
+    /** Particulas ambientales de los extra (Minecraft.tick solo llama a animateTick con el jugador 1). */
+    public static boolean ctxAmbientParticles = true;
 
     private static void secondaryTick(PlayerContext self, float forward, float left, float lookX, float lookY,
                                       boolean jump, boolean attack, boolean use, boolean lb, boolean rb, PadSettings cfg) {
@@ -269,6 +313,10 @@ public final class SecondaryTick {
         st.prevLb = lb;
         st.prevRb = rb;
         // Acciones por flanco, con los bindings de P2 (por defecto, los de P1): como Minecraft.handleKeybinds / PadDriver.onPress.
+        if (st.dropRepeat && !player.isSpectator() && player.drop(false)) {
+            player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+            dbgDropRepeat++;
+        }
         for (PadAction act : st.pressedNow) {
             switch (act) {
                 case DROP -> {
@@ -315,5 +363,6 @@ public final class SecondaryTick {
         mc.level.tickRateManager().tick();
         mc.level.tickEntities();
         mc.level.tick(() -> true);
+        if (ctxAmbientParticles && mc.level.tickRateManager().runsNormally()) mc.level.animateTick(player.getBlockX(), player.getBlockY(), player.getBlockZ()); // antorchas, lava, portales... cerca de este jugador
     }
 }

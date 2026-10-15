@@ -36,6 +36,13 @@ public final class PadManager {
         Device hidden;
 
         Slot(int index) { this.index = index; }
+
+        /** Familia de iconos que ve este jugador: la que elija en sus ajustes o, si no, la de su mando (Xbox si no tiene). */
+        public PadType iconType() {
+            int st = settings.iconStyle;
+            if (st >= 1 && st <= PadType.values().length) return PadType.values()[st - 1];
+            return device == null ? PadType.XBOX : device.type;
+        }
     }
 
     /** Diagnostico opcional (variable de entorno CONSOLEPAD_PADLOG=1): registra los cambios de estado de cada mando. */
@@ -98,10 +105,66 @@ public final class PadManager {
     }
 
     public void saveSettings() {
-        for (Slot s : slots) PadSettingsStore.save(s.index, s.settings);
+        for (Slot s : slots) {
+            PadSettingsStore.save(s.index, s.settings);
+            dev.consolepad.split.Profiles.sync(s.index); // el perfil que usa el jugador guarda sus ajustes
+        }
     }
 
     public Slot slot(int index) { return slots[index]; }
+
+    /** Todos los mandos conectados (reales y virtuales), con o sin jugador. */
+    public java.util.List<Device> allDevices() {
+        java.util.List<Device> out = new java.util.ArrayList<>();
+        for (Device d : devices) if (d != null) out.add(d);
+        out.addAll(virtualDevices);
+        return out;
+    }
+
+    /** El jugador (slot) de un mando, o null si no tiene. */
+    public Slot slotOfDevice(Device d) {
+        return slotOf(d);
+    }
+
+    /**
+     * Asigna un mando a un jugador: si el jugador ya tenia otro mando, los dos se intercambian (el otro pasa al jugador que tenia este, o queda sin
+     * jugador si este no tenia). Un jugador que se queda sin mando se marca como "mando perdido" (PadLost lo pausa si esta dentro).
+     * Los ajustes pertenecen al jugador, no al mando: se quedan donde estan.
+     */
+    public void assign(Device d, int slotIndex) {
+        if (d == null || slotIndex < 0 || slotIndex >= MAX_PLAYERS) return;
+        Slot target = slots[slotIndex];
+        if (target.device == d) return;
+        Slot from = slotOf(d);
+        Device old = target.device;
+        target.device = d;
+        target.lost = false;
+        target.hidden = null;
+        if (from != null) {
+            from.device = old;
+            from.hidden = null;
+            from.lost = old == null;
+            if (old == null) from.lostJid = d.jid;
+        }
+        ConsolePad.LOGGER.info("Mando '{}' asignado al jugador {} (antes: {}); el jugador {} {}", d.name, slotIndex + 1,
+                from == null ? "sin jugador" : "jugador " + (from.index + 1), slotIndex + 1, old == null ? "no tenia mando" : "tenia '" + old.name + "'");
+    }
+
+    /** Un mando de este fotograma con algun boton recien pulsado (para "pulsa un boton en el mando que quieres"), o null. */
+    public Device firstPressedDevice() {
+        for (Device d : allDevices()) {
+            for (int code = 0; code <= PadState.RT; code++) {
+                if (d.state.pressed(code)) return d;
+            }
+        }
+        return null;
+    }
+
+    /** Verdadero si algun mando tiene un boton pulsado ahora. */
+    public boolean anyDown() {
+        for (Device d : allDevices()) if (d.state.downBits() != 0) return true;
+        return false;
+    }
 
     public void poll() {
         for (Device d : virtualDevices) {

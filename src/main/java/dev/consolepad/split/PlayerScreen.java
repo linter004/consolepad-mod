@@ -20,6 +20,9 @@ public interface PlayerScreen {
         return false;
     }
 
+    /** Cambia de pestana o pagina (LB = -1, RB = +1) cuando {@link #hintTabs} es verdadero. */
+    default void tab(int dir) {}
+
     /** Boton del mando (codigo de PadState) que se acaba de pulsar mientras se escuchaba. */
     default void padButton(int code) {}
 }

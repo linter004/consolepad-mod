@@ -17,7 +17,9 @@ import dev.consolepad.split.PadKeyboard;
 import dev.consolepad.split.SecondaryPlayers;
 import dev.consolepad.split.SecondaryScreens;
 import dev.consolepad.split.SecondaryTick;
+import dev.consolepad.split.QuickWheel;
 import dev.consolepad.split.SplitView;
+import dev.consolepad.split.TabNav;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -83,6 +85,7 @@ public final class PadDriver {
         lastNanos = now;
 
         pads.poll();
+        dev.consolepad.split.IrisCompat.frame(mc); // con Iris y shaders, se apagan mientras haya jugadores extra
         dev.consolepad.split.ViewDistances.frame(mc);
         dev.consolepad.split.PadLost.frame(mc);
         dev.consolepad.split.PlayerLabels.tick(mc);
@@ -119,11 +122,15 @@ public final class PadDriver {
         }
         for (var extra : SecondaryPlayers.contexts()) {
             SecondaryScreens.frame(mc, pads.slot(extra.slotIndex), dt, extra);
+            SecondaryTick.frameWheel(mc, pads.slot(extra.slotIndex), extra, dt); // rueda de acciones rapidas
             SecondaryTick.frameLook(mc, pads.slot(extra.slotIndex), extra, dt); // giro de camara por fotograma
         }
+        if (dev.consolepad.split.Compat.yieldP1() && !AutoTest.running()) return; // modo compatibilidad: el mando del jugador 1 es de Controlify
         PadManager.Slot slot = pads.slot(0);
         PadManager.Device dev = slot.device;
+        if (dev == null || mc.screen != null || mc.player == null || mc.level == null) QuickWheel.closeWheel(0);
         if (dev == null || (!mc.isWindowActive() && !AutoTest.running())) {
+            untrackCursor(mc);
             releaseAll(mc);
             return;
         }
@@ -144,9 +151,13 @@ public final class PadDriver {
                 if (code >= 0) ps.padButton(code);
                 return;
             }
+            trackCursor(mc, s);
             screenFrame(mc, s, cfg, dt);
+            ourX = mc.mouseHandler.xpos();
+            ourY = mc.mouseHandler.ypos();
             return;
         }
+        untrackCursor(mc);
         releaseMouseButtons(mc);
         PadKeyboard.of(0).sync(null);
 
@@ -181,17 +192,77 @@ public final class PadDriver {
             fwdState = false;
         }
 
+        // Rueda de acciones rapidas: con ella abierta el stick derecho elige y la camara no gira.
+        QuickWheel.frame(0, s, cfg, !player.isDeadOrDying(), dt, cmd -> player.connection.sendCommand(cmd));
+
         // Camara (stick derecho), independiente de los ticks para que sea fluida.
-        LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(player), sensitivityFactor(o), dt, lookState, tmp);
-        if (tmp[0] != 0f || tmp[1] != 0f) player.turn(tmp[0], tmp[1]);
+        if (!QuickWheel.isOpen(0)) {
+            LookControl.compute(cfg, s.rx, s.ry, LookControl.isAiming(player), sensitivityFactor(o) * LookControl.targetFactor(cfg, mc.crosshairPickEntity), dt, lookState, tmp);
+            if (tmp[0] != 0f || tmp[1] != 0f) player.turn(tmp[0], tmp[1]);
+        }
 
         // Botones segun los bindings del jugador.
         for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
             int code = e.getKey();
             PadAction action = e.getValue();
-            if (s.pressed(code)) onPress(mc, player, o, action, cfg);
+            if (s.pressed(code)) {
+                onPress(mc, player, o, action, cfg);
+                if (action == PadAction.DROP) dropHeld = 0.0001f; // empieza a contar: mantenido, repite como la tecla Q
+            }
             if (s.released(code)) onRelease(o, action, cfg);
         }
+        // Soltar mantenido (B por defecto): tras un instante tira un objeto cada pocos fotogramas mientras siga pulsado, como Q mantenida en el teclado.
+        // Solo cuenta si la pulsacion empezo en el mundo (el B que cierra un menu no tira nada).
+        boolean dropDown = false;
+        for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
+            if (e.getValue() == PadAction.DROP && s.isDown(e.getKey())) dropDown = true;
+        }
+        if (dropDown && dropHeld > 0f) {
+            dropHeld += dt;
+            if (dropHeld >= DROP_DELAY) {
+                dropHeld -= DROP_INTERVAL;
+                tap(o.keyDrop);
+                dropRepeats++;
+            }
+        } else {
+            dropHeld = 0f;
+        }
+    }
+
+    private static final float DROP_DELAY = 0.35f;
+    private static final float DROP_INTERVAL = 0.1f;
+    private float dropHeld;
+    /** Veces que el soltar mantenido ha repetido (diagnostico y pruebas). */
+    public static volatile int dropRepeats;
+
+    /** Verdadero mientras el cursor de P1 lo mueve el mando (se dibuja la flecha virtual y se oculta el del sistema); un movimiento real del raton lo apaga. */
+    public static volatile boolean padCursor;
+    private double ourX = Double.NaN, ourY = Double.NaN;
+    private boolean cursorHidden;
+
+    /** Antes de mover el cursor: detecta si el raton real se ha movido desde que lo dejo el mando. */
+    private void trackCursor(Minecraft mc, PadState s) {
+        double x = mc.mouseHandler.xpos(), y = mc.mouseHandler.ypos();
+        if (padCursor && (Math.abs(x - ourX) > 0.5 || Math.abs(y - ourY) > 0.5)) padCursor = false; // el raton real manda
+        if (!padCursor && (s.downBits() != 0 || Math.abs(s.lx) > 0.3f || Math.abs(s.ly) > 0.3f)) padCursor = true; // el mando manda otra vez
+        long window = mc.getWindow().getWindow();
+        if (padCursor) {
+            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_HIDDEN);
+            cursorHidden = true;
+            ourX = x;
+            ourY = y;
+        } else if (cursorHidden) {
+            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+            cursorHidden = false;
+        }
+    }
+
+    /** Sin pantalla (o sin mando) el cursor del sistema vuelve a ser el de vanilla. */
+    private void untrackCursor(Minecraft mc) {
+        if (cursorHidden && mc.screen != null) GLFW.glfwSetInputMode(mc.getWindow().getWindow(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+        padCursor = false;
+        cursorHidden = false;
+        ourX = ourY = Double.NaN;
     }
 
     /** Cursor virtual: stick izq = cursor, A/X = clic izq/der, Y = mover rapido, stick der = scroll, B/Start = cerrar. */
@@ -221,6 +292,7 @@ public final class PadDriver {
             }
         }
 
+        TabNav.handle(mc.screen, s); // LB/RB: pestanas del creativo y paginas de los ajustes
         dpadNavigation(mc, mouse, window, s, cfg.snapNav, dt);
 
         // Clics: pulsar y soltar por separado, para poder arrastrar.
@@ -322,6 +394,13 @@ public final class PadDriver {
         if (s.pressed(padButton)) {
             mouse.consolepad$onPress(window, mouseButton, GLFW.GLFW_PRESS, 0);
             mouseDown |= 1 << mouseButton;
+            // Un primer arrastre sin desplazamiento mete en el reparto el hueco donde se pulso (vanilla solo lo anade con un evento de arrastre, y
+            // MouseHandler solo los manda cuando el cursor se ha movido).
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen instanceof AbstractContainerScreen<?>) {
+                double[] gc = guiCursor(mc);
+                mc.screen.mouseDragged(gc[0], gc[1], mouseButton, 0, 0);
+            }
         }
         if (s.released(padButton) && (mouseDown & (1 << mouseButton)) != 0) {
             mouse.consolepad$onPress(window, mouseButton, GLFW.GLFW_RELEASE, 0);

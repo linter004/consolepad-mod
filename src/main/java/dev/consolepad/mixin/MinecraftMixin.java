@@ -23,6 +23,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MinecraftMixin {
     @Shadow public ClientLevel level;
 
+    /** Dentro de renderSnowAndRain y tickRain, la calidad del clima por jugador (ver LevelRendererMixin). */
+    @Inject(method = "useFancyGraphics", at = @At("HEAD"), cancellable = true, require = 0)
+    private static void consolepad$weatherQuality(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+        if (dev.consolepad.split.PerfLimits.inWeather) cir.setReturnValue(dev.consolepad.split.PerfLimits.fancyWeather());
+    }
+
     /** setLevel de vanilla cambia pantalla, LevelRenderer, ParticleEngine... compartidos con P1. P2 solo fija su nivel. */
     @Inject(method = "setLevel", at = @At("HEAD"), cancellable = true)
     private void consolepad$secondarySetLevel(ClientLevel newLevel, ReceivingLevelScreen.Reason reason, CallbackInfo ci) {

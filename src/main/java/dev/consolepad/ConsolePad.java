@@ -27,6 +27,8 @@ public class ConsolePad {
     /** Ajustes y mandos de los 4 slots (para los mixins). */
     public static dev.consolepad.pad.PadManager PADS;
     public static final String MODID = "consolepad";
+    /** La bienvenida sale una sola vez por sesion de juego (y solo si no se marco "no volver a mostrar"). */
+    public static boolean welcomeShown;
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ConsolePad(IEventBus modBus, ModContainer container) {
@@ -35,6 +37,10 @@ public class ConsolePad {
         AutoTest.init(driver.pads());
         NeoForge.EVENT_BUS.addListener(driver::onFrame);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onNameFormat);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onBreak);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onAttack);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onUseFinish);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onExplosion);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onTabName);
 
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
@@ -43,12 +49,19 @@ public class ConsolePad {
             for (var extra : SecondaryPlayers.contexts()) SecondaryTick.tick(driver.pads().slot(extra.slotIndex), extra);
             AutoTest.tick();
         });
-        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e) -> SecondaryPlayers.shutdown());
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e) -> {
+            SecondaryPlayers.shutdown();
+            dev.consolepad.pad.Rumble.stopAll();
+        });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> {
             for (var extra : SecondaryPlayers.contexts()) ContextSwitcher.watchdog(extra);
+            dev.consolepad.split.AdaptivePerf.frame();
         });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Post e) -> AutoTest.frameEnd());
-        NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent e) -> SplitDiag.onStage(e));
+        NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent e) -> {
+            SplitDiag.onStage(e);
+            if (e.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) dev.consolepad.split.PerfLimits.applyEntityScale(net.minecraft.client.Minecraft.getInstance());
+        });
         NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) -> {
             var root = Commands.literal("consolepad");
             for (int slot = 1; slot <= SecondaryPlayers.MAX_EXTRA; slot++) {
@@ -73,6 +86,27 @@ public class ConsolePad {
                     name, mc.player == null ? "null" : mc.player.getName().getString(),
                     mc.player != null && !mc.player.getName().getString().equals(name)));
         });
+        // Bienvenida de la primera vez, sobre el titulo (nunca durante el autotest ni la generacion de capturas).
+        NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> {
+            Minecraft mc = Minecraft.getInstance();
+            dev.consolepad.split.WorldEntry.tick(mc);
+            dev.consolepad.split.RumbleTick.tick(mc);
+            dev.consolepad.split.PaperDoll.tick(mc);
+            dev.consolepad.split.CleanCheck.tick(mc);
+            if (mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen && !welcomeShown && !AutoTest.running()
+                    && !dev.consolepad.split.ShotsTest.ENABLED && !dev.consolepad.split.SplitSettings.welcomeSeen()) {
+                welcomeShown = true;
+                mc.setScreen(new dev.consolepad.split.WelcomeScreen(mc.screen));
+            }
+        });
+        // Boton "Mandos" en el titulo: asignar mandos a jugadores antes de entrar en un mundo.
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ScreenEvent.Init.Post e) -> {
+            if (e.getScreen() instanceof net.minecraft.client.gui.screens.TitleScreen title) {
+                e.addListener(net.minecraft.client.gui.components.Button.builder(net.minecraft.network.chat.Component.literal("Mandos"),
+                        b -> Minecraft.getInstance().setScreen(new dev.consolepad.split.PadSetupScreen(title))).bounds(4, 4, 56, 20).build());
+            }
+        });
+        dev.consolepad.split.Compat.logOnce();
         LOGGER.info("ConsolePad cargado");
     }
 }

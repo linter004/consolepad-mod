@@ -23,6 +23,11 @@ public final class PlayerLabels {
         return c < 0 || c >= COLOR_RGB.length ? 0 : c;
     }
 
+    /** Color RGB (sin alfa) de la etiqueta del slot; blanco si no ha elegido ninguno. */
+    public static int rgbOf(int slot) {
+        return COLOR_RGB[colorIndex(slot)];
+    }
+
     /** Nombre visible del slot ya con su color de etiqueta. */
     public static Component styled(int slot, String text) {
         int c = colorIndex(slot);

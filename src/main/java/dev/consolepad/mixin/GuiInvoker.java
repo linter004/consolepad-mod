@@ -22,6 +22,14 @@ public interface GuiInvoker {
     @Invoker("maybeRenderPlayerHealth")
     void consolepad$renderPlayerHealth(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
 
+    /** Barra de salto de la montura (caballo, mula...): sustituye a la de experiencia mientras se monta. */
+    @Invoker("maybeRenderJumpMeter")
+    void consolepad$renderJumpMeter(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
+    /** Corazones de la montura (sobre la comida del jugador). */
+    @Invoker("maybeRenderVehicleHealth")
+    void consolepad$renderVehicleHealth(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
+
     @Invoker("renderExperienceLevel")
     void consolepad$renderExperienceLevel(GuiGraphics guiGraphics, DeltaTracker deltaTracker);
 

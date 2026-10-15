@@ -25,6 +25,7 @@ public final class PadNames {
             case PLAYER_LIST -> "Jugadores";
             case CHAT -> "Chat";
             case PAUSE -> "Pausa";
+            case QUICK_WHEEL -> "Acciones";
         };
     }
 

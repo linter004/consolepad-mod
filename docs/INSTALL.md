@@ -12,8 +12,8 @@ ConsolePad añade soporte de mandos estilo consola y pantalla dividida local de 
 ## Instalar
 
 1. Instala NeoForge 21.1.x para Minecraft 1.21.1 con su instalador y crea un perfil en el lanzador.
-2. Copia `consolepad-0.9.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
-3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.9.0-beta**.
+2. Copia `consolepad-0.11.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
+3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.11.0-beta**.
 
 ## Cómo se unen los jugadores
 
@@ -51,7 +51,7 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 ## Lista de comprobación para una instalación limpia
 
 1. [ ] Minecraft 1.21.1 con NeoForge 21.1.x y Java 21.
-2. [ ] `consolepad-0.9.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
+2. [ ] `consolepad-0.11.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
 3. [ ] El juego arranca y **ConsolePad** aparece en la lista de mods.
 4. [ ] Con un mando conectado, P1 se mueve y gira con él y Start abre su menú de pausa.
 5. [ ] En un mundo de un jugador, con un segundo mando, aparece «Unirse como el jugador 2»; Start lo mete y la pantalla se divide.
@@ -62,12 +62,11 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 
 ## Problemas conocidos
 
-- **Sodium e Iris:** sin verificar. El mod sustituye partes del dibujo del mundo para cada jugador; con mods que cambian el renderizador puede no funcionar. Prueba sin ellos.
+- **Sodium e Iris:** el juego arranca y la pantalla dividida de 4 jugadores se dibuja bien con Sodium 0.8.13 e Iris 1.8.14 en NeoForge 21.1.248. Los shaders de Iris no funcionan con la pantalla dividida (se ve bien solo la última pasada): ConsolePad los apaga mientras haya jugadores extra y los enciende al quedar uno; con `"keepShaders": true` en `config/consolepad/split.json` se dejan puestos. Otros mods de renderizado, sin verificar.
 - **Solo mundos locales, LAN o servidores sin autenticación:** los jugadores extra se conectan por dentro del juego. En un servidor con autenticación no pueden entrar.
 - **Cierre del mundo:** las tres excepciones (`NullPointerException` en `handleSoundEvent` y `hurtTo` al salir un jugador extra con paquetes todavía en cola) están corregidas; el cierre con 1 y con 4 jugadores no deja ningún `ERROR` en el log.
 - **Un fallo raro del servidor al entrar un jugador extra** (`IndexOutOfBoundsException` al preparar un chunk, visto 1 vez en unas 20 pruebas, justo cuando cambiaba la distancia de visión): el informe queda en `crash-reports`. Si te pasa, guarda el informe y avisa.
-- **Partículas ambientales** (antorchas, lava, portales) cerca de P2 a P4: todavía no se generan; las de romper, golpear, comer, pociones y recoger objetos sí.
-- **Sin vibración del mando ni volumen por jugador:** el sonido es el de P1 (ver `docs/splitscreen-roadmap.md`).
-- **Un jugador extra con el mando desconectado** queda en pausa con un aviso hasta que el mando vuelva; no hay forma de sacarlo desde P1.
+- **Vibración solo en mandos XInput (Windows).** El sonido por jugador mueve los sonidos de los demás al oyente de P1 (OpenAL tiene uno solo): se oye lo que pasa junto a cada jugador, con la distancia y la dirección de ese jugador (se apaga con `"soundPerPlayer": false` en `split.json`).
+- **Un jugador extra con el mando desconectado** queda en pausa con un aviso; a los 30 s sale solo, o P1 lo saca antes desde su menú de pausa («Sacar a un jugador»).
 - **Skins:** todos los jugadores locales usan el perfil del servidor; se distinguen por la etiqueta con nombre (y color) sobre la cabeza.
 - El resto de pendientes y límites están en `docs/splitscreen-roadmap.md`.

@@ -16,6 +16,8 @@ public final class PadSettings {
     public LookControl.Curve lookCurve = LookControl.Curve.SMOOTH;
     /** Multiplicador de la sensibilidad de la camara al apuntar con arco, ballesta o catalejo (1 = la misma). */
     public float aimSensitivity = 1f;
+    /** Factor de la sensibilidad de la camara mientras la mira esta sobre un ser vivo (1 = sin ayuda): frena un poco el giro para acertar mas facil. */
+    public float targetSlowdown = 0.8f;
     /** Sensibilidad vertical (grados por segundo); 0 = la misma que la horizontal. */
     public float lookSpeedY = 0f;
     /** Empujar dos veces seguidas el stick izquierdo hacia delante activa el sprint. */
@@ -27,6 +29,8 @@ public final class PadSettings {
     public boolean showHand = true;
     /** Campo de vision de este jugador (grados); 0 = el de las opciones del juego. */
     public int fov = 0;
+    /** Compensacion del campo de vision al dividir la pantalla (0 = ninguna, 0.5 = media, 1 = total): sube el FOV vertical en regiones estrechas. */
+    public float fovComp = 0.5f;
     /** Distancia de chunks de este jugador (4 a 32); 0 = la de las opciones del juego. La automatica por numero de jugadores es un tope (PerfLimits). */
     public int viewDistance = 0;
     public float triggerThreshold = 0.5f;
@@ -40,6 +44,14 @@ public final class PadSettings {
     public boolean showCoords = false;
     public boolean showDirection = false;
     public boolean showFps = false;
+    /** Punto sobre la barra de experiencia que apunta hacia los demas jugadores cuando estan lejos (como la barra de localizacion de Bedrock), con su nombre y distancia. */
+    public boolean showCompanions = true;
+    /** Salto automatico de este jugador al subir bloques de uno en uno: 0 = como la opcion del juego, 1 = si, 2 = no. */
+    public int autoJump = 0;
+    /** Muñeco del jugador en una esquina mientras corre, se agacha, nada o planea (como en Bedrock). */
+    public boolean paperDoll = true;
+    /** Fuerza de la vibracion del mando de este jugador (0 = apagada, 1 = maxima). */
+    public float vibration = 0.7f;
     /** Color de la etiqueta con el nombre sobre la cabeza (indice de PlayerLabels.COLORS; 0 = sin color). */
     public int labelColor = 0;
     /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */
@@ -65,6 +77,26 @@ public final class PadSettings {
     public boolean reduceEffects = false;
     /** Accesibilidad: los botones de mantener (agacharse, correr, atacar, usar) pasan a alternar. */
     public boolean toggleHolds = false;
+    /** Iconos de botones de este jugador: 0 = los de su mando, 1 = Xbox, 2 = PlayStation, 3 = Nintendo (el orden de PadType + 1). */
+    public int iconStyle = 0;
+
+    /** Entrada de la rueda de acciones rapidas propia del jugador. */
+    public static final class WheelEntry {
+        public String label = "";
+        public String command = "";
+
+        public WheelEntry(String label, String command) {
+            this.label = label;
+            this.command = command;
+        }
+    }
+
+    /** Rueda propia del jugador (null = la comun, config/consolepad/wheel.json). La lista no se modifica: se sustituye entera. */
+    public java.util.List<WheelEntry> wheel = null;
+    /** Perfil local que usa este jugador (id = nombre de cuenta con el que entra, ver dev.consolepad.split.Profiles); vacio = ninguno. Es de identidad: no se copia. */
+    public String profileId = "";
+    /** La rueda de acciones rapidas ya se ofrecio a este jugador (los ajustes guardados de antes no la traen: se le da la cruceta izquierda una sola vez si estaba libre). */
+    public boolean wheelOffered = false;
 
     /** Si la accion se alterna con una pulsacion (true) o se mantiene (false). */
     public boolean isToggle(PadAction a) {
@@ -79,7 +111,7 @@ public final class PadSettings {
 
     /** Lo propio de cada jugador que ni copiar ni restablecer tocan (quien es, no como juega). */
     private static boolean isIdentity(String field) {
-        return field.equals("playerName") || field.equals("labelColor");
+        return field.equals("playerName") || field.equals("labelColor") || field.equals("profileId");
     }
 
     /** Copia todos los ajustes de otro jugador (botones incluidos, copia profunda) salvo su nombre y su color de etiqueta. */
@@ -128,6 +160,7 @@ public final class PadSettings {
         m.put(PadState.R3, PadAction.SNEAK_TOGGLE);
         m.put(PadState.DPAD_UP, PadAction.PERSPECTIVE);
         m.put(PadState.DPAD_DOWN, PadAction.PICK_BLOCK);
+        m.put(PadState.DPAD_LEFT, PadAction.QUICK_WHEEL);
         m.put(PadState.DPAD_RIGHT, PadAction.CHAT);
         m.put(PadState.BACK, PadAction.PLAYER_LIST);
         m.put(PadState.RT, PadAction.ATTACK);

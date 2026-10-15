@@ -59,6 +59,18 @@ public final class ContextSwitcher {
         return active ? current : null;
     }
 
+    private static net.minecraft.world.item.ItemStack[] creativeItems() {
+        var c = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$container();
+        net.minecraft.world.item.ItemStack[] out = new net.minecraft.world.item.ItemStack[c.getContainerSize()];
+        for (int i = 0; i < out.length; i++) out[i] = c.getItem(i);
+        return out;
+    }
+
+    private static void setCreativeItems(net.minecraft.world.item.ItemStack[] items) {
+        var c = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$container();
+        for (int i = 0; i < c.getContainerSize(); i++) c.setItem(i, items != null && i < items.length ? items[i] : net.minecraft.world.item.ItemStack.EMPTY);
+    }
+
     public static void run(PlayerContext ctx, Runnable body) {
         Minecraft mc = Minecraft.getInstance();
         if (active) { // anidado (p. ej. paquetes dentro de un bundle): ya estamos en el contexto
@@ -81,6 +93,9 @@ public final class ContextSwitcher {
         float p1Fov = gr.consolepad$getFov();
         float p1OldFov = gr.consolepad$getOldFov();
 
+        net.minecraft.world.item.CreativeModeTab p1Tab = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$selectedTab();
+        final boolean creativeSwap = true; // siempre: una pantalla creativa puede abrirse dentro del propio cuerpo (45 referencias, sin copias)
+        net.minecraft.world.item.ItemStack[] p1Items = creativeSwap ? creativeItems() : null;
         ParticleEngineAccessor particles = (ParticleEngineAccessor) mc.particleEngine;
         ClientLevel p1ParticleLevel = particles.consolepad$getLevel();
         active = true;
@@ -98,6 +113,8 @@ public final class ContextSwitcher {
         opts.consolepad$setCameraType(ctx.cameraType);
         gr.consolepad$setFov(ctx.fov);
         gr.consolepad$setOldFov(ctx.oldFov);
+        dev.consolepad.mixin.CreativeScreenAccessor.consolepad$setSelectedTab(ctx.creativeTab != null ? ctx.creativeTab : net.minecraft.world.item.CreativeModeTabs.getDefaultTab());
+        if (creativeSwap) setCreativeItems(ctx.creativeItems);
         try {
             body.run();
         } finally {
@@ -116,6 +133,12 @@ public final class ContextSwitcher {
             opts.consolepad$setCameraType(p1CameraType);
             ctx.fov = gr.consolepad$getFov();
             ctx.oldFov = gr.consolepad$getOldFov();
+            ctx.creativeTab = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$selectedTab();
+            if (creativeSwap) {
+                ctx.creativeItems = creativeItems();
+                setCreativeItems(p1Items);
+            }
+            dev.consolepad.mixin.CreativeScreenAccessor.consolepad$setSelectedTab(p1Tab);
             gr.consolepad$setFov(p1Fov);
             gr.consolepad$setOldFov(p1OldFov);
             particles.consolepad$setLevel(p1ParticleLevel);

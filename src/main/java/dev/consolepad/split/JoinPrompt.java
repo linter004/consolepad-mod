@@ -74,7 +74,7 @@ public final class JoinPrompt {
         int minX = Integer.MAX_VALUE, maxX = 0, minY = Integer.MAX_VALUE, maxY = 0;
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
             if ((mask & (1 << i)) == 0) continue;
-            var type = pads.slot(i).device.type;
+            var type = pads.slot(i).iconType();
             String text = "Unirse como el jugador " + (i + 1);
             int iconW = PadIcons.width(font, PadState.START, type);
             int totalW = iconW + 4 + font.width(text);

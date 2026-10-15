@@ -49,6 +49,8 @@ public final class ConsoleCraft {
     /** Recetas fabricadas con A desde el arranque, por slot (pruebas). */
     public static final int[] crafted = new int[4];
     /** Si la ultima receta pulsada con A estaba marcada como fabricable (diagnostico). */
+    /** Veces que Y ha fabricado "todo" en cada slot (diagnostico y pruebas). */
+    public static final int[] craftedAll = new int[4];
     public static final boolean[] lastCraftable = new boolean[4];
 
     private ConsoleCraft() {}
@@ -169,8 +171,18 @@ public final class ConsoleCraft {
             return false;
         }
         if (!bookVisible(screen)) return false;
+        if (s.pressed(PadState.LT)) changePage(screen, -1); // LT/RT: pagina de recetas
+        if (s.pressed(PadState.RT)) changePage(screen, 1);
         if (s.pressed(PadState.LB)) changeTab(screen, -1);
         if (s.pressed(PadState.RB)) changeTab(screen, 1);
+        if (s.pressed(PadState.Y)) { // Y sobre una receta: fabrica todo lo que dan los ingredientes (como mayus + clic en vanilla)
+            RecipeButton b = recipeAt(screen, cx, cy);
+            if (b != null) {
+                craftAll(mc, screen, st, b, cx, cy);
+                craftedAll[slot]++;
+                return true;
+            }
+        }
         if (s.pressed(PadState.A)) {
             RecipeButton b = recipeAt(screen, cx, cy);
             if (b != null) {
@@ -205,6 +217,17 @@ public final class ConsoleCraft {
     public static void toggleFilter(Screen screen) {
         var f = ((RecipeBookComponentAccessor) book(screen)).consolepad$filter();
         if (f != null) book(screen).mouseClicked(f.getX() + f.getWidth() / 2.0, f.getY() + f.getHeight() / 2.0, 0);
+    }
+
+    /** Coloca la receta con "mayus" (reparte los ingredientes por toda la cuadricula) y el mover rapido del resultado fabrica todas las veces que se pueda. */
+    private static void craftAll(Minecraft mc, Screen screen, State st, RecipeButton b, double cx, double cy) {
+        if (!b.getCollection().isCraftable(b.getRecipe()) || mc.gameMode == null || mc.player == null) {
+            craft(screen, st, b, cx, cy); // sin ingredientes: como A (receta fantasma)
+            return;
+        }
+        mc.gameMode.handlePlaceRecipe(mc.player.containerMenu.containerId, b.getRecipe(), true);
+        lastCraftable[slotOf(st)] = true;
+        st.pendingUntil = System.nanoTime() + 1_500_000_000L;
     }
 
     private static void craft(Screen screen, State st, RecipeButton b, double cx, double cy) {

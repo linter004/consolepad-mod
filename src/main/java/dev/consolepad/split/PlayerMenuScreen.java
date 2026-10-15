@@ -22,6 +22,13 @@ public abstract class PlayerMenuScreen extends Screen implements PlayerScreen {
         return ConsolePad.PADS.slot(slot).settings;
     }
 
+    /** Y de la fila de botones de abajo (Atras, paginas): por encima de la barra de ayuda de botones, que se dibuja pegada al borde inferior. */
+    protected int footerY() {
+        var ps = ConsolePad.PADS.slot(slot);
+        int bar = ps.device != null && ps.settings.showHints ? Math.round((PadIcons.H + 3) * (ps.settings.bigHints ? PadHints.BIG : 1f)) : 0;
+        return this.height - ROW_H - Math.max(4, bar + 2);
+    }
+
     /** Y del primer boton de una columna de n botones, centrada pero sin tapar el titulo. */
     protected int firstRowY(int rows) {
         return Math.max(24, (this.height - rows * PITCH) / 2 + 8);
@@ -31,10 +38,27 @@ public abstract class PlayerMenuScreen extends Screen implements PlayerScreen {
         return addRenderableWidget(Button.builder(text, press).bounds(this.width / 2 - ROW_W / 2, firstRowY(rows) + index * PITCH, ROW_W, ROW_H).build());
     }
 
+    /** Momento en que se abrio el menu, para la animacion de entrada. */
+    private final long openedNanos = System.nanoTime();
+    private static final double ANIM_SECONDS = 0.18;
+
+    /** Avance de la animacion de entrada (0 a 1, con frenado al final). */
+    protected float openProgress() {
+        double t = Math.min(1.0, (System.nanoTime() - openedNanos) / 1e9 / ANIM_SECONDS);
+        return (float) (1 - Math.pow(1 - t, 3));
+    }
+
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
+        float e = openProgress();
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, (1 - e) * 10, 0); // el menu sube unos pixeles al abrirse
+        try {
+            super.render(graphics, mouseX, mouseY, partialTick);
+            graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
+        } finally {
+            graphics.pose().popPose();
+        }
     }
 
     public static int[] center(Button b) {

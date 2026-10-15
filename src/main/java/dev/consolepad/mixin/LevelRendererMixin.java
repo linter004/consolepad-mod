@@ -14,24 +14,28 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
-    @Redirect(method = "renderLevel",
+    @Redirect(method = "renderLevel", require = 0,
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;bindWrite(Z)V"))
     private void consolepad$keepRegionViewport(RenderTarget target, boolean setViewport) {
         target.bindWrite(setViewport);
         SplitView.restoreViewport();
     }
 
-    /** Dibujo de entidades mas corto con 3 y 4 jugadores (PerfLimits.entityScale). */
-    @org.spongepowered.asm.mixin.injection.ModifyArg(method = "setupRender", index = 0,
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;setViewScale(D)V"))
-    private double consolepad$entityScale(double scale) {
-        return scale * dev.consolepad.split.PerfLimits.entityScale();
+    // La escala de dibujo de entidades con 3 y 4 jugadores ya no es un mixin sobre setupRender (Sodium reescribe ese metodo y el mixin tumbaba el
+    // arranque): la aplica PerfLimits.applyEntityScale desde RenderLevelStageEvent.
+
+    /**
+     * Lluvia rapida con 3 y 4 jugadores (PerfLimits.fancyWeather). Antes era un @Redirect de Minecraft.useFancyGraphics() dentro de estos metodos, y Sodium
+     * redirige esa misma llamada (dos @Redirect no caben y el de Sodium es critico: el juego no arrancaba). Ahora solo se marca que se esta en el clima y
+     * Minecraft.useFancyGraphics() (MinecraftMixin) responde con el valor rapido mientras la marca esta puesta; si Sodium redirige la llamada, manda su opcion.
+     */
+    @org.spongepowered.asm.mixin.injection.Inject(method = {"renderSnowAndRain", "tickRain"}, at = @At("HEAD"), require = 0)
+    private void consolepad$weatherStart(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        dev.consolepad.split.PerfLimits.inWeather = true;
     }
 
-    /** Lluvia rapida con 3 y 4 jugadores (PerfLimits.fancyWeather). */
-    @Redirect(method = {"renderSnowAndRain", "tickRain"},
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;useFancyGraphics()Z"))
-    private boolean consolepad$weatherQuality() {
-        return dev.consolepad.split.PerfLimits.fancyWeather();
+    @org.spongepowered.asm.mixin.injection.Inject(method = {"renderSnowAndRain", "tickRain"}, at = @At("RETURN"), require = 0)
+    private void consolepad$weatherEnd(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        dev.consolepad.split.PerfLimits.inWeather = false;
     }
 }

@@ -31,7 +31,7 @@ public final class ShotsTest {
     static final String OUT = System.getenv("CONSOLEPAD_SHOTS");
     public static final boolean ENABLED = OUT != null && !OUT.isBlank();
     private static final String WORLD = "cp-shots-temp-" + System.currentTimeMillis();
-    private static int phase, ticks;
+    private static int phase, ticks, welcomeStep, welcomeT;
     private static String pendingName;
     private static Difficulty prevDifficulty;
     private static int prevGuiScale = -1;
@@ -93,6 +93,21 @@ public final class ShotsTest {
         });
     }
 
+    /** Pone a P2 a unos 30 bloques de P1 para la captura del indicador del companero. */
+    private static void farAway(Minecraft mc) {
+        ServerPlayer p1 = server(mc, 0);
+        if (p1 == null) return;
+        int bx = (int) Math.floor(p1.getX()), bz = (int) Math.floor(p1.getZ());
+        mc.getSingleplayerServer().execute(() -> {
+            ServerPlayer sp = server(mc, 1);
+            if (sp == null) return;
+            ServerLevel level = (ServerLevel) sp.level();
+            int x = bx + 20, z = bz + 22;
+            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            sp.teleportTo(level, x + 0.5, y, z + 0.5, 135f, 8f);
+        });
+    }
+
     private static void shot(String name) {
         pendingName = name;
     }
@@ -100,10 +115,37 @@ public final class ShotsTest {
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
         ticks++;
+        if (phase == 0 && ticks == 1) { // las capturas salen con los nombres de fabrica, no con el perfil de quien las genera (el script restaura los archivos)
+            for (int i = 0; i < dev.consolepad.pad.PadManager.MAX_PLAYERS; i++) {
+                ConsolePad.PADS.slot(i).settings.playerName = "";
+                ConsolePad.PADS.slot(i).settings.labelColor = 0;
+                ConsolePad.PADS.slot(i).settings.profileId = "";
+            }
+        }
         if (phase >= 1 && phase < 90 && mc.level != null) mc.options.pauseOnLostFocus = false;
         switch (phase) {
             case 0 -> {
-                if (mc.screen instanceof TitleScreen && ticks > 60) {
+                if (welcomeStep == 0 && mc.screen instanceof TitleScreen && ticks > 60) { // la bienvenida, a tamano pequeno (la ventana aun no se ha agrandado)
+                    mc.setScreen(new WelcomeScreen(mc.screen));
+                    welcomeStep = 1;
+                    welcomeT = ticks;
+                } else if (welcomeStep == 1 && ticks - welcomeT > 20) {
+                    shot("welcome.png");
+                    welcomeStep = 2;
+                    welcomeT = ticks;
+                } else if (welcomeStep == 2 && ticks - welcomeT > 10) {
+                    mc.setScreen(new PadSetupScreen(mc.screen)); // asignar mandos antes de entrar
+                    welcomeStep = 20;
+                    welcomeT = ticks;
+                } else if (welcomeStep == 20 && ticks - welcomeT > 20) {
+                    shot("setup.png");
+                    welcomeStep = 21;
+                    welcomeT = ticks;
+                } else if (welcomeStep == 21 && ticks - welcomeT > 10) {
+                    mc.setScreen(new TitleScreen());
+                    welcomeStep = 3;
+                    welcomeT = ticks;
+                } else if (welcomeStep == 3 && mc.screen instanceof TitleScreen && ticks - welcomeT > 10) {
                     ConsolePad.LOGGER.info("[shots] creando el mundo temporal");
                     created = true;
                     levelId = WORLD;
@@ -148,7 +190,9 @@ public final class ShotsTest {
             }
             case 4 -> {
                 if (ticks == 200) shot("split-2-players.png");
-                if (ticks == 210) go(5);
+                if (ticks == 205) farAway(mc);
+                if (ticks == 290) shot("companion.png"); // con el companero lejos: el punto sobre la barra de experiencia
+                if (ticks == 300) go(5);
             }
             case 5 -> { // 4 jugadores
                 if (!AutoTest.joinTo(mc, 4)) return;
@@ -195,8 +239,39 @@ public final class ShotsTest {
             }
             case 9 -> { // ajustes del jugador
                 if (ticks == 20) mc.setScreen(new PlayerSettingsScreen(0, null));
+                if (ticks == 40) mc.setScreen(new PlayerPauseScreen(0));
+                if (ticks == 55) shot("pause.png");
+                if (ticks == 62) mc.setScreen(new PlayerSettingsScreen(0, null));
                 if (ticks == 70) shot("player-settings.png");
-                if (ticks == 80) {
+                if (ticks == 80) mc.setScreen(new PlayerControlsScreen(0, null)); // diagrama del mando
+                if (ticks == 130) shot("controls-diagram.png");
+                if (ticks == 140) {
+                    mc.setScreen(null);
+                    go(80);
+                }
+            }
+            case 80 -> { // inventario creativo: fichas LB/RB/LT/RT y marco de la ranura bajo el cursor
+                if (ticks == 1) ConsolePad.PADS.slot(0).settings.hudMargin = 6; // zona segura al 6 %: captura del HUD
+                if (ticks == 8) shot("margin.png");
+                if (ticks == 12) ConsolePad.PADS.slot(0).settings.hudMargin = 0;
+                if (ticks == 13) {
+                    var srv = mc.getSingleplayerServer();
+                    var sp = srv.getPlayerList().getPlayer(mc.player.getUUID());
+                    srv.execute(() -> sp.setGameMode(GameType.CREATIVE));
+                }
+                if (ticks == 32) {
+                    mc.setScreen(new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(mc.player, mc.player.connection.enabledFeatures(), true));
+                }
+                if (ticks == 57 && mc.screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen c) {
+                    var slot = c.getMenu().slots.get(14);
+                    double k = mc.getWindow().getGuiScale();
+                    double px = (c.getGuiLeft() + slot.x + 8) * k, py = (c.getGuiTop() + slot.y + 8) * k;
+                    long window = mc.getWindow().getWindow();
+                    org.lwjgl.glfw.GLFW.glfwSetCursorPos(window, px, py);
+                    ((dev.consolepad.mixin.MouseHandlerInvoker) mc.mouseHandler).consolepad$onMove(window, px, py);
+                }
+                if (ticks == 87) shot("creative.png");
+                if (ticks == 97) {
                     mc.setScreen(null);
                     go(90);
                 }

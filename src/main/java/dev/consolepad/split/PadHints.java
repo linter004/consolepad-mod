@@ -46,8 +46,7 @@ public final class PadHints {
     }
 
     private static PadType typeOf(int slot) {
-        PadManager.Device d = ConsolePad.PADS.slot(slot).device;
-        return d == null ? PadType.XBOX : d.type;
+        return ConsolePad.PADS.slot(slot).iconType();
     }
 
     // ------------------------------------------------------------------ HUD
@@ -78,7 +77,7 @@ public final class PadHints {
         if (ps.device == null || !ps.settings.showHints || mc.player == null || mc.options.hideGui || mc.screen != null) return;
         if (mc.player.isSpectator()) return;
         PadSettings cfg = ps.settings;
-        PadType type = ps.device.type;
+        PadType type = ps.iconType();
 
         List<Hint> left = new ArrayList<>();
         int drop = buttonFor(cfg, PadAction.DROP);
@@ -91,11 +90,12 @@ public final class PadHints {
         String attackText = attackLabel(mc.hitResult);
         if (attack >= 0 && attackText != null) right.add(new Hint(attack, attackText));
         int use = buttonFor(cfg, PadAction.USE);
-        if (use >= 0) right.add(new Hint(use, useLabel(mc.player)));
+        if (use >= 0) right.add(new Hint(use, Interact.useLabel(mc.player, mc.level, mc.hitResult)));
 
         Font font = mc.font;
         // La barra de objetos ocupa 182 de ancho en el centro: la ayuda de cada lado se encoge si no cabe en lo que queda.
-        int margin = Math.max(24, (w - 182) / 2 - 8);
+        int offhand = mc.player.getOffhandItem().isEmpty() ? 0 : 29; // la ranura de la mano izquierda va pegada a la izquierda de la barra (el mapa, el escudo...)
+        int margin = Math.max(24, (w - 182) / 2 - 8 - offhand);
         int[] boxL = {Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 0}, boxR = {Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 0};
         float boost = cfg.bigHints ? BIG : 1f;
         drawColumn(g, font, left, type, 4, h - 4, margin, false, boxL, boost);
@@ -171,14 +171,26 @@ public final class PadHints {
         out.add(new Hint(PadState.B, screen instanceof PlayerMenuScreen || screen instanceof net.minecraft.client.gui.screens.PauseScreen ? "Volver" : "Salir"));
         if (screen instanceof AbstractContainerScreen<?>) {
             out.add(new Hint(PadState.X, "Coger la mitad"));
-            out.add(new Hint(PadState.Y, "Movimiento rápido"));
+            out.add(new Hint(PadState.Y, craftBook && ConsoleCraft.hovering(keyboardSlot) ? "Fabricar todo" : "Movimiento rápido"));
         }
-        if (screen instanceof PlayerScreen ps && ps.hintTabs()) out.add(new Hint(PadState.LB, "Pestañas"));
+        if (screen instanceof PlayerSettingsScreen) out.add(new Hint(PadState.X, "Valor anterior"));
+        if (screen instanceof PlayerScreen ps && ps.hintTabs()) {
+            out.add(new Hint(PadState.LB, "Página anterior"));
+            out.add(new Hint(PadState.RB, "Página siguiente"));
+        }
+        if (screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen) {
+            out.add(new Hint(PadState.LB, "Categoría"));
+            out.add(new Hint(PadState.RB, "Categoría"));
+            out.add(new Hint(PadState.LT, "Página anterior"));
+            out.add(new Hint(PadState.RT, "Página siguiente"));
+        }
         if (craftBook) {
             out.add(new Hint(PadState.L3, "Libro de recetas"));
             if (ConsoleCraft.bookVisible(screen)) {
                 out.add(new Hint(PadState.LB, "Categoría"));
                 out.add(new Hint(PadState.RB, "Categoría"));
+                out.add(new Hint(PadState.LT, "Página anterior"));
+                out.add(new Hint(PadState.RT, "Página siguiente"));
             }
         }
         return out;
@@ -192,13 +204,14 @@ public final class PadHints {
         lastBar[slot] = "";
         lastBarBox[slot] = new int[] {0, 0, 0, 0};
         PadManager.Slot ps = ConsolePad.PADS.slot(slot);
+        if (screen != null) TabNav.render(g, screen, w, h, ps.iconType()); // flecha de la categoria actual y fichas LB/RB
         if (screen == null || ps.device == null || !ps.settings.showHints) return;
         keyboardSlot = slot;
         List<Hint> hints = screenHints(screen);
         keyboardSlot = -1;
         if (hints.isEmpty()) return;
         Font font = mc.font;
-        PadType type = ps.device.type;
+        PadType type = ps.iconType();
         int total = 0;
         for (Hint hint : hints) total += PadIcons.width(font, hint.code(), type) + 3 + font.width(hint.text()) + 10;
         total -= 10;

@@ -6,5 +6,6 @@ public enum PadAction {
     HOTBAR_PREV, HOTBAR_NEXT,
     SPRINT_TOGGLE, SNEAK_TOGGLE,
     PICK_BLOCK, PLAYER_LIST, CHAT,
-    PAUSE
+    PAUSE,
+    QUICK_WHEEL
 }

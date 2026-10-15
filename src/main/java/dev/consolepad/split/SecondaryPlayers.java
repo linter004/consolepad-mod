@@ -99,6 +99,8 @@ public final class SecondaryPlayers {
     }
 
     public static String secondaryName(Minecraft mc, int slot) {
+        var profile = Profiles.of(slot);
+        if (profile != null && slot >= 1) return profile.id; // un jugador con perfil entra con la cuenta del perfil: su inventario y su reaparicion son suyos
         String base = mc.getUser().getName();
         if (base.length() > 14) base = base.substring(0, 14);
         return base + "_" + (slot + 1);

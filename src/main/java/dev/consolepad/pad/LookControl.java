@@ -58,6 +58,12 @@ public final class LookControl {
         out[1] = pitch * cfg.lookSpeedY() * k;
     }
 
+    /** Factor extra de la sensibilidad con un ser vivo bajo la mira (ayuda de apuntado de cada jugador); 1 si no hay o esta apagada. */
+    public static float targetFactor(PadSettings cfg, net.minecraft.world.entity.Entity underCrosshair) {
+        if (!(underCrosshair instanceof net.minecraft.world.entity.LivingEntity)) return 1f;
+        return Math.max(0.2f, Math.min(1f, cfg.targetSlowdown));
+    }
+
     /** Apuntando: tensando un arco o una ballesta, o mirando por el catalejo. */
     public static boolean isAiming(Player p) {
         if (p == null || !p.isUsingItem()) return false;

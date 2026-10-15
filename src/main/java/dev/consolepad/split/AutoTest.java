@@ -72,6 +72,12 @@ public final class AutoTest {
 
     private AutoTest() {}
 
+    /** Pide una captura de la ventana al terminar el siguiente fotograma (carpeta screenshots del juego). */
+    static void requestShot(String name) {
+        screenshotName = name;
+        screenshotPending = true;
+    }
+
     /** Al terminar cada frame (RenderFrameEvent.Post): aqui se hace la captura, con el frame ya dibujado. */
     public static void frameEnd() {
         if (ShotsTest.ENABLED) ShotsTest.frame();
@@ -239,6 +245,7 @@ public final class AutoTest {
     }
 
     private static net.minecraft.world.Difficulty prevDifficulty;
+    private static net.minecraft.world.level.GameType p2StartMode;
     private static int prevGuiScale = -1;
     private static boolean prevPauseOnLostFocus;
 
@@ -297,8 +304,9 @@ public final class AutoTest {
                 ItemStack server = p2 == null ? ItemStack.EMPTY : p2.getInventory().getItem(20);
                 ItemStack client = c == null || c.player == null ? ItemStack.EMPTY : c.player.getInventory().getItem(20);
                 boolean ok = server.is(Items.DIAMOND) && server.getCount() == 7 && client.is(Items.DIAMOND) && client.getCount() == 7;
-                ConsolePad.LOGGER.info("[autotest] RESULTADO reentrada de P2: inventario slot 20 en servidor = {} x{}, en cliente = {} x{} (esperado 7 diamantes) -> {}",
-                        server.getItem(), server.getCount(), client.getItem(), client.getCount(), ok ? "OK" : "FALLO");
+                ConsolePad.LOGGER.info("[autotest] RESULTADO reentrada de P2: inventario slot 20 en servidor = {} x{}, en cliente = {} x{} (esperado 7 diamantes), "
+                                + "sincronizaciones de registros omitidas={} -> {}",
+                        server.getItem(), server.getCount(), client.getItem(), client.getCount(), SplitDiag.registrySyncSkipped, ok ? "OK" : "FALLO");
                 leaveSub = 4;
                 ticks = 0;
             }
@@ -307,6 +315,8 @@ public final class AutoTest {
                 if (V1Test.EXIT_PLAYERS == 1 && !leaveTo(mc, 1)) return; // CONSOLEPAD_EXIT_PLAYERS=1: se cierra el mundo con P1 solo
                 var srv = mc.getSingleplayerServer();
                 if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
+                ServerPlayer p2Last = serverP2(mc);
+                if (p2Last != null && p2StartMode != null) srv.execute(() -> p2Last.setGameMode(p2StartMode));
                 if (prevGuiScale >= 0) mc.options.guiScale().set(prevGuiScale);
                 mc.options.pauseOnLostFocus = prevPauseOnLostFocus;
                 ConsolePad.LOGGER.info("[autotest] P1 sale del mundo (dificultad restaurada a {})", prevDifficulty);
@@ -1642,7 +1652,20 @@ public final class AutoTest {
     // ---------------------------------------------------------------- crafteo estilo consola (libro de recetas con mando)
 
     private static boolean ccOk = true, ccBookInit, ccFilterInit;
-    private static int ccSlot, ccStep, ccTabs, ccTab0, ccPlanks0, ccTable0;
+    private static int ccSlot, ccStep, ccTabs, ccTab0, ccPlanks0, ccTable0, ccAll0;
+    private static boolean compatDone, controlsDone;
+    private static net.minecraft.world.level.GameType hbPrevMode = net.minecraft.world.level.GameType.SURVIVAL;
+    private static float ccScroll0;
+
+    /** Ejecuta algo dentro del contexto del jugador de la prueba (P2 tiene su propia pestana del creativo). */
+    private static <T> T ccIn(java.util.function.Supplier<T> body) {
+        if (ccSlot == 0) return body.get();
+        Object[] out = new Object[1];
+        ContextSwitcher.run(SecondaryPlayers.context(ccSlot), () -> out[0] = body.get());
+        @SuppressWarnings("unchecked") T t = (T) out[0];
+        return t;
+    }
+    private static String ccPage0 = "";
     private static double[] ccCenter, ccB1, ccB6;
     private static java.util.List<net.minecraft.world.item.ItemStack> ccSaved;
     private static java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>> ccAwarded = java.util.List.of();
@@ -1881,6 +1904,55 @@ public final class AutoTest {
                     double[] cur = ccCursor(mc);
                     ccVerdict(who + ": D-pad abajo salta a la fila siguiente (cursor " + (int) cur[0] + "," + (int) cur[1] + ", esperado " + (ccB6 == null ? "?" : (int) ccB6[0] + "," + (int) ccB6[1]) + ")",
                             ccB6 != null && ccNear(cur, ccB6));
+                    ccStep = 11;
+                    ticks = 0;
+                }
+            }
+            case 11 -> { // LT/RT: pagina anterior / siguiente de las recetas
+                if (t == 4) {
+                    var rs = ConsoleCraft.visibleRecipes(screen);
+                    ccPage0 = rs.isEmpty() ? "" : rs.get(0).getRecipe().id().toString();
+                    simSlot(ccSlot, 1 << PadState.RT);
+                }
+                if (t == 10) simSlot(ccSlot, 0);
+                if (t == 18) {
+                    var rs = ConsoleCraft.visibleRecipes(screen);
+                    String now = rs.isEmpty() ? "" : rs.get(0).getRecipe().id().toString();
+                    ccVerdict(who + ": RT pasa a la pagina siguiente de recetas (" + ccPage0 + " -> " + now + ")", !ccPage0.isEmpty() && !now.equals(ccPage0));
+                    simSlot(ccSlot, 1 << PadState.LT);
+                }
+                if (t == 24) simSlot(ccSlot, 0);
+                if (t == 32) {
+                    var rs = ConsoleCraft.visibleRecipes(screen);
+                    String now = rs.isEmpty() ? "" : rs.get(0).getRecipe().id().toString();
+                    ccVerdict(who + ": LT vuelve a la pagina anterior de recetas (" + now + ")", now.equals(ccPage0));
+                    ccStep = 12;
+                    ticks = 0;
+                }
+            }
+            case 12 -> { // buscador del libro de recetas: A sobre el campo abre el teclado en pantalla y una tecla escribe
+                var sbx = ConsoleCraft.bookVisible(screen)
+                        ? ((dev.consolepad.mixin.RecipeBookComponentAccessor) ((net.minecraft.client.gui.screens.recipebook.RecipeUpdateListener) screen).getRecipeBookComponent()).consolepad$searchBox() : null;
+                if (t == 3 && sbx != null) ccSetCursor(mc, sbx.getX() + sbx.getWidth() / 2.0, sbx.getY() + sbx.getHeight() / 2.0);
+                if (t == 12) simSlot(ccSlot, 1 << PadState.A);
+                if (t == 18) simSlot(ccSlot, 0);
+                if (t == 28) {
+                    boolean open = PadKeyboard.of(ccSlot).active();
+                    ccVerdict(who + ": A sobre el buscador del libro de recetas abre el teclado en pantalla (activo=" + open + ")", sbx != null && open);
+                    simSlot(ccSlot, 1 << PadState.A);
+                }
+                if (t == 34) simSlot(ccSlot, 0);
+                if (t == 44) {
+                    String typed = sbx == null ? "" : sbx.getValue();
+                    ccVerdict(who + ": una tecla del teclado escribe en el buscador del libro ('" + typed + "')", !typed.isEmpty());
+                    PadKeyboard.of(ccSlot).close();
+                    ccIn(() -> {
+                        screen.keyPressed(259, 0, 0); // borrar: el resto de la prueba necesita todas las recetas
+                        screen.keyReleased(259, 0, 0);
+                        return 0;
+                    });
+                }
+                if (t == 50) {
                     ccStep = 4;
                     ticks = 0;
                 }
@@ -1897,7 +1969,102 @@ public final class AutoTest {
                     ccVerdict(who + ": A sobre la receta fabrica una mesa (receta encontrada=" + (ccCenter != null) + ", mesas " + ccTable0 + " -> " + tables + ", tablones " + ccPlanks0 + " -> " + planks
                             + ", fabricadas con A=" + ConsoleCraft.crafted[ccSlot] + ", marcada fabricable=" + ConsoleCraft.lastCraftable[ccSlot] + ", libro visible=" + ConsoleCraft.bookVisible(screen) + ")",
                             ccCenter != null && tables == ccTable0 + 1 && planks == ccPlanks0 - 4);
+                    ccStep = 7;
+                    ticks = 0;
+                }
+            }
+            case 7 -> { // Y sobre la receta fabrica todo lo que dan los ingredientes (8 tablones = 2 mesas)
+                if (t == 1) {
+                    mc.getSingleplayerServer().execute(() -> {
+                        for (int i = 0; i < sp.getInventory().items.size(); i++) sp.getInventory().items.set(i, ItemStack.EMPTY);
+                        sp.getInventory().setItem(20, new ItemStack(Items.OAK_PLANKS, 8));
+                    });
+                }
+                if (t == 15) {
+                    ccPlanks0 = sp.getInventory().countItem(Items.OAK_PLANKS);
+                    ccTable0 = sp.getInventory().countItem(Items.CRAFTING_TABLE);
+                    ccAll0 = ConsoleCraft.craftedAll[ccSlot];
+                    ccCenter = ccFind(screen, Items.CRAFTING_TABLE);
+                    if (ccCenter != null) ccSetCursor(mc, ccCenter[0], ccCenter[1]);
+                }
+                if (t == 25) {
+                    ccVerdict(who + ": la barra de ayuda dice Fabricar todo con el cursor sobre una receta ('" + PadHints.lastBar[ccSlot] + "')", ccCenter != null && PadHints.lastBar[ccSlot].contains("Fabricar todo"));
+                    simSlot(ccSlot, 1 << PadState.Y);
+                }
+                if (t == 31) simSlot(ccSlot, 0);
+                if (t == 90) {
+                    int planks = sp.getInventory().countItem(Items.OAK_PLANKS), tables = sp.getInventory().countItem(Items.CRAFTING_TABLE);
+                    ccVerdict(who + ": Y sobre la receta fabrica todo (mesas " + ccTable0 + " -> " + tables + ", tablones " + ccPlanks0 + " -> " + planks + ", Y fabricadas=" + (ConsoleCraft.craftedAll[ccSlot] - ccAll0) + ")",
+                            ccCenter != null && ccPlanks0 == 8 && tables == ccTable0 + 2 && planks == 0 && ConsoleCraft.craftedAll[ccSlot] == ccAll0 + 1);
                     ccStep = 5;
+                    ticks = 0;
+                }
+            }
+            case 8 -> { // flecha de la categoria en el libro (supervivencia) y LB/RB + flecha en el creativo
+                if (t == 1) {
+                    mc.getSingleplayerServer().execute(() -> sp.setGameMode(net.minecraft.world.level.GameType.CREATIVE));
+                }
+                if (t == 45) {
+                    if (ccSlot == 0) {
+                        mc.setScreen(new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(mc.player, mc.player.connection.enabledFeatures(), true));
+                    } else {
+                        PlayerContext c = SecondaryPlayers.context(1);
+                        ContextSwitcher.run(c, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(c.player, c.player.connection.enabledFeatures(), true)));
+                    }
+                }
+                if (t == 60) {
+                    var cs = screenOf(mc, ccSlot);
+                    ccTabs = ccIn(() -> TabNav.creativeTabs(cs).size());
+                    ccTab0 = ccIn(() -> TabNav.creativeIndex(cs));
+                    var mk = ccIn(() -> TabNav.mark(cs));
+                    ccVerdict(who + ": creativo abierto con " + ccTabs + " categorias, la flecha marca la " + ccTab0 + " (" + (mk == null ? "sin marca" : mk.x() + "," + mk.y() + " " + (mk.above() ? "arriba" : "abajo")) + ")",
+                            cs instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen && ccTabs >= 2 && ccTab0 >= 0 && mk != null && mk.above() != null && (ccSlot == 0 || ccTab0 == 0)); // P2 empieza en la categoria por defecto aunque P1 dejara otra
+                    simSlot(ccSlot, 1 << PadState.RB);
+                }
+                if (t == 66) simSlot(ccSlot, 0);
+                if (t == 75) {
+                    var cs = screenOf(mc, ccSlot);
+                    int now = ccIn(() -> TabNav.creativeIndex(cs));
+                    ccVerdict(who + ": RB pasa del creativo " + ccTab0 + " al " + now + " de " + ccTabs, now == (ccTab0 + 1) % ccTabs);
+                    simSlot(ccSlot, 1 << PadState.LB);
+                }
+                if (t == 81) simSlot(ccSlot, 0);
+                if (t == 90) {
+                    var cs = screenOf(mc, ccSlot);
+                    int now = ccIn(() -> TabNav.creativeIndex(cs));
+                    var mk = ccIn(() -> TabNav.mark(cs));
+                    ccVerdict(who + ": LB vuelve a la categoria " + ccTab0 + " del creativo (ahora " + now + ") y la flecha la sigue (" + (mk == null ? "sin marca" : mk.x() + "," + mk.y()) + ")",
+                            now == ccTab0 && mk != null);
+                    ccStep = 9;
+                    ticks = 0;
+                }
+                if (t == 110) {
+                    if (ccSlot == 0) mc.setScreen(new PlayerSettingsScreen(0, null));
+                    else {
+                        PlayerContext c = SecondaryPlayers.context(1);
+                        ContextSwitcher.run(c, () -> mc.setScreen(new PlayerSettingsScreen(1, null)));
+                    }
+                }
+                if (t == 125) {
+                    var cs = screenOf(mc, ccSlot);
+                    ccVerdict(who + ": los ajustes tienen varias paginas y anuncian LB/RB", cs instanceof PlayerSettingsScreen st && st.hintTabs());
+                    ccAll0 = cs instanceof PlayerSettingsScreen st ? st.page() : -1;
+                    simSlot(ccSlot, 1 << PadState.RB);
+                }
+                if (t == 131) simSlot(ccSlot, 0);
+                if (t == 140) {
+                    var cs = screenOf(mc, ccSlot);
+                    int pg = cs instanceof PlayerSettingsScreen st ? st.page() : -9;
+                    ccVerdict(who + ": RB pasa de la pagina " + ccAll0 + " de los ajustes a la " + pg, pg == ccAll0 + 1);
+                    simSlot(ccSlot, 1 << PadState.LB);
+                }
+                if (t == 146) simSlot(ccSlot, 0);
+                if (t == 155) {
+                    var cs = screenOf(mc, ccSlot);
+                    int pg = cs instanceof PlayerSettingsScreen st ? st.page() : -9;
+                    ccVerdict(who + ": LB vuelve a la pagina " + ccAll0 + " de los ajustes (ahora " + pg + ")", pg == ccAll0);
+                    ccClose(mc);
+                    ccStep = 6;
                     ticks = 0;
                 }
             }
@@ -1912,6 +2079,11 @@ public final class AutoTest {
                     ccVerdict(who + ": la barra de ayuda dice Fabricar con el cursor sobre una receta ('" + PadHints.lastBar[ccSlot] + "')", ccCenter != null && PadHints.lastBar[ccSlot].contains("Fabricar"));
                     screenshotName = "consola-crafteo-" + who + ".png";
                     screenshotPending = true;
+                    var mk = TabNav.mark(screen);
+                    var tabs = ConsoleCraft.visibleTabs(screen);
+                    int si = ConsoleCraft.selectedTabIndex(screen);
+                    boolean onTab = mk != null && si >= 0 && mk.x() == tabs.get(si).getX() && mk.y() == tabs.get(si).getY() && mk.above() == null;
+                    ccVerdict(who + ": la flecha marca la categoria " + si + " del libro de recetas (" + (mk == null ? "sin marca" : mk.x() + "," + mk.y()) + ")", onTab);
                 }
                 if (t == 20) {
                     if (ccFilterInit && !ConsoleCraft.filtering(screen)) ConsoleCraft.toggleFilter(screen); // deja el filtro como estaba
@@ -1922,8 +2094,61 @@ public final class AutoTest {
                         for (int i = 0; i < sp.getInventory().items.size(); i++) sp.getInventory().items.set(i, ccSaved.get(i).copy());
                         sp.resetRecipes(ccAwarded);
                     });
-                    ccStep = 6;
+                    ccStep = 8;
                     ticks = 0;
+                }
+            }
+            case 9 -> { // creativo: LT/RT pasan de pagina y la pestana de busqueda abre el teclado en pantalla
+                var cs = screenOf(mc, ccSlot);
+                var acc = cs instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen ? (dev.consolepad.mixin.CreativeScreenAccessor) cs : null;
+                if (t == 3 && acc != null) {
+                    ccScroll0 = acc.consolepad$scrollOffs();
+                    simSlot(ccSlot, 1 << PadState.RT);
+                }
+                if (t == 9) simSlot(ccSlot, 0);
+                if (t == 18 && acc != null) {
+                    float now = acc.consolepad$scrollOffs();
+                    ccVerdict(who + ": RT baja una pagina en la lista del creativo (" + ccScroll0 + " -> " + now + ")", now > ccScroll0);
+                    simSlot(ccSlot, 1 << PadState.LT);
+                }
+                if (t == 24) simSlot(ccSlot, 0);
+                if (t == 33 && acc != null) {
+                    float now = acc.consolepad$scrollOffs();
+                    ccVerdict(who + ": LT sube una pagina en la lista del creativo (" + now + ")", Math.abs(now - ccScroll0) < 0.001f);
+                }
+                if (t == 40 && acc != null) { // como un clic en la pestana de busqueda (no con LB/RB)
+                    ccIn(() -> {
+                        acc.consolepad$selectTab(net.minecraft.world.item.CreativeModeTabs.searchTab());
+                        return 0;
+                    });
+                }
+                if (t == 60) {
+                    boolean open = PadKeyboard.of(ccSlot).active();
+                    ccVerdict(who + ": elegir la pestana de busqueda abre el teclado en pantalla (activo=" + open + ")", open);
+                    simSlot(ccSlot, 1 << PadState.A);
+                }
+                if (t == 66) simSlot(ccSlot, 0);
+                if (t == 78 && ccSlot == 0 && SecondaryPlayers.context(1) != null) { // la lista del creativo es por jugador (el contenedor de vanilla es uno solo)
+                    PlayerContext c2 = SecondaryPlayers.context(1);
+                    var cont = dev.consolepad.mixin.CreativeScreenAccessor.consolepad$container();
+                    ItemStack[] theirs = new ItemStack[cont.getContainerSize()];
+                    java.util.Arrays.fill(theirs, ItemStack.EMPTY);
+                    theirs[0] = new ItemStack(Items.DIAMOND, 1);
+                    c2.creativeItems = theirs;
+                    ItemStack mine0 = cont.getItem(0);
+                    ItemStack[] inside = new ItemStack[1];
+                    ContextSwitcher.run(c2, () -> inside[0] = cont.getItem(0));
+                    ccVerdict("creativo: dentro del contexto de P2 la lista es la suya (" + inside[0].getItem() + ") y fuera vuelve la de P1 (" + (cont.getItem(0) == mine0) + ")",
+                            inside[0].is(Items.DIAMOND) && cont.getItem(0) == mine0);
+                    c2.creativeItems = null;
+                }
+                if (t == 80 && acc != null) {
+                    String typed = acc.consolepad$searchBox().getValue();
+                    ccVerdict(who + ": una tecla del teclado escribe en el buscador del creativo ('" + typed + "')", !typed.isEmpty());
+                    ccClose(mc);
+                    mc.getSingleplayerServer().execute(() -> sp.setGameMode(ccPrevMode));
+                    ccStep = 8;
+                    ticks = 100;
                 }
             }
             case 6 -> {
@@ -3403,7 +3628,7 @@ public final class AutoTest {
             hit = c.hitResult;
         }
         String atk = hit == null ? null : hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK ? "Romper" : hit.getType() == net.minecraft.world.phys.HitResult.Type.ENTITY ? "Atacar" : null;
-        String use = player.getMainHandItem().getItem() instanceof net.minecraft.world.item.BlockItem ? "Colocar bloque" : "Usar objeto";
+        String use = Interact.useLabel(player, slot == 0 ? mc.level : SecondaryPlayers.context(slot).level, hit);
         String left = hbJoin(hbHint(PadHints.buttonFor(cfg, PadAction.DROP), "Tirar objeto"), hbHint(PadHints.buttonFor(cfg, PadAction.INVENTORY), "Inventario"));
         String right = hbJoin(atk == null ? null : hbHint(PadHints.buttonFor(cfg, PadAction.ATTACK), atk), hbHint(PadHints.buttonFor(cfg, PadAction.USE), use));
         return new String[] {left, right};
@@ -3411,7 +3636,7 @@ public final class AutoTest {
 
     private static String hbBarExpected(boolean container, boolean menu, net.minecraft.client.gui.screens.Screen screen) {
         if (container && ConsoleCraft.applies(screen)) { // inventario de supervivencia: L3 abre el libro de recetas; con el libro abierto, LB/RB cambian de categoria
-            return "0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido|" + PadState.L3 + ":Libro de recetas" + (ConsoleCraft.bookVisible(screen) ? "|" + PadState.LB + ":Categoría|" + PadState.RB + ":Categoría" : "");
+            return "0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido|" + PadState.L3 + ":Libro de recetas" + (ConsoleCraft.bookVisible(screen) ? "|" + PadState.LB + ":Categoría|" + PadState.RB + ":Categoría|" + PadState.LT + ":Página anterior|" + PadState.RT + ":Página siguiente" : "");
         }
         return container ? "0:Coger|1:Salir|2:Coger la mitad|3:Movimiento rápido" : menu ? "0:Seleccionar|1:Volver" : "0:Seleccionar|1:Salir";
     }
@@ -3428,6 +3653,9 @@ public final class AutoTest {
                 if (joinTo(mc, 4) && ticks > 20) {
                     mc.setScreen(null);
                     mc.player.setXRot(90f); // P1 mira al suelo: apunta a un bloque
+                    var hbSp = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+                    hbPrevMode = hbSp.gameMode.getGameModeForPlayer(); // la barra de ayuda del inventario depende del modo: el mundo del usuario puede tener a P1 en creativo
+                    mc.getSingleplayerServer().execute(() -> hbSp.setGameMode(net.minecraft.world.level.GameType.SURVIVAL));
                     hbPhase = 1;
                     ticks = 0;
                 }
@@ -3532,6 +3760,8 @@ public final class AutoTest {
                     hbVerdict("icono del boton inferior segun el mando: Xbox '" + a + "', PlayStation '" + b + "', Nintendo '" + c + "'", a.equals("A") && b.equals("\u00d7") && c.equals("B"));
                     mc.player.setXRot(0f);
                     ConsolePad.LOGGER.info("[autotest] RESULTADO ayuda de botones del HUD y de las pantallas en conjunto -> {}", hbOk ? "OK" : "FALLO");
+                    var hbSp = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
+                    mc.getSingleplayerServer().execute(() -> hbSp.setGameMode(hbPrevMode));
                 }
                 if (ticks > 1 && leaveTo(mc, 2) || ticks > 600) {
                     hbPhase = 7;
@@ -3819,7 +4049,9 @@ public final class AutoTest {
     }
 
     private static void scaCloseScreens(Minecraft mc) {
-        mc.setScreen(null);
+        // onClose y no setScreen(null): en creativo la pantalla es la del creativo y sin cerrar el contenedor el cliente se queda con
+        // ItemPickerMenu, que descarta los cambios de armadura que manda el servidor (los elitros de la casilla 47)
+        if (mc.screen != null) mc.screen.onClose();
         for (PlayerContext c : SplitRender.activeContexts()) {
             ContextSwitcher.run(c, () -> {
                 if (mc.screen != null) mc.screen.onClose();
@@ -4251,6 +4483,7 @@ public final class AutoTest {
     private static boolean mnOk = true;
     private static int mnPhase;
     private static SplitSettings.Orientation mnOrig;
+    private static dev.consolepad.pad.PadAction mnWheel0, mnWheel1;
     private static float mnDead0;
     private static int mnJump0, mnSwap0;
 
@@ -4278,6 +4511,8 @@ public final class AutoTest {
         switch (mnPhase) {
             case 0 -> { // ajustes de P2 desde su menu
                 if (t == 1) {
+                    mnWheel0 = s0.bindings.remove(PadState.DPAD_LEFT); // sin la rueda en la cruceta izquierda queda un boton libre para remapear
+                    mnWheel1 = s1.bindings.remove(PadState.DPAD_LEFT);
                     mnOrig = SplitSettings.orientation();
                     SplitSettings.setOrientation(SplitSettings.Orientation.SIDE_BY_SIDE);
                     s1.guiScale = 0;
@@ -4482,6 +4717,8 @@ public final class AutoTest {
             }
             case 9 -> {
                 SplitSettings.setOrientation(mnOrig);
+                if (s0.bindings.get(PadState.DPAD_LEFT) == null && mnWheel0 != null) s0.bindings.put(PadState.DPAD_LEFT, mnWheel0); // la rueda vuelve a la cruceta izquierda
+                if (s1.bindings.get(PadState.DPAD_LEFT) == null && mnWheel1 != null) s1.bindings.put(PadState.DPAD_LEFT, mnWheel1);
                 s1.guiScale = 0;
                 SecondaryTick.scriptActive = false;
                 simP2(0);
@@ -4922,6 +5159,14 @@ public final class AutoTest {
                     prevPauseOnLostFocus = mc.options.pauseOnLostFocus;
                     mc.options.pauseOnLostFocus = false; // sin foco la ventana abriria el menu de pausa de P1 en mitad de una prueba
                     mc.options.guiScale().set(0); // escala de interfaz automatica, como al instalar el juego (la del usuario puede ser fija)
+                    for (int i = 0; i < dev.consolepad.pad.PadManager.MAX_PLAYERS; i++) { // nombre y perfil del usuario fuera: las pruebas parten de los de fabrica (el script restaura los archivos)
+                        // ajustes de fabrica: los del usuario (margen del HUD, curva con aceleracion...) cambian las medidas de aspecto y giro
+                        ConsolePad.PADS.slot(i).settings.resetToDefaults();
+                        ConsolePad.PADS.slot(i).settings.fovComp = 0f; // las medidas de campo de vision y proyeccion parten del FOV sin compensar (la compensacion tiene su propia prueba)
+                        ConsolePad.PADS.slot(i).settings.playerName = "";
+                        ConsolePad.PADS.slot(i).settings.labelColor = 0;
+                        ConsolePad.PADS.slot(i).settings.profileId = "";
+                    }
                     server.execute(() -> {
                         server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
                         server.overworld().setDayTime(1000L);
@@ -4949,6 +5194,20 @@ public final class AutoTest {
             case 18 -> fovTest(mc);
             case 19 -> fpsPhase(mc, false);
             case 20 -> fpsPhase(mc, true);
+            case 21 -> {
+                if (!controlsDone) {
+                    if (ControlsTest.run(mc)) controlsDone = true;
+                } else {
+                    if (!compatDone) {
+                        CompatTest.run(mc); // tanda B: modo compatibilidad y bienvenida (sin mundo)
+                        compatDone = true;
+                    }
+                    if (AssignTest.run(mc)) { // asignar mandos
+                        controlsDone = compatDone = false;
+                        next();
+                    }
+                }
+            }
             case 22 -> startCloseTest(mc);
             case 23 -> scaleTest(mc);
             case 24 -> uiClipTest(mc);
@@ -5028,6 +5287,8 @@ public final class AutoTest {
                 }
                 target = new Vec3(x + 0.5, y, z + 0.5);
                 p2.teleportTo(level, target.x, target.y, target.z, 0f, 0f);
+                p2StartMode = p2.gameMode.getGameModeForPlayer(); // P2 en supervivencia para todas las pruebas (el usuario puede haberlo dejado en creativo); se restaura al salir
+                p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
             });
             teleported = true;
             ticks = 0;

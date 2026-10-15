@@ -6,9 +6,12 @@
   "client": [
     "KeyboardInputMixin",
     "KeyMappingAccessor",
+    "AbstractSoundInstanceAccessor",
+    "PlayerInfoMixin",
     "MouseHandlerInvoker",
     "ContainerScreenInvoker",
     "ConnectionMixin",
+    "RegistrySyncMixin",
     "MinecraftMixin",
     "ClientPacketListenerMixin",
     "SoundManagerMixin",
@@ -37,9 +40,12 @@
     "FogStateAccessor",
     "RecipeBookComponentAccessor",
     "RecipeBookPageAccessor",
+    "CreativeScreenAccessor",
     "ReduceFovMixin",
     "ParticleEngineAccessor",
-    "ParticleAccessor"
+    "ParticleAccessor",
+    "LocalPlayerMixin",
+    "RecipeButtonMixin"
   ],
   "injectors": {
     "defaultRequire": 1

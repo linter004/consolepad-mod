@@ -77,18 +77,7 @@ public final class SecondaryScreens {
             if (ConsoleCraft.applies(screen)) ConsoleCraft.renderPanel(mc, graphics, ctx.slotIndex, screen, ctx.cursorX, ctx.cursorY, w, h);
             PadHints.renderScreenBar(mc, graphics, ctx.slotIndex, screen, w, h);
             PadKeyboard.of(ctx.slotIndex).render(graphics, mc.font, w, h);
-            graphics.pose().pushPose();
-            graphics.pose().translate(0, 0, 500);
-            int cx = (int) ctx.cursorX, cy = (int) ctx.cursorY;
-            for (int r = 0; r < 10; r++) { // flecha: contorno negro y relleno blanco
-                int width = Math.min(r / 2 + 2, 6);
-                graphics.fill(cx, cy + r, cx + width + 1, cy + r + 1, 0xFF000000);
-            }
-            for (int r = 1; r < 9; r++) {
-                int width = Math.min(r / 2 + 1, 5);
-                graphics.fill(cx + 1, cy + r, cx + width, cy + r + 1, 0xFFFFFFFF);
-            }
-            graphics.pose().popPose();
+            VirtualCursor.draw(graphics, (int) ctx.cursorX, (int) ctx.cursorY);
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;
@@ -132,6 +121,7 @@ public final class SecondaryScreens {
                 else if (ctx.buttonDown[1]) screen.mouseDragged(nx, ny, 1, dx, dy);
                 else screen.mouseMoved(nx, ny);
             }
+            TabNav.handle(screen, s); // LB/RB: pestanas del creativo y paginas de los ajustes
             dpad(ctx, screen, s, cfg.snapNav, dt);
             // Clics: pulsar y soltar por separado, para poder arrastrar.
             boolean craftedNow = ConsoleCraft.handle(mc, screen, s, ctx.slotIndex, ctx.cursorX, ctx.cursorY); // libro de recetas: L3, LB/RB, A sobre una receta
@@ -212,6 +202,7 @@ public final class SecondaryScreens {
                 if (sl.isActive()) out.add(new double[] {c.getGuiLeft() + sl.x + 8, c.getGuiTop() + sl.y + 8, 16, 16});
             }
             out.addAll(ConsoleCraft.extraTargets(screen)); // libro de recetas abierto: recetas, paginas y filtro
+            WorkstationTargets.add(c, out); // recetas de la mesa de corte y patrones del telar (se dibujan a mano)
             // Botones y campos propios de la pantalla (ofertas del aldeano, nombre del yunque...) y el boton del libro de recetas (el icono verde):
             // el D-pad puede posarse en el y A lo abre y cierra, igual que L3.
             for (var child : screen.children()) {
@@ -239,9 +230,13 @@ public final class SecondaryScreens {
     private static void jump(PlayerContext ctx, Screen screen, int dir) {
         double[] best = pick(targets(screen), ctx.cursorX, ctx.cursorY, dir);
         if (best != null) {
+            double dx = best[0] - ctx.cursorX, dy = best[1] - ctx.cursorY;
             ctx.cursorX = best[0];
             ctx.cursorY = best[1];
-            screen.mouseMoved(best[0], best[1]);
+            // Con A o X mantenido el salto de casilla es un arrastre (reparte uno en cada hueco, como en Bedrock); si no, un simple movimiento.
+            if (ctx.buttonDown[0]) screen.mouseDragged(best[0], best[1], 0, dx, dy);
+            else if (ctx.buttonDown[1]) screen.mouseDragged(best[0], best[1], 1, dx, dy);
+            else screen.mouseMoved(best[0], best[1]);
         }
     }
 
@@ -281,6 +276,8 @@ public final class SecondaryScreens {
         if (s.pressed(padButton)) {
             ctx.buttonDown[mouseButton] = true;
             screen.mouseClicked(ctx.cursorX, ctx.cursorY, mouseButton);
+            // Un primer arrastre sin movimiento mete en el reparto el hueco donde se pulso (vanilla solo lo anade con un evento de arrastre).
+            if (screen instanceof AbstractContainerScreen<?>) screen.mouseDragged(ctx.cursorX, ctx.cursorY, mouseButton, 0, 0);
         }
         if (s.released(padButton) && ctx.buttonDown[mouseButton]) {
             ctx.buttonDown[mouseButton] = false;
