@@ -28,6 +28,7 @@ public final class SoundRouting {
         List<ServerPlayer> players;
         try {
             players = new ArrayList<>(server.getPlayerList().getPlayers());
+            players.removeIf(java.util.Objects::isNull); // el servidor cambia la lista (entra o sale un jugador) mientras se copia desde el hilo de dibujo: la copia puede traer un hueco
         } catch (RuntimeException e) {
             return out;
         }

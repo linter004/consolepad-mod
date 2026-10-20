@@ -21,7 +21,7 @@ public final class ProfilesScreen extends PlayerMenuScreen {
     private String message = "";
 
     public ProfilesScreen(int slot, Screen parent) {
-        super(slot, Component.literal("Perfiles del jugador " + (slot + 1)));
+        super(slot, I18n.lit("Perfiles del jugador " + (slot + 1)));
         this.parent = parent;
     }
 
@@ -42,14 +42,14 @@ public final class ProfilesScreen extends PlayerMenuScreen {
             Button b;
             int y = 34 + k * PITCH;
             if (idx == 0) {
-                b = Button.builder(Component.literal((Profiles.of(slot) == null ? "• " : "") + "Ninguno"), btn -> {
+                b = Button.builder(I18n.lit((Profiles.of(slot) == null ? "• " : "") + I18n.tr("Ninguno")), btn -> {
                     String err = Profiles.clear(slot);
-                    message = err == null ? "Perfil quitado" : err;
+                    message = err == null ? I18n.tr("Perfil quitado") : err;
                     this.rebuildWidgets();
                 }).bounds(x, y, ROW_W, ROW_H).build();
             } else if (idx == total - 1) {
                 final boolean full = list.size() >= Profiles.MAX;
-                b = Button.builder(Component.literal(full ? "Nuevo perfil (máximo " + Profiles.MAX + ")" : "Nuevo perfil..."), btn -> {
+                b = Button.builder(I18n.lit(full ? I18n.fmt("Nuevo perfil (máximo {0})", Profiles.MAX) : I18n.tr("Nuevo perfil...")), btn -> {
                     if (!full) Minecraft.getInstance().setScreen(new NewProfileScreen(slot, this));
                 }).bounds(x, y, ROW_W, ROW_H).build();
             } else {
@@ -59,23 +59,23 @@ public final class ProfilesScreen extends PlayerMenuScreen {
                 String tag = mine ? "• " : "";
                 String suffix = user >= 0 && !mine ? " (J" + (user + 1) + ")" : "";
                 String text = this.font.plainSubstrByWidth(tag + p.name + suffix + " - " + (p.customSkin != null ? p.customSkin : Profiles.SKIN_NAMES[p.skin % 9]), ROW_W - 8);
-                b = Button.builder(Component.literal(text), btn -> Minecraft.getInstance().setScreen(new ProfileScreen(slot, p, this))).bounds(x, y, ROW_W, ROW_H).build();
+                b = Button.builder(I18n.lit(text), btn -> Minecraft.getInstance().setScreen(new ProfileScreen(slot, p, this))).bounds(x, y, ROW_W, ROW_H).build();
             }
             rows.add(addRenderableWidget(b));
         }
         if (pages > 1) {
-            prev = addRenderableWidget(Button.builder(Component.literal("<"), b -> {
+            prev = addRenderableWidget(Button.builder(I18n.lit("<"), b -> {
                 page = (page + pages - 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x, footerY, 30, ROW_H).build());
-            back = addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
-            next = addRenderableWidget(Button.builder(Component.literal(">"), b -> {
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
+            next = addRenderableWidget(Button.builder(I18n.lit(">"), b -> {
                 page = (page + 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x + ROW_W - 30, footerY, 30, ROW_H).build());
         } else {
             prev = next = null;
-            back = addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
         }
     }
 

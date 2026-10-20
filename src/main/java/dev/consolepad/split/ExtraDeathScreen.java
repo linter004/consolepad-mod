@@ -32,7 +32,7 @@ public final class ExtraDeathScreen extends Screen implements PlayerScreen {
             this.minecraft.player.respawn();
             b.active = false;
         }).bounds(x, y, 200, 20).build());
-        quit = addRenderableWidget(Button.builder(Component.literal("Salir de la partida (P" + (slot + 1) + ")"),
+        quit = addRenderableWidget(Button.builder(I18n.lit(I18n.fmt("Salir de la partida (P{0})", slot + 1)),
                 b -> SecondaryPlayers.leave(Minecraft.getInstance(), slot)).bounds(x, y + 24, 200, 20).build());
         respawn.active = false;
         quit.active = false;
@@ -83,7 +83,7 @@ public final class ExtraDeathScreen extends Screen implements PlayerScreen {
         if (cause != null) graphics.drawCenteredString(this.font, cause, this.width / 2, y, 0xFFFFFF);
         if (this.minecraft.player != null) {
             graphics.drawCenteredString(this.font, Component.translatable("deathScreen.score.value",
-                    Component.literal(Integer.toString(this.minecraft.player.getScore())).withStyle(net.minecraft.ChatFormatting.YELLOW)),
+                    I18n.lit(Integer.toString(this.minecraft.player.getScore())).withStyle(net.minecraft.ChatFormatting.YELLOW)),
                     this.width / 2, y + 14, 0xFFFFFF);
         }
     }

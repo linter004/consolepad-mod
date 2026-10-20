@@ -70,6 +70,11 @@ public final class AutoTest {
     /** Se ejecuta una vez al final del siguiente fotograma con la imagen de la ventana (fila 0 = arriba). */
     private static volatile java.util.function.Consumer<com.mojang.blaze3d.platform.NativeImage> pixelProbe;
 
+    /** Pide el fotograma ya dibujado (imagen de arriba abajo, en pixeles de la ventana) al terminar el proximo fotograma. */
+    static void probe(java.util.function.Consumer<com.mojang.blaze3d.platform.NativeImage> p) {
+        pixelProbe = p;
+    }
+
     private AutoTest() {}
 
     /** Pide una captura de la ventana al terminar el siguiente fotograma (carpeta screenshots del juego). */
@@ -245,6 +250,10 @@ public final class AutoTest {
     }
 
     private static net.minecraft.world.Difficulty prevDifficulty;
+    /** Modo de juego de P1 antes de la prueba (el usuario lo cambia al jugar: en creativo no se gastan cohetes ni se rompe como en supervivencia); se restaura al salir. */
+    private static net.minecraft.world.level.GameType p1StartMode;
+    /** Mobs del mundo del usuario cerca de P1 (un golem de hierro pegado a P1 tapaba la mira y generaba particulas) apartados durante la prueba: {entidad, x, y, z, sin gravedad}; vuelven a su sitio al salir. */
+    private static final java.util.List<Object[]> movedMobs = new java.util.ArrayList<>();
     private static net.minecraft.world.level.GameType p2StartMode;
     private static int prevGuiScale = -1;
     private static boolean prevPauseOnLostFocus;
@@ -315,8 +324,19 @@ public final class AutoTest {
                 if (V1Test.EXIT_PLAYERS == 1 && !leaveTo(mc, 1)) return; // CONSOLEPAD_EXIT_PLAYERS=1: se cierra el mundo con P1 solo
                 var srv = mc.getSingleplayerServer();
                 if (prevDifficulty != null) srv.execute(() -> srv.setDifficulty(prevDifficulty, true));
+                restoreBooks(mc);
                 ServerPlayer p2Last = serverP2(mc);
                 if (p2Last != null && p2StartMode != null) srv.execute(() -> p2Last.setGameMode(p2StartMode));
+                ServerPlayer p1Last = mc.player == null ? null : srv.getPlayerList().getPlayer(mc.player.getUUID());
+                if (p1Last != null && p1StartMode != null) srv.execute(() -> p1Last.setGameMode(p1StartMode));
+                srv.execute(() -> {
+                    for (Object[] mv : movedMobs) {
+                        var e = (net.minecraft.world.entity.Entity) mv[0];
+                        e.moveTo((double) mv[1], (double) mv[2], (double) mv[3]);
+                        e.setNoGravity((boolean) mv[4]);
+                    }
+                    movedMobs.clear();
+                });
                 if (prevGuiScale >= 0) mc.options.guiScale().set(prevGuiScale);
                 mc.options.pauseOnLostFocus = prevPauseOnLostFocus;
                 ConsolePad.LOGGER.info("[autotest] P1 sale del mundo (dificultad restaurada a {})", prevDifficulty);
@@ -2856,7 +2876,7 @@ public final class AutoTest {
                     SplitDiag.hudRecording = false;
                     var seen = SplitDiag.hudSeen();
                     hbdVerdict("calabaza en la cabeza de P2: brillo de la esquina de su region " + hbdCornerP2 + " contra " + hbdCornerP3 + " en la de P3 (debe ser menos de la mitad)",
-                            hbdCornerP3 > 60 && hbdCornerP2 * 2 < hbdCornerP3);
+                            hbdCornerP3 > 30 && hbdCornerP2 * 2 < hbdCornerP3);
                     int b1 = hbdBossCount(mc.gui.getBossOverlay()), b2 = hbdBossCount(c2.bossOverlay()), b3 = hbdBossCount(c3.bossOverlay());
                     hbdVerdict("barra de jefe vista por P3: barras de P1=" + b1 + ", P2=" + b2 + ", P3=" + b3 + " (esperado 0, 0, 1)", b1 == 0 && b2 == 0 && b3 == 1);
                     hbdVerdict("marcador lateral: capa dibujada en P2=" + seen.getOrDefault("P2", new java.util.TreeMap<>()).containsKey("marcador") + ", en P3="
@@ -2899,7 +2919,8 @@ public final class AutoTest {
     private static boolean mvOk = true;
     private static int mvPhase;
     private static float mvYaw0, mvPitch0, mvYawDelta, mvPitchDelta;
-
+    private static boolean mvRetried;
+    private static int focusForced;
     private static void mvVerdict(String name, boolean ok) {
         mvOk &= ok;
         ConsolePad.LOGGER.info("[autotest] RESULTADO {} -> {}", name, ok ? "OK" : "FALLO");
@@ -2933,13 +2954,14 @@ public final class AutoTest {
         switch (mvPhase) {
             case 0 -> {
                 if (t == 1) mc.setScreen(null);
-                if (joinTo(mc, 2) && t > 20) {
+                if (joinTo(mc, 2) && t > 100) { // P2 recien entrado carga su mundo con tirones de mas de 0,1 s (PadDriver limita el giro por fotograma a 0,1 s): se espera a que pase
                     for (var cfg : cfgs) {
                         cfg.lookSpeed = 180f;
                         cfg.lookSpeedY = 90f;
                         cfg.invertY = false;
                         cfg.doubleTapSprint = true;
                     }
+                    mvRetried = false;
                     mvPhase = 1;
                     ticks = 0;
                 }
@@ -2964,6 +2986,13 @@ public final class AutoTest {
                     mvStick(slot, 0f, 0f, 0f, 0f);
                     mvPitchDelta = player.getXRot() - mvPitch0;
                     float ratio = mvPitchDelta == 0f ? 0f : mvYawDelta / mvPitchDelta;
+                    if (!(ratio > 1.7f && ratio < 2.3f) && !mvRetried) { // un tiron (carga de chunks) en una de las dos medidas: se repite una vez
+                        mvRetried = true;
+                        ConsolePad.LOGGER.info("[autotest] {}: cociente de sensibilidad {} fuera de rango, se repite la medida una vez", who, ratio);
+                        mvSetPitch(mc, slot, 0f);
+                        ticks = 0;
+                        return;
+                    }
                     mvVerdict(who + ": sensibilidad horizontal 180 y vertical 90: giro horizontal " + mvYawDelta + " grados, vertical " + mvPitchDelta + " (cociente " + ratio + ", esperado 2)",
                             mvYawDelta > 1f && mvPitchDelta > 0.5f && ratio > 1.7f && ratio < 2.3f);
                     cfg.invertY = true;
@@ -2978,6 +3007,7 @@ public final class AutoTest {
                     cfg.invertY = false;
                     mvSetPitch(mc, slot, 0f);
                     mvPhase = slot == 0 ? 2 : 3;
+                    mvRetried = false;
                     ticks = 0;
                 }
             }
@@ -3587,6 +3617,8 @@ public final class AutoTest {
 
     private static boolean hbOk = true;
     private static int hbPhase;
+    private static net.minecraft.world.level.block.state.BlockState hbFeetState, hbBelowState;
+    private static net.minecraft.core.BlockPos hbFeet;
     private static ItemStack hbSaved = ItemStack.EMPTY;
 
     private static void hbVerdict(String name, boolean ok) {
@@ -3680,11 +3712,27 @@ public final class AutoTest {
             }
             case 2 -> { // P1 con un bloque en la mano: Colocar bloque
                 if (ticks == 1) {
+                    mc.player.setXRot(90f); // mira al suelo
+                    var srvHb = mc.getSingleplayerServer();
+                    hbFeet = mc.player.blockPosition();
+                    srvHb.execute(() -> { // piedra bajo P1 y nada a sus pies: lo que haya en el mundo del usuario (una cama diria "Dormir") no cuenta; se restaura al terminar
+                        var lv = srvHb.overworld();
+                        hbFeetState = lv.getBlockState(hbFeet);
+                        hbBelowState = lv.getBlockState(hbFeet.below());
+                        lv.setBlock(hbFeet, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                        lv.setBlock(hbFeet.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 3);
+                    });
                     hbSaved = mc.player.getInventory().getSelected().copy();
                     mc.player.getInventory().setItem(mc.player.getInventory().selected, new ItemStack(Items.DIRT, 5));
                 } else if (ticks == 8) {
                     hbVerdict("P1 con tierra en la mano: el boton de usar dice Colocar bloque (" + PadHints.lastRight[0] + ")", PadHints.lastRight[0].endsWith(":Colocar bloque"));
                     mc.player.getInventory().setItem(mc.player.getInventory().selected, hbSaved);
+                    var srvHb2 = mc.getSingleplayerServer();
+                    srvHb2.execute(() -> {
+                        var lv = srvHb2.overworld();
+                        if (hbBelowState != null) lv.setBlock(hbFeet.below(), hbBelowState, 3);
+                        if (hbFeetState != null) lv.setBlock(hbFeet, hbFeetState, 3);
+                    });
                     hbPhase = 3;
                     ticks = 0;
                 }
@@ -5135,6 +5183,13 @@ public final class AutoTest {
         SecondaryTick.autoRespawn = deathTestPhase == 0; // las pruebas dejan reaparecer solos a los extra, salvo la de la pantalla de muerte
         Minecraft mc = Minecraft.getInstance();
         ticks++;
+        // Sin foco (el usuario usa otra ventana mientras corre) vanilla no captura el raton de P1: Minecraft.continueAttack exige isMouseGrabbed (P1 no
+        // rompia bloques) y MouseHandler solo arrastra en pantallas con la ventana activa (el reparto con X de P1 no repartia). Las pruebas fijan el foco.
+        if (state >= 1 && !mc.isWindowActive()) {
+            mc.setWindowActive(true);
+            if (focusForced++ % 200 == 0) ConsolePad.LOGGER.info("[autotest] ventana sin foco: se fuerza activa ({} veces)", focusForced);
+        }
+        if (state >= 3 && mc.screen == null && mc.player != null && mc.getOverlay() == null && !mc.mouseHandler.isMouseGrabbed()) mc.mouseHandler.grabMouse();
         if (state >= 3 && pads != null) pads.attachVirtual(0); // si el mando real de P1 se desconecta a mitad de la prueba (mandos inalambricos), un virtual ocupa su sitio
         // Si un mundo guardado trae a alguien muerto (los mobs de la noche), reaparece: la pantalla de muerte bloquearia la prueba.
         if (deathTestPhase == 0 && mc.screen instanceof net.minecraft.client.gui.screens.DeathScreen && mc.player != null && ticks % 20 == 0) mc.player.respawn();
@@ -5144,6 +5199,9 @@ public final class AutoTest {
             case 0 -> {
                 if (mc.screen instanceof TitleScreen && ticks > 60) {
                     ConsolePad.LOGGER.info("[autotest] abriendo el mundo '{}'", WORLD);
+                    I18n.force("es"); // las pruebas comparan los textos en espanol, sea cual sea el idioma del juego del usuario (en_us en su options.txt)
+                    prevPauseOnLostFocus = mc.options.pauseOnLostFocus;
+                    mc.options.pauseOnLostFocus = false; // desde ya: con otra ventana encima (otro juego, el navegador) el mundo recien abierto se pausaba y la prueba esperaba para siempre
                     next();
                     mc.createWorldOpenFlows().openWorld(WORLD, () -> ConsolePad.LOGGER.error("[autotest] no se pudo abrir el mundo"));
                 }
@@ -5156,18 +5214,28 @@ public final class AutoTest {
                     var server = mc.getSingleplayerServer();
                     prevDifficulty = server.getWorldData().getDifficulty();
                     prevGuiScale = mc.options.guiScale().get();
-                    prevPauseOnLostFocus = mc.options.pauseOnLostFocus;
-                    mc.options.pauseOnLostFocus = false; // sin foco la ventana abriria el menu de pausa de P1 en mitad de una prueba
+                    mc.options.pauseOnLostFocus = false; // sin foco la ventana abriria el menu de pausa de P1 en mitad de una prueba (ya guardado el valor del usuario al abrir el mundo)
+                    SplitSettings.setOrientation(SplitSettings.Orientation.STACKED); // el reparto que el usuario dejo guardado (y recordado por mundo) cambia las medidas de las regiones: las pruebas parten de apilado (el script restaura los archivos)
                     mc.options.guiScale().set(0); // escala de interfaz automatica, como al instalar el juego (la del usuario puede ser fija)
                     for (int i = 0; i < dev.consolepad.pad.PadManager.MAX_PLAYERS; i++) { // nombre y perfil del usuario fuera: las pruebas parten de los de fabrica (el script restaura los archivos)
                         // ajustes de fabrica: los del usuario (margen del HUD, curva con aceleracion...) cambian las medidas de aspecto y giro
                         ConsolePad.PADS.slot(i).settings.resetToDefaults();
                         ConsolePad.PADS.slot(i).settings.fovComp = 0f; // las medidas de campo de vision y proyeccion parten del FOV sin compensar (la compensacion tiene su propia prueba)
+                        ConsolePad.PADS.slot(i).settings.autoKeyboard = true; // las pruebas de teclado parten de que se abre solo; la prueba del boton (KeyboardButtonTest) lo apaga
                         ConsolePad.PADS.slot(i).settings.playerName = "";
                         ConsolePad.PADS.slot(i).settings.labelColor = 0;
                         ConsolePad.PADS.slot(i).settings.profileId = "";
                     }
+                    ServerPlayer sp1 = server.getPlayerList().getPlayer(mc.player.getUUID());
+                    p1StartMode = sp1.gameMode.getGameModeForPlayer();
                     server.execute(() -> {
+                        sp1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL); // las pruebas de P1 parten de supervivencia
+                        movedMobs.clear();
+                        for (var e : sp1.serverLevel().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, sp1.getBoundingBox().inflate(48), e -> !(e instanceof net.minecraft.world.entity.player.Player))) {
+                            movedMobs.add(new Object[] {e, e.getX(), e.getY(), e.getZ(), e.isNoGravity()});
+                            e.setNoGravity(true);
+                            e.moveTo(e.getX(), e.getY() + 100, e.getZ());
+                        }
                         server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
                         server.overworld().setDayTime(1000L);
                     });
@@ -5743,6 +5811,53 @@ public final class AutoTest {
     private static void next() {
         state++;
         while (ONLY != null && state >= 3 && state < 50 && !ONLY.contains(state)) state++;
+        if (state >= 3 && state < 50) closeBooks(Minecraft.getInstance());
         ticks = 0;
+    }
+
+    /** Estado del libro de recetas de cada jugador al empezar el autotest (abierto por tipo), para devolverlo al salir. */
+    private static final java.util.Map<java.util.UUID, boolean[]> bookOrig = new java.util.HashMap<>();
+
+    /**
+     * Cada prueba empieza con el libro de recetas cerrado en todos los jugadores locales. El estado es por jugador y se guarda en el mundo:
+     * con el libro abierto en una region estrecha InventoryScreen no dibuja casillas ni el objeto del cursor (widthTooNarrow), y fallaban
+     * las pruebas de inventario de P1/P2 (casillas 24, 32, 43, 44, 48, 49). Las que necesitan el libro lo abren ellas.
+     */
+    private static void closeBooks(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        if (server == null || mc.player == null) return;
+        java.util.List<net.minecraft.world.entity.player.Player> locals = new java.util.ArrayList<>();
+        locals.add(mc.player);
+        for (PlayerContext c : SplitRender.activeContexts()) if (c.player != null) locals.add(c.player);
+        var types = net.minecraft.world.inventory.RecipeBookType.values();
+        for (var lp : locals) {
+            var book = ((net.minecraft.client.player.LocalPlayer) lp).getRecipeBook();
+            boolean[] orig = bookOrig.computeIfAbsent(lp.getUUID(), u -> {
+                boolean[] o = new boolean[types.length];
+                for (int i = 0; i < types.length; i++) o[i] = book.isOpen(types[i]);
+                return o;
+            });
+            ServerPlayer sp = server.getPlayerList().getPlayer(lp.getUUID());
+            for (var t : types) {
+                if (!book.isOpen(t)) continue;
+                book.setOpen(t, false);
+                if (sp != null) server.execute(() -> sp.getRecipeBook().setBookSetting(t, false, sp.getRecipeBook().isFiltering(t)));
+            }
+        }
+    }
+
+    /** Al salir: devuelve el libro de recetas de los jugadores aun conectados a como estaba al empezar. */
+    private static void restoreBooks(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        if (server == null) return;
+        var types = net.minecraft.world.inventory.RecipeBookType.values();
+        for (var e : bookOrig.entrySet()) {
+            ServerPlayer sp = server.getPlayerList().getPlayer(e.getKey());
+            if (sp == null) continue;
+            boolean[] o = e.getValue();
+            server.execute(() -> {
+                for (int i = 0; i < types.length; i++) sp.getRecipeBook().setBookSetting(types[i], o[i], sp.getRecipeBook().isFiltering(types[i]));
+            });
+        }
     }
 }

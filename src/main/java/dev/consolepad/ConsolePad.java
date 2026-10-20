@@ -41,6 +41,7 @@ public class ConsolePad {
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onAttack);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onUseFinish);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onExplosion);
+        NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onServerTick);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onTabName);
 
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
@@ -102,7 +103,7 @@ public class ConsolePad {
         // Boton "Mandos" en el titulo: asignar mandos a jugadores antes de entrar en un mundo.
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ScreenEvent.Init.Post e) -> {
             if (e.getScreen() instanceof net.minecraft.client.gui.screens.TitleScreen title) {
-                e.addListener(net.minecraft.client.gui.components.Button.builder(net.minecraft.network.chat.Component.literal("Mandos"),
+                e.addListener(net.minecraft.client.gui.components.Button.builder(dev.consolepad.split.I18n.lit("Mandos"),
                         b -> Minecraft.getInstance().setScreen(new dev.consolepad.split.PadSetupScreen(title))).bounds(4, 4, 56, 20).build());
             }
         });

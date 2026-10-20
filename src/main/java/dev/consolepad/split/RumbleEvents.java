@@ -30,12 +30,12 @@ public final class RumbleEvents {
 
     public static void onBreak(BlockEvent.BreakEvent e) {
         int slot = slotOf(e.getPlayer());
-        if (slot >= 0) Rumble.pulse(slot, 0.25f, 0.45f, 90);
+        if (slot >= 0) Rumble.pulse(slot, 0.25f, 0.45f, 90, Rumble.Kind.ACTION);
     }
 
     public static void onAttack(AttackEntityEvent e) {
         int slot = slotOf(e.getEntity());
-        if (slot >= 0) Rumble.pulse(slot, 0.3f, 0.65f, 80);
+        if (slot >= 0) Rumble.pulse(slot, 0.3f, 0.65f, 80, Rumble.Kind.ACTION);
     }
 
     public static void onUseFinish(LivingEntityUseItemEvent.Finish e) {
@@ -44,7 +44,7 @@ public final class RumbleEvents {
         ItemStack item = e.getItem();
         if (item.getUseAnimation() != net.minecraft.world.item.UseAnim.EAT && item.getUseAnimation() != net.minecraft.world.item.UseAnim.DRINK) return;
         int slot = slotOf(p);
-        if (slot >= 0) Rumble.pulse(slot, 0.15f, 0.25f, 70);
+        if (slot >= 0) Rumble.pulse(slot, 0.15f, 0.25f, 70, Rumble.Kind.ACTION);
     }
 
     /** Fuerza (0 a 1) con que un jugador a esa distancia nota una explosion. */
@@ -59,7 +59,51 @@ public final class RumbleEvents {
             int slot = slotOf(p);
             if (slot < 0) continue;
             float k = explosionStrength(Math.sqrt(p.distanceToSqr(center)));
-            if (k > 0.05f) Rumble.pulse(slot, 0.4f + 0.6f * k, 0.3f + 0.7f * k, 150 + (int) (350 * k));
+            if (k > 0.05f) Rumble.pulse(slot, 0.4f + 0.6f * k, 0.3f + 0.7f * k, 150 + (int) (350 * k), Rumble.Kind.WORLD);
+        }
+    }
+
+    private static final int[] lastNibble = new int[4];
+    private static java.lang.reflect.Field nibbleField;
+    private static boolean nibbleTried;
+
+    /** Cuando pica un pez: el anzuelo pone a mordisquear (nibble > 0) durante unos ticks; el campo es privado y se lee por reflexion. */
+    private static int nibbleOf(net.minecraft.world.entity.projectile.FishingHook hook) {
+        if (!nibbleTried) {
+            nibbleTried = true;
+            try {
+                nibbleField = net.minecraft.world.entity.projectile.FishingHook.class.getDeclaredField("nibble");
+                nibbleField.setAccessible(true);
+            } catch (ReflectiveOperationException e) {
+                dev.consolepad.ConsolePad.LOGGER.warn("Vibracion al pescar: no se encuentra el campo del anzuelo ({})", e.toString());
+            }
+        }
+        try {
+            return nibbleField == null ? 0 : nibbleField.getInt(hook);
+        } catch (ReflectiveOperationException e) {
+            return 0;
+        }
+    }
+
+    /** El valor actual de "nibble" del anzuelo del jugador del slot; vibra en el instante en que empieza a picar. Devuelve si vibro. */
+    public static boolean fishingBite(int slot, int nibble) {
+        boolean bite = nibble > 0 && lastNibble[slot] == 0;
+        lastNibble[slot] = nibble;
+        if (bite) Rumble.pulse(slot, 0.35f, 0.7f, 220, Rumble.Kind.ACTION);
+        return bite;
+    }
+
+    public static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) {
+        java.util.List<ServerPlayer> players;
+        try {
+            players = new java.util.ArrayList<>(e.getServer().getPlayerList().getPlayers());
+        } catch (RuntimeException ex) {
+            return;
+        }
+        for (ServerPlayer sp : players) {
+            int slot = slotOf(sp);
+            if (slot < 0) continue;
+            fishingBite(slot, sp.fishing == null ? 0 : nibbleOf(sp.fishing));
         }
     }
 

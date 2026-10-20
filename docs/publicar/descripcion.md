@@ -28,7 +28,7 @@ Plug in your controllers, open a single-player world, and ConsolePad asks "How m
 - **2 to 4 players, one screen.** Side by side or stacked, remembered per world. Players join with Start and leave with Start + Back, without affecting the others.
 - **Xbox, PlayStation and Nintendo controllers**, with button prompts in the matching style.
 - **Bedrock-style menus:** console crafting with LB/RB categories, creative tabs on the shoulder buttons, a virtual cursor with D-pad navigation, and an on-screen keyboard.
-- **Co-op comforts:** a partner dot on your experience bar (like Bedrock's locator bar) with name and distance, a quick actions wheel ("Go to a player", "Bring a player", time, weather...), and per-player settings (sensitivity, field of view, render distance, HUD margin and opacity, left-handed layout, remapping).
+- **Co-op comforts:** a partner marker on your experience bar (like Bedrock's locator bar; distance and name optional), a quick actions wheel ("Go to a player", "Bring a player", time, weather...), and per-player settings (sensitivity, field of view, render distance, HUD margin and opacity, left-handed layout, remapping).
 - **Rumble per player** on Xbox-compatible controllers: damage, hits, breaking, eating, drawing a bow, explosions.
 - **Console touches:** contextual button prompts ("Open", "Ride", "Trade"...), per-player auto-jump, a paper doll while you sprint or sneak, riding with a jump bar for everyone, and items spread one by one with X and the D-pad.
 - **Sound and particles for every player:** each sound is heard by the player closest to it, and torches, lava and portals animate around all of them.
@@ -63,7 +63,7 @@ Conecta los mandos, abre un mundo de un jugador y ConsolePad pregunta «¿Cuánt
 - **De 2 a 4 jugadores en una pantalla.** Lado a lado o apilados, recordado por mundo. Se entra con Start y se sale con Start + Atrás, sin afectar a los demás.
 - **Mandos Xbox, PlayStation y Nintendo**, con iconos del estilo de cada uno.
 - **Menús al estilo Bedrock:** crafteo de consola con categorías en LB/RB, pestañas del creativo en los gatillos, cursor virtual con cruceta y teclado en pantalla.
-- **Comodidades cooperativas:** punto del compañero sobre tu barra de experiencia (como la barra de localización de Bedrock) con nombre y distancia, rueda de acciones rápidas («Ir con alguien», «Traer a alguien», hora, clima...) y ajustes por jugador (sensibilidad, campo de visión, distancia de visión, margen y opacidad del HUD, zurdos, remapeo).
+- **Comodidades cooperativas:** marcador del compañero sobre tu barra de experiencia (como la barra de localización de Bedrock; distancia y nombre opcionales), rueda de acciones rápidas («Ir con alguien», «Traer a alguien», hora, clima...) y ajustes por jugador (sensibilidad, campo de visión, distancia de visión, margen y opacidad del HUD, zurdos, remapeo).
 - **Vibración por jugador** en mandos compatibles con Xbox: daño, golpes, romper bloques, comer, tensar el arco y explosiones.
 - **Detalles de consola:** avisos de botones contextuales («Abrir», «Montar», «Comerciar»...), salto automático por jugador, muñeco del jugador al correr o agacharte, cabalgaduras con barra de salto para todos y objetos repartidos de uno en uno con X y la cruceta.
 - **Sonido y partículas para todos:** cada sonido lo oye el jugador más cercano y las antorchas, la lava y los portales se animan alrededor de todos.

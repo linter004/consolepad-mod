@@ -55,7 +55,7 @@ public final class Profiles {
     /** Nombre legible de una de las 18 skins: personaje y modelo. */
     public static String skinLabel(int skin) {
         int s = Math.floorMod(skin, 18);
-        return SKIN_NAMES[s % 9] + (s < 9 ? " (brazos finos)" : " (brazos anchos)");
+        return I18n.fmt(s < 9 ? "{0} (brazos finos)" : "{0} (brazos anchos)", SKIN_NAMES[s % 9]);
     }
 
     /** Opciones de skin al crear un perfil: las 18 por defecto y, por cada PNG de la carpeta de skins, una con brazos anchos y otra con finos. */
@@ -63,15 +63,15 @@ public final class Profiles {
         List<String> out = new ArrayList<>();
         for (int i = 0; i < 18; i++) out.add(skinLabel(i));
         for (String f : CustomSkins.files()) {
-            out.add(f + " (brazos anchos)");
-            out.add(f + " (brazos finos)");
+            out.add(I18n.fmt("{0} (brazos anchos)", f));
+            out.add(I18n.fmt("{0} (brazos finos)", f));
         }
         return out;
     }
 
     /** Texto de la skin de un perfil. */
     public static String labelOf(Profile p) {
-        return p.customSkin != null ? p.customSkin + (p.slim ? " (finos)" : " (anchos)") : skinLabel(p.skin);
+        return p.customSkin != null ? I18n.fmt(p.slim ? "{0} (finos)" : "{0} (anchos)", p.customSkin) : skinLabel(p.skin);
     }
 
     /** Skin por defecto (0 a 17) que le toca a una cuenta sin conexion con ese nombre. */
@@ -135,7 +135,7 @@ public final class Profiles {
     public static String accountFor(String name, int skin) {
         StringBuilder b = new StringBuilder();
         for (char c : name.toCharArray()) if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) b.append(c);
-        String base = b.length() == 0 ? "Jugador" : b.substring(0, Math.min(11, b.length()));
+        String base = b.length() == 0 ? I18n.tr("Jugador") : b.substring(0, Math.min(11, b.length()));
         String host = Minecraft.getInstance().getUser() == null ? "" : Minecraft.getInstance().getUser().getName();
         for (int n = 0; n < 100000; n++) {
             String id = base + "_" + n;
@@ -208,8 +208,8 @@ public final class Profiles {
      */
     public static String use(int slot, Profile p) {
         int other = slotUsing(p);
-        if (other >= 0 && other != slot) return "Lo usa el jugador " + (other + 1);
-        if (slot >= 1 && SecondaryPlayers.isActive(slot)) return "Saca al jugador " + (slot + 1) + " primero (Start + Atrás 2 s)";
+        if (other >= 0 && other != slot) return I18n.fmt("Lo usa el jugador {0}", other + 1);
+        if (slot >= 1 && SecondaryPlayers.isActive(slot)) return I18n.fmt("Saca al jugador {0} primero (Start + Atrás 2 s)", slot + 1);
         PadSettings s = ConsolePad.PADS.slot(slot).settings;
         s.copyFrom(p.settings);
         s.playerName = p.name;
@@ -222,7 +222,7 @@ public final class Profiles {
 
     /** Quita el perfil de un jugador (vuelve a su nombre de cuenta de siempre, con los ajustes que tenga). */
     public static String clear(int slot) {
-        if (slot >= 1 && SecondaryPlayers.isActive(slot)) return "Saca al jugador " + (slot + 1) + " primero (Start + Atrás 2 s)";
+        if (slot >= 1 && SecondaryPlayers.isActive(slot)) return I18n.fmt("Saca al jugador {0} primero (Start + Atrás 2 s)", slot + 1);
         ConsolePad.PADS.slot(slot).settings.profileId = "";
         ConsolePad.PADS.saveSettings();
         return null;

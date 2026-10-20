@@ -24,10 +24,10 @@ public final class PlayerInfo {
 
     public static String directionName(Direction d) {
         return switch (d) {
-            case NORTH -> "norte (-Z)";
-            case SOUTH -> "sur (+Z)";
-            case WEST -> "oeste (-X)";
-            case EAST -> "este (+X)";
+            case NORTH -> I18n.tr("norte (-Z)");
+            case SOUTH -> I18n.tr("sur (+Z)");
+            case WEST -> I18n.tr("oeste (-X)");
+            case EAST -> I18n.tr("este (+X)");
             default -> d.getName();
         };
     }
@@ -40,7 +40,7 @@ public final class PlayerInfo {
             out.add(String.format(Locale.ROOT, "XYZ: %.1f / %.1f / %.1f", mc.player.getX(), mc.player.getY(), mc.player.getZ()));
         }
         if (cfg.showDirection) {
-            out.add(String.format(Locale.ROOT, "Mira al %s  %.0f°", directionName(mc.player.getDirection()), Mth.wrapDegrees(mc.player.getYRot())));
+            out.add(I18n.fmt("Mira al {0}  {1}°", directionName(mc.player.getDirection()), String.format(Locale.ROOT, "%.0f", Mth.wrapDegrees(mc.player.getYRot()))));
         }
         if (cfg.showFps) {
             out.add(mc.getFps() + " FPS");

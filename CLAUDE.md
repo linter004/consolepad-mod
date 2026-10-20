@@ -34,7 +34,7 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 
 - **Sonnet medio basta para el código del mod.** Las 8 tareas de código (compilar, mixins, controles, cursor, D-pad, ajustes JSON) se resolvieron al primer intento sin escalar. No proponer subir de nivel para este tipo de tarea salvo 2 fallos seguidos del juez.
 - **Opus solo para investigación o diseño amplio** (por ejemplo, el plan de pantalla dividida), y solo si lo pide el usuario.
-- **Entorno:** Gradle necesita `JAVA_HOME=C:/Users/alvar/.jdks/jbr-21.0.11` (el Java por defecto es el 8). Las fuentes de MC para verificar nombres están en `build/moddev/artifacts/neoforge-21.1.92-sources.jar`: comprobar ahí los nombres antes de escribir mixins.
+- **Entorno:** Gradle necesita `JAVA_HOME=C:/Users/<usuario>/.jdks/jbr-21.0.11` (el Java por defecto es el 8). Las fuentes de MC para verificar nombres están en `build/moddev/artifacts/neoforge-21.1.92-sources.jar`: comprobar ahí los nombres antes de escribir mixins.
 - **`build` no valida mixins.** Tras tocar mixins, lanzar `runClient` y revisar el log. Avisar de qué mixins solo se validan con una acción en el juego (entrar en un mundo, abrir un contenedor).
 - **Ajustes guardados mandan sobre los valores por defecto.** Al cambiar un valor por defecto de `PadSettings`, actualizar también `run/config/consolepad/slot*.json` con el juego cerrado. Cerrar el juego a la fuerza evita que lo sobrescriba al salir.
 - **Coste:** el gasto principal es esperar el arranque de `runClient` (unos 30 s si ya está descargado). Usar un Monitor corto con `grep` del log y pararlo al terminar.
@@ -106,3 +106,23 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 - **Las particulas pertenecen a un nivel** (`Particle.level`): el motor es uno, `ContextSwitcher` le cambia el nivel al entrar en un contexto y la pasada de dibujo filtra por `Minecraft.level`. Las pruebas de particulas cuentan solo la clase que miden (`TerrainParticle`): la lluvia (`WaterDropParticle`) y los efectos de otros jugadores aparecen cerca de cualquiera.
 - **Un paquete de un extra puede procesarse despues de que su jugador salga:** `PlayerContext.released` lo descarta. `tools/check-clean-exit.sh <log>` es el juez del cierre; `CONSOLEPAD_EXIT_PLAYERS=1|4` hace que la casilla 49 cierre el mundo con ese numero de jugadores.
 - **Las pruebas que cambian el inventario o dejan objetos sueltos deben guardar y restaurar las 36 casillas y quitar los objetos:** el mundo "New World" es compartido y otras pruebas (`actionsTest`) cuentan la tierra de la barra.
+
+### Reglas aprendidas de la 0.12.0 (2026-10-15)
+
+- **Todo lo que una prueba mide debe fijarlo ella al empezar, porque el usuario juega en el mismo mundo y en la misma carpeta `run/`:** perfil y margen del HUD de P1, libro de recetas abierto (estado por jugador guardado en el mundo), reparto de pantalla (recordado por mundo), modo de juego, escala de interfaz y foco de la ventana (`pauseOnLostFocus` se apaga ANTES de abrir el mundo). Un fallo que aparece solo en la pasada completa y no suelto suele ser de estado: repetir una cadena corta de casillas (`CONSOLEPAD_AUTOTEST_CASES=40,41,...`) y registrar region, orientacion y jugadores dentro.
+- **Al subir de version hay que cambiar tambien `version` en `src/main/resources/META-INF/neoforge.mods.toml`** (es literal, no se rellena solo con `mod_version`): si no, el jar se anuncia con una version vieja en la lista de mods.
+- **Otros juegos abiertos de otros mods no molestan al autotest ni los cierra `run-autotest.sh`** (solo mata el de esta carpeta, por `fml.modFolders=consolepad`); comprobarlo sin imprimir lineas de comandos. No compilar (`./gradlew build`) mientras un juego de pruebas esta corriendo (ClassNotFound).
+- **Leer los datos de una medida ANTES de que la propia prueba cambie el estado** (apagar a P2 y volver a llamar a `render` ponia a cero los contadores que se leian despues).
+
+### Reglas aprendidas de la prueba de shaders (2026-10-17)
+
+- **Sodium e Iris (incluso 0.6.13 y 1.8.12) empaquetan modulos de Fabric API que exigen NeoForge 21.1.169 o mas; el entorno de desarrollo usa 21.1.92 y el juego no carga** ("Mod fabric_api_base requires neoforge ..."). Para probarlos sin tocar `gradle.properties`: `ORG_GRADLE_PROJECT_neo_version=21.1.248` en el entorno (esta en la cache de Gradle) y los jars en `run/mods`. Con jars de otros mods en `run/mods` cualquier arranque normal falla: quitarlos y restaurar `run/config/iris.properties` y `split.json` al terminar.
+- **Las capturas de `CONSOLEPAD_SHOTS=<ruta relativa>` salen en `run/<ruta>`** (la carpeta de trabajo del juego es `run/`).
+- **Resultado con shaders (Complementary Reimagined) y `keepShaders=true`:** P1 correcto, P2 a P4 lavados o blancos. No ofrecer "shaders en pantalla dividida" hasta que cada vista tenga su propio framebuffer.
+
+### Reglas aprendidas de los ajustes tras probar la 0.13.0 (2026-10-17)
+
+- **Lo que se dibuja encima del HUD de P1 va a `Companions.OVERLAY_Z` (1200), no a 300:** el HUD de P1 lo dibujan las capas de NeoForge (`LayeredDraw`), que se separan 200 unidades de z cada una, y la barra de experiencia quedaba por encima del punto del companero. En P2 a P4 el HUD se dibuja a mano a z = 0 y no lo ve. Un fallo "solo en P1" asi se comprueba leyendo el pixel (`AutoTest.probe`, `CompanionPixelTest`), no con la posicion.
+- **Las acciones de P2 a P4 se tratan una por una en `SecondaryTick`** (`switch (act)`): una accion de `PadAction` sin caso ahi no hace nada (asi pasaba con `PICK_BLOCK`). Al anadir una accion nueva a P1, repasar ese `switch`. Los metodos privados de `Minecraft` se llaman con un `@Invoker` de `MinecraftInvoker`.
+- **Un ajuste con valor guardado en `split.json` manda sobre el valor por defecto nuevo** (`language` quedo en "auto"): con el juego cerrado, cambiarlo tambien en `run/config/consolepad/split.json`.
+- **`java` por defecto es el 8:** para `java Archivo.java` (utilidades sueltas como recortar capturas) usar `C:/Users/<usuario>/.jdks/jbr-21.0.11/bin/java`, desde la carpeta del archivo y con rutas de Windows (`C:/...`).

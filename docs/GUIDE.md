@@ -32,7 +32,7 @@ Open the pause menu (Start) and choose **Player settings**. They are per player 
 - *Camera and aiming:* sensitivity, camera curve, aim assist, field of view.
 - *Movement and buttons:* dead zones, layout (default, Java, left-handed), toggle or hold for sneak and sprint.
 - *Menus and cursor:* cursor speed, button prompts and their style (Xbox, PlayStation, Nintendo).
-- *Screen and interface:* interface scale, view distance, HUD margin and opacity, partner indicator, coordinates, FPS.
+- *Screen and interface:* interface scale, view distance, HUD margin and opacity, partner indicator and its distance, coordinates, FPS.
 - *Player and controllers:* name, label colour, profile, assign controllers, rumble strength, quick wheel editor.
 
 On any value button, **X** (or right click) goes to the previous value.
@@ -52,6 +52,8 @@ Rumble works on controllers Windows sees as XInput (Xbox-compatible; PlayStation
 - In inventories, hold X and move with the D-pad to spread one item per slot.
 - Player 1 can remove another player from the pause menu ("Remove a player").
 - Sounds are heard by the player closest to them; with several players the game lowers distance by itself if the frame rate drops under 40 FPS.
+
+- Press LB and RB together to jump to the previous hotbar slot. Player settings also have a Nintendo layout (A/B and X/Y swapped), "Mark my bed", a strength for each kind of rumble and a Saving mode for weak PCs.
 
 ### 7. Troubleshooting
 
@@ -95,7 +97,7 @@ Abre el menú de pausa (Start) y elige **Ajustes del jugador**. Son por jugador 
 - *Cámara y apuntado:* sensibilidad, curva de cámara, ayuda de apuntado, campo de visión.
 - *Movimiento y botones:* zonas muertas, disposición (de fábrica, Java, zurdo), mantener o alternar para agacharse y correr.
 - *Menús y cursor:* velocidad del cursor, iconos de botones y su estilo (Xbox, PlayStation, Nintendo).
-- *Pantalla e interfaz:* escala, distancia de visión, margen y opacidad del HUD, indicador del compañero, coordenadas, FPS.
+- *Pantalla e interfaz:* escala, distancia de visión, margen y opacidad del HUD, indicador del compañero y su distancia, coordenadas, FPS.
 - *Jugador y mandos:* nombre, color de etiqueta, perfil, asignar mandos, fuerza de la vibración, editor de la rueda rápida.
 
 En cualquier botón de valor, **X** (o clic derecho) vuelve al valor anterior.
@@ -115,6 +117,14 @@ Funciona en los mandos que Windows ve como XInput (compatibles con Xbox; los de 
 - En los inventarios, mantén X y muévete con la cruceta para repartir un objeto por hueco.
 - P1 puede sacar a otro jugador desde el menú de pausa («Sacar a un jugador»).
 - Cada sonido lo oye el jugador más cercano; con varios jugadores el juego baja solo la distancia si los FPS caen de 40.
+
+- Pulsa LB y RB a la vez para saltar a la casilla anterior. Los ajustes del jugador incluyen una disposición Nintendo (A/B y X/Y intercambiados), «Marcar mi cama», una fuerza para cada tipo de vibración y un Modo ahorro para PC modestos.
+
+- **Idioma de los menús:** empiezan en español; en los ajustes del jugador, «Idioma de los menús» los cambia a inglés o al idioma de Minecraft (automático).
+- Los ajustes del jugador incluyen **Colores del jugador** (cursor y casilla seleccionada con tu color), **Destello con poca vida**, **Brillo** propio, y para todos **Línea entre jugadores** y **Aviso de quién duerme**.
+
+- **Teclado en pantalla:** en el chat, los carteles y los nombres se abre con **Y** (o con **A** sobre un campo de texto) y se cierra con **B**. «Teclado automático» (ajustes del jugador) lo abre solo al entrar.
+- **Cama:** los jugadores 2 a 4 tienen su botón «Salir de la cama»; **B** también los levanta.
 
 ### 7. Si algo falla
 

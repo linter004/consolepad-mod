@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class AmbientTest {
     private static int t, flames, smokes, flamesP1;
+    private static double minP1;
     private static BlockPos pos;
     private static BlockState before;
 
@@ -32,6 +33,7 @@ public final class AmbientTest {
         if (t == 1) {
             mc.setScreen(null);
             pos = sp.blockPosition().east(3).above(2);
+            minP1 = Double.MAX_VALUE;
             ServerLevel level = (ServerLevel) sp.level();
             server.execute(() -> {
                 before = level.getBlockState(pos);
@@ -55,10 +57,11 @@ public final class AmbientTest {
             flames = Math.max(flames, f);
             smokes = Math.max(smokes, s);
             flamesP1 = Math.max(flamesP1, f1);
+            minP1 = Math.min(minP1, mc.player.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos))); // P1 puede moverse durante la prueba
         }
         if (t == 150) {
             check("particulas ambientales: la antorcha junto a P2 suelta llama (" + flames + ") y humo (" + smokes + ") en el mundo de P2", flames > 0 && smokes > 0);
-            boolean p1Far = mc.player.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 24; // con P1 cerca de la antorcha tambien la ve (es el mismo mundo)
+            boolean p1Far = minP1 > 24; // con P1 cerca de la antorcha tambien la ve (es el mismo mundo)
             check("particulas ambientales: nada de eso en el mundo de P1 si esta lejos (" + (p1Far ? "lejos" : "cerca, no se mide") + ", " + flamesP1 + ")", !p1Far || flamesP1 == 0);
             ServerLevel level = (ServerLevel) sp.level();
             server.execute(() -> level.setBlock(pos, before, 3));
@@ -66,6 +69,7 @@ public final class AmbientTest {
         if (t == 160) {
             t = 0;
             flames = smokes = flamesP1 = 0;
+            minP1 = Double.MAX_VALUE;
             return true;
         }
         return false;

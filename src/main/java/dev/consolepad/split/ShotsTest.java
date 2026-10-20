@@ -122,7 +122,8 @@ public final class ShotsTest {
                 ConsolePad.PADS.slot(i).settings.profileId = "";
             }
         }
-        if (phase >= 1 && phase < 90 && mc.level != null) mc.options.pauseOnLostFocus = false;
+        if (phase == 0 && ticks == 1) prevPause = mc.options.pauseOnLostFocus; // el valor del usuario, antes de apagarlo
+        if (phase < 90) mc.options.pauseOnLostFocus = false; // con otra ventana encima (otro juego, el navegador) el mundo se pausaba y salia el menu de pausa de P1 en las capturas
         switch (phase) {
             case 0 -> {
                 if (welcomeStep == 0 && mc.screen instanceof TitleScreen && ticks > 60) { // la bienvenida, a tamano pequeno (la ventana aun no se ha agrandado)
@@ -160,7 +161,6 @@ public final class ShotsTest {
                     var srv = mc.getSingleplayerServer();
                     prevDifficulty = srv.getWorldData().getDifficulty();
                     prevGuiScale = mc.options.guiScale().get();
-                    prevPause = mc.options.pauseOnLostFocus;
                     mc.options.pauseOnLostFocus = false;
                     mc.options.guiScale().set(0);
                     mc.options.hideGui = false;
@@ -191,8 +191,23 @@ public final class ShotsTest {
             case 4 -> {
                 if (ticks == 200) shot("split-2-players.png");
                 if (ticks == 205) farAway(mc);
+                if (ticks == 210) { // con experiencia: el relleno verde de la barra no debe tapar el punto
+                    ServerPlayer[] xps = {server(mc, 0), server(mc, 1)};
+                    mc.getSingleplayerServer().execute(() -> {
+                        for (ServerPlayer xp : xps) if (xp != null) { xp.setExperienceLevels(12); xp.experienceProgress = 0.6f; }
+                    });
+                }
                 if (ticks == 290) shot("companion.png"); // con el companero lejos: el punto sobre la barra de experiencia
-                if (ticks == 300) go(5);
+                if (ticks >= 295 && ticks <= 335 && ticks % 4 == 0) {
+                    ServerPlayer low = server(mc, 1);
+                    if (low != null) mc.getSingleplayerServer().execute(() -> low.setHealth(4f)); // P2 con poca vida (en pacifico se regenera enseguida): destello y marcador rojo para P1
+                }
+                if (ticks == 330) shot("low-health.png");
+                if (ticks == 337) {
+                    ServerPlayer low = server(mc, 1);
+                    if (low != null) mc.getSingleplayerServer().execute(() -> low.setHealth(20f));
+                }
+                if (ticks == 345) go(5);
             }
             case 5 -> { // 4 jugadores
                 if (!AutoTest.joinTo(mc, 4)) return;

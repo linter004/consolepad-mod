@@ -67,7 +67,7 @@ public final class IrisCompat {
             disabledByUs = true;
             set(false);
             ConsolePad.LOGGER.info("[compat] Iris: shaders apagados mientras haya jugadores extra (la pantalla dividida no los admite)");
-            if (mc.player != null) mc.player.displayClientMessage(Component.literal("Shaders apagados mientras juegan varios jugadores; se encienden al quedar uno."), true);
+            if (mc.player != null) mc.player.displayClientMessage(I18n.lit("Shaders apagados mientras juegan varios jugadores; se encienden al quedar uno."), true);
         } else if (!split && disabledByUs) {
             disabledByUs = false;
             set(true);

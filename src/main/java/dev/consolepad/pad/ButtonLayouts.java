@@ -5,11 +5,12 @@ import java.util.Map;
 /**
  * Disposiciones de botones preestablecidas: cambian todos los botones de un jugador de golpe (el remapeo individual de PlayerControlsScreen sigue
  * disponible encima). BEDROCK = la de fabrica; JAVA = acciones de teclado (agacharse en B, soltar en R3); ZURDO = la de fabrica con gatillos,
- * bumpers y clics de stick intercambiados y los sticks intercambiados (PadSettings.swapSticks).
+ * bumpers y clics de stick intercambiados y los sticks intercambiados (PadSettings.swapSticks); NINTENDO = la de fabrica con A y B, y X e Y, intercambiados
+ * al leer el mando (PadSettings.swapFace).
  */
 public final class ButtonLayouts {
     public enum Layout {
-        BEDROCK("Bedrock"), JAVA("Java"), LEFTY("Zurdo (sticks cambiados)");
+        BEDROCK("Bedrock"), JAVA("Java"), LEFTY("Zurdo (sticks cambiados)"), NINTENDO("Nintendo (A↔B, X↔Y)");
 
         public final String label;
 
@@ -47,19 +48,20 @@ public final class ButtonLayouts {
         s.bindings.clear();
         s.bindings.putAll(bindings(l));
         s.swapSticks = l == Layout.LEFTY;
+        s.swapFace = l == Layout.NINTENDO; // los botones se intercambian al leer el mando, asi vale tambien en los menus
     }
 
     /** La disposicion que coincide exactamente con los botones y los sticks de estos ajustes, o null si es personalizada. */
     public static Layout detect(PadSettings s) {
         for (Layout l : Layout.values()) {
-            if (s.swapSticks == (l == Layout.LEFTY) && s.bindings.equals(bindings(l))) return l;
+            if (s.swapSticks == (l == Layout.LEFTY) && s.swapFace == (l == Layout.NINTENDO) && s.bindings.equals(bindings(l))) return l;
         }
         return null;
     }
 
     public static String name(PadSettings s) {
         Layout l = detect(s);
-        return l == null ? "personalizada" : l.label;
+        return dev.consolepad.split.I18n.tr(l == null ? "personalizada" : l.label);
     }
 
     /** Siguiente del ciclo; desde una personalizada se vuelve a Bedrock. */

@@ -18,11 +18,11 @@ public final class PlayerPauseScreen extends PlayerMenuScreen {
     public static final int[][] lastPreview = new int[4][4];
 
     public PlayerPauseScreen(int slot) {
-        super(slot, Component.literal("Pausa · ").append(PlayerLabels.styled(slot, PlayerLabels.labelOf(slot))));
+        super(slot, I18n.lit("Pausa · ").append(PlayerLabels.styled(slot, PlayerLabels.labelOf(slot))));
     }
 
     private static Component layoutLabel() {
-        return Component.literal("Reparto: " + (SplitSettings.orientation() == SplitSettings.Orientation.SIDE_BY_SIDE ? "lado a lado" : "apilado"));
+        return I18n.lit("Reparto: " + (SplitSettings.orientation() == SplitSettings.Orientation.SIDE_BY_SIDE ? I18n.tr("lado a lado") : I18n.tr("apilado")));
     }
 
     @Override
@@ -31,18 +31,18 @@ public final class PlayerPauseScreen extends PlayerMenuScreen {
         boolean canKick = slot == 0 && SecondaryPlayers.anyActive(); // P1 puede sacar a los extra (sobre todo a quien se quedo sin mando)
         int rows = (slot == 0 ? 6 : 5) + (canKick ? 1 : 0);
         int i = 0;
-        resume = addRow(i++, rows, Component.literal("Volver a la partida"), b -> this.onClose());
-        settingsButton = addRow(i++, rows, Component.literal("Ajustes del jugador"), b -> mc.setScreen(new PlayerSettingsScreen(slot, this)));
-        controls = addRow(i++, rows, Component.literal("Controles"), b -> mc.setScreen(new PlayerControlsScreen(slot, this)));
+        resume = addRow(i++, rows, I18n.lit("Volver a la partida"), b -> this.onClose());
+        settingsButton = addRow(i++, rows, I18n.lit("Ajustes del jugador"), b -> mc.setScreen(new PlayerSettingsScreen(slot, this)));
+        controls = addRow(i++, rows, I18n.lit("Controles"), b -> mc.setScreen(new PlayerControlsScreen(slot, this)));
         layout = addRow(i++, rows, layoutLabel(), b -> {
             SplitSettings.toggleOrientation(); // global: se recalcula todo en el siguiente fotograma
             SplitSettings.rememberWorldOrientation(WorldEntry.worldId(mc), SplitSettings.orientation()); // y se recuerda para este mundo
             b.setMessage(layoutLabel());
         });
-        if (canKick) kick = addRow(i++, rows, Component.literal("Sacar a un jugador"), b -> mc.setScreen(new KickPlayerScreen(this)));
+        if (canKick) kick = addRow(i++, rows, I18n.lit("Sacar a un jugador"), b -> mc.setScreen(new KickPlayerScreen(this)));
         if (slot == 0) {
-            options = addRow(i++, rows, Component.literal("Opciones del juego"), b -> mc.setScreen(new OptionsScreen(this, mc.options)));
-            quit = addRow(i, rows, Component.literal("Guardar y salir al título"), b -> {
+            options = addRow(i++, rows, I18n.lit("Opciones del juego"), b -> mc.setScreen(new OptionsScreen(this, mc.options)));
+            quit = addRow(i, rows, I18n.lit("Guardar y salir al título"), b -> {
                 b.active = false;
                 if (mc.level != null) mc.level.disconnect();
                 if (mc.isLocalServer()) mc.disconnect(new GenericMessageScreen(Component.translatable("menu.savingLevel")));
@@ -50,7 +50,7 @@ public final class PlayerPauseScreen extends PlayerMenuScreen {
                 mc.setScreen(new TitleScreen());
             });
         } else {
-            quit = addRow(i, rows, Component.literal("Salir de la partida (P" + (slot + 1) + ")"), b -> SecondaryPlayers.leave(mc, slot));
+            quit = addRow(i, rows, I18n.lit(I18n.fmt("Salir de la partida (P{0})", slot + 1)), b -> SecondaryPlayers.leave(mc, slot));
         }
     }
 

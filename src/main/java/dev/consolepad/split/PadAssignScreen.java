@@ -22,7 +22,7 @@ public final class PadAssignScreen extends PlayerMenuScreen {
     private boolean armed;
 
     public PadAssignScreen(int slot, Screen parent) {
-        super(slot, Component.literal("Asignar mandos"));
+        super(slot, I18n.lit("Asignar mandos"));
         this.parent = parent;
     }
 
@@ -31,9 +31,9 @@ public final class PadAssignScreen extends PlayerMenuScreen {
         int n = PadManager.MAX_PLAYERS + 1;
         for (int i = 0; i < PadManager.MAX_PLAYERS; i++) {
             final int p = i;
-            rows[i] = addRow(i, n, Component.literal(""), b -> startListening(p));
+            rows[i] = addRow(i, n, I18n.lit(""), b -> startListening(p));
         }
-        back = addRow(PadManager.MAX_PLAYERS, n, Component.literal("Atrás"), b -> this.onClose());
+        back = addRow(PadManager.MAX_PLAYERS, n, I18n.lit("Atrás"), b -> this.onClose());
         refreshLabels();
     }
 
@@ -46,8 +46,8 @@ public final class PadAssignScreen extends PlayerMenuScreen {
 
     private String describe(int p) {
         PadManager.Device d = ConsolePad.PADS.slot(p).device;
-        String who = "Jugador " + (p + 1) + (p == slot ? " (tú)" : "");
-        String pad = d == null ? "sin mando" : d.name + " [" + d.type + "]";
+        String who = I18n.fmt(p == slot ? "Jugador {0} (tú)" : "Jugador {0}", p + 1);
+        String pad = d == null ? I18n.tr("sin mando") : d.name + " [" + d.type + "]";
         String text = who + ": " + pad;
         return this.font.plainSubstrByWidth(text, ROW_W - 2 * (thumbW() + 8));
     }
@@ -60,7 +60,7 @@ public final class PadAssignScreen extends PlayerMenuScreen {
     private void refreshLabels() {
         for (int i = 0; i < rows.length; i++) {
             if (rows[i] == null) continue;
-            rows[i].setMessage(Component.literal(i == target ? "Jugador " + (i + 1) + ": pulsa un botón..." : describe(i)));
+            rows[i].setMessage(I18n.lit(i == target ? I18n.fmt("Jugador {0}: pulsa un botón...", i + 1) : describe(i)));
         }
     }
 
@@ -120,8 +120,8 @@ public final class PadAssignScreen extends PlayerMenuScreen {
         }
         int free = 0;
         for (PadManager.Device d : ConsolePad.PADS.allDevices()) if (ConsolePad.PADS.slotOfDevice(d) == null) free++;
-        String hint = target >= 0 ? "Pulsa un botón en el mando que quieres para el jugador " + (target + 1) + " (el mismo mando cancela)"
-                : free > 0 ? free + (free == 1 ? " mando sin jugador" : " mandos sin jugador") : "Elige un jugador y pulsa un botón en su nuevo mando";
+        String hint = target >= 0 ? I18n.fmt("Pulsa un botón en el mando que quieres para el jugador {0} (el mismo mando cancela)", target + 1)
+                : free > 0 ? I18n.fmt(free == 1 ? "{0} mando sin jugador" : "{0} mandos sin jugador", free) : I18n.tr("Elige un jugador y pulsa un botón en su nuevo mando");
         graphics.drawCenteredString(this.font, this.font.plainSubstrByWidth(hint, this.width - 8), this.width / 2, 20, 0xFFFFD84A);
     }
 }

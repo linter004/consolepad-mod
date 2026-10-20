@@ -45,7 +45,9 @@
     "ParticleEngineAccessor",
     "ParticleAccessor",
     "LocalPlayerMixin",
-    "RecipeButtonMixin"
+    "RecipeButtonMixin",
+    "GuiHotbarTintMixin",
+    "LightTextureBrightnessMixin"
   ],
   "injectors": {
     "defaultRequire": 1

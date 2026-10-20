@@ -14,7 +14,8 @@ import org.lwjgl.glfw.GLFW;
 /**
  * Teclado en pantalla de un jugador (uno por slot): una cuadricula de teclas que se maneja con el D-pad o el stick izquierdo y escribe en la
  * pantalla abierta con las mismas entradas que el teclado fisico (charTyped / keyPressed), asi sirve para chat, comandos, carteles, yunque y
- * nombre del mundo. Se abre solo en las pantallas de texto y al pulsar A sobre un campo de texto; B o Start lo cierran.
+ * nombre del mundo. Se abre al pulsar Y en una pantalla de texto o A sobre un campo de texto (con el ajuste "Teclado automatico" tambien solo al entrar en las
+ * pantallas de texto); B o Start lo cierran.
  */
 public final class PadKeyboard {
     private static final PadKeyboard[] KEYBOARDS = {new PadKeyboard(0), new PadKeyboard(1), new PadKeyboard(2), new PadKeyboard(3)};
@@ -77,7 +78,7 @@ public final class PadKeyboard {
         watchCreativeSearch(screen);
         if (screen == lastScreen) return;
         lastScreen = screen;
-        if (screen != null && wantsKeyboard(screen)) open();
+        if (screen != null && wantsKeyboard(screen) && dev.consolepad.ConsolePad.PADS.slot(slot).settings.autoKeyboard) open();
         else active = false;
     }
 
@@ -85,6 +86,10 @@ public final class PadKeyboard {
 
     /** Creativo: al elegir la pestana de busqueda con el cursor (no con LB/RB, que pasan por ella) se abre el teclado en pantalla. */
     private void watchCreativeSearch(Screen screen) {
+        if (!dev.consolepad.ConsolePad.PADS.slot(slot).settings.autoKeyboard) { // por defecto el teclado se abre con un boton
+            wasSearchTab = false;
+            return;
+        }
         if (!(screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen)) {
             wasSearchTab = false;
             return;
@@ -98,6 +103,12 @@ public final class PadKeyboard {
             }
         }
         wasSearchTab = search;
+    }
+
+    /** Tras pulsar Y: en una pantalla de escribir (chat, cartel, nombre...) que no sea un contenedor (alli Y es movimiento rapido), abre el teclado. */
+    public void tryOpenFromButton(Screen screen) {
+        if (active || screen == null || screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) return;
+        if (wantsKeyboard(screen)) open();
     }
 
     /** Tras pulsar A: si hay un campo de texto enfocado bajo el cursor, abre el teclado. */
@@ -222,7 +233,7 @@ public final class PadKeyboard {
             } else {
                 for (int k = 0; k < SPECIAL.length; k++) {
                     boolean on = (k == 0 && shift) || (k == 1 && symbols);
-                    drawKey(g, font, x0 + k * 2 * KEY_W, y, 2 * KEY_W, SPECIAL[k], row == r && col / 2 == k, on);
+                    drawKey(g, font, x0 + k * 2 * KEY_W, y, 2 * KEY_W, I18n.tr(SPECIAL[k]), row == r && col / 2 == k, on);
                 }
             }
         }

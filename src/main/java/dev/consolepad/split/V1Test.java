@@ -25,7 +25,7 @@ import java.util.function.Supplier;
  */
 public final class V1Test {
     private static int phase;
-    private static boolean dropCursorDone, wheelDone, profilesDone, lostDone, rideDone, rumbleDone, dragDone, ambientDone, kickDone;
+    private static boolean dropCursorDone, wheelDone, profilesDone, lostDone, rideDone, rumbleDone, dragDone, ambientDone, kickDone, hotbarDone, sleepDone, pickDone, dotDone, kbDone;
     private static int calls;
     static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
 
@@ -45,6 +45,26 @@ public final class V1Test {
         calls++;
         switch (phase) {
             case 0 -> {
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && pickDone && dotDone && !kbDone) { // teclado con un boton
+                    kbDone = KeyboardButtonTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && pickDone && !dotDone) { // punto del companero encima de la barra
+                    dotDone = CompanionPixelTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && !pickDone) { // copiar bloque
+                    pickDone = PickBlockTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && !sleepDone) { // dormir juntos
+                    sleepDone = SleepTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && !hotbarDone) { // casilla anterior con LB y RB
+                    hotbarDone = HotbarTest.run(mc);
+                    return false;
+                }
                 if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && !kickDone) { // P1 saca a P2 desde su menu y luego se vuelve a meter
                     kickDone = KickTest.run(mc);
                     return false;
@@ -406,7 +426,15 @@ public final class V1Test {
                             c.cursorY = gy;
                         }
                     });
-                }, () -> itemNameAll(n, SplitDiag.tooltipsDrawn, tipBase, true) && itemNameAll(n, SplitDiag.itemNameShown, shownBase, false)),
+                }, () -> {
+                    boolean ok = itemNameAll(n, SplitDiag.tooltipsDrawn, tipBase, true) && itemNameAll(n, SplitDiag.itemNameShown, shownBase, false);
+                    if (!ok) { // por jugador, para saber cual falla (con el raton real del usuario moviendose por la ventana el cursor de P1 se va del diamante)
+                        StringBuilder sb = new StringBuilder();
+                        for (int s = 0; s < n; s++) sb.append(" P").append(s + 1).append(": tooltips +").append(SplitDiag.tooltipsDrawn[s] - tipBase[s]).append(", nombre +").append(SplitDiag.itemNameShown[s] - shownBase[s]).append(';');
+                        ConsolePad.LOGGER.info("[autotest] tooltip del diamante por jugador:{} ventana activa={}", sb, mc.isWindowActive());
+                    }
+                    return ok;
+                }),
                 Settings2Test.step(who + ": cierra los inventarios y restaura el hueco 20; el nombre vuelve", 20, () -> {
                     if (Settings2Test.seqTick == 0) {
                         closeAll.run();
@@ -526,6 +554,8 @@ public final class V1Test {
         int ownMax, crossMax, crossBase = -1;
         boolean crack, swingSeenByOther, swingOwn;
         int drawnBase, foreignBase;
+        /** Mobs del mundo que estorbaban a la mira (un golem de hierro junto a P1 tapaba el bloque) apartados durante la prueba: {entidad, x, y, z, sin gravedad}. */
+        final java.util.List<Object[]> moved = new java.util.ArrayList<>();
     }
 
     /** El jugador del slot rompe un bloque de tierra a 2 bloques: particulas en su mundo y no en el del otro, progreso de rotura propio y gesto de golpear visto por el otro. */
@@ -561,6 +591,11 @@ public final class V1Test {
                         server.execute(() -> {
                             var lv = sp.serverLevel();
                             clearDrops(lv, tgt);
+                            for (var e : lv.getEntitiesOfClass(net.minecraft.world.entity.Entity.class, new net.minecraft.world.phys.AABB(feet).inflate(5), e -> !(e instanceof net.minecraft.world.entity.player.Player) && !(e instanceof net.minecraft.world.entity.item.ItemEntity))) {
+                                m.moved.add(new Object[] {e, e.getX(), e.getY(), e.getZ(), e.isNoGravity()});
+                                e.setNoGravity(true);
+                                e.moveTo(e.getX(), e.getY() + 100, e.getZ()); // fuera del camino de la mira; al terminar vuelve a su sitio
+                            }
                             sp.setGameMode(GameType.SURVIVAL);
                             for (int dy = 0; dy <= 2; dy++) for (int dz = 1; dz <= 2; dz++) lv.setBlock(feet.offset(0, dy, dz), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
                             lv.setBlock(tgt, net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 3);
@@ -576,6 +611,9 @@ public final class V1Test {
                     }
                     aim.run();
                     if (padDev != null) padDev.state.simDown = bitOf(slot, dev.consolepad.pad.PadAction.ATTACK);
+                    if (Settings2Test.seqTick == 20) ConsolePad.LOGGER.info("[autotest] diag rompe {}: ventana activa={}, raton capturado={}, pantalla={}, mira={}, modo={}, mano={}, pad={}, ataque={}, tgt={}, pies={}", who, mc.isWindowActive(), mc.mouseHandler.isMouseGrabbed(),
+                            mc.screen == null ? "-" : mc.screen.getClass().getSimpleName(), mc.hitResult == null ? "null" : mc.hitResult.getType() + (mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult eh ? " " + eh.getEntity().getType() + " en " + eh.getEntity().blockPosition().toShortString() : ""), sp.gameMode.getGameModeForPlayer(), me.getMainHandItem().getItem(),
+                            padDev == null ? "null" : padDev.name, padDev == null ? -1 : padDev.state.simDown, tgt.toShortString(), feet.toShortString());
                     int own = 0, cross = 0;
                     for (var part : allParticles(mc)) {
                         if (!part.getClass().getSimpleName().equals("TerrainParticle")) continue; // los de rotura y golpe de bloque (la lluvia y los efectos no cuentan)
@@ -606,6 +644,11 @@ public final class V1Test {
                     check(who + " rompe: gesto de golpear propio=" + m.swingOwn + " y visto por el otro jugador=" + m.swingSeenByOther, m.swingOwn && m.swingSeenByOther);
                     server.execute(() -> {
                         clearDrops(sp.serverLevel(), tgt);
+                        for (Object[] mv : m.moved) {
+                            var e = (net.minecraft.world.entity.Entity) mv[0];
+                            e.moveTo((double) mv[1], (double) mv[2], (double) mv[3]);
+                            e.setNoGravity((boolean) mv[4]);
+                        }
                         sp.setGameMode(prev[0]);
                         for (int i = 0; i < 36; i++) sp.getInventory().setItem(i, kept[i]);
                     });

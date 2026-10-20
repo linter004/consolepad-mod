@@ -21,6 +21,10 @@ public abstract class ParticleEngineMixin {
     private void consolepad$ownWorldOnly(Particle particle, com.mojang.blaze3d.vertex.VertexConsumer consumer, Camera camera, float partialTick) {
         int slot = dev.consolepad.split.SplitRender.passSlot;
         if (((ParticleAccessor) particle).consolepad$getLevel() == Minecraft.getInstance().level) {
+            if (dev.consolepad.split.PerfLimits.playerCount > 1 && !dev.consolepad.split.AdaptivePerf.drawParticle(System.identityHashCode(particle), dev.consolepad.split.AdaptivePerf.level())) {
+                dev.consolepad.split.SplitDiag.particlesThinned++; // presion alta: se adelgazan
+                return;
+            }
             if (slot >= 0 && slot < 4) dev.consolepad.split.SplitDiag.particlesDrawn[slot]++;
             particle.render(consumer, camera, partialTick);
         } else if (slot >= 0 && slot < 4) {

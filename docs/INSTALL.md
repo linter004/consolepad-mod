@@ -12,8 +12,8 @@ ConsolePad añade soporte de mandos estilo consola y pantalla dividida local de 
 ## Instalar
 
 1. Instala NeoForge 21.1.x para Minecraft 1.21.1 con su instalador y crea un perfil en el lanzador.
-2. Copia `consolepad-0.11.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
-3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.11.0-beta**.
+2. Copia `consolepad-0.13.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
+3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.13.0-beta**.
 
 ## Cómo se unen los jugadores
 
@@ -28,7 +28,7 @@ ConsolePad añade soporte de mandos estilo consola y pantalla dividida local de 
 Carpeta `config/consolepad/` de la instancia:
 
 - `slot0.json` a `slot3.json`: ajustes de cada jugador (botones, sensibilidad, curva de cámara, distancia de chunks, accesibilidad...). Se editan desde el menú de pausa de cada jugador; se guardan al cerrar el juego.
-- `split.json`: ajustes globales de la pantalla dividida.
+- `split.json`: ajustes globales de la pantalla dividida (entre ellos `adaptivePerformance`, `targetFps`, `savingMode`, `soundPerPlayer`, `soundOcclusion`, `askPlayers` y `padLostLeaveSeconds`).
 
 Cierra el juego antes de editar los archivos a mano: se reescriben al salir.
 
@@ -51,7 +51,7 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 ## Lista de comprobación para una instalación limpia
 
 1. [ ] Minecraft 1.21.1 con NeoForge 21.1.x y Java 21.
-2. [ ] `consolepad-0.11.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
+2. [ ] `consolepad-0.13.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
 3. [ ] El juego arranca y **ConsolePad** aparece en la lista de mods.
 4. [ ] Con un mando conectado, P1 se mueve y gira con él y Start abre su menú de pausa.
 5. [ ] En un mundo de un jugador, con un segundo mando, aparece «Unirse como el jugador 2»; Start lo mete y la pantalla se divide.

@@ -18,7 +18,7 @@ public final class KickPlayerScreen extends PlayerMenuScreen {
     private Button back;
 
     public KickPlayerScreen(Screen parent) {
-        super(0, Component.literal("Sacar a un jugador"));
+        super(0, I18n.lit("Sacar a un jugador"));
         this.parent = parent;
     }
 
@@ -35,13 +35,13 @@ public final class KickPlayerScreen extends PlayerMenuScreen {
         int i = 0;
         for (int s : slots) {
             final int slotToKick = s;
-            Component label = Component.literal("Sacar a ").append(PlayerLabels.styled(s, PlayerLabels.labelOf(s))).append(" (P" + (s + 1) + ")");
+            Component label = I18n.lit("Sacar a ").append(PlayerLabels.styled(s, PlayerLabels.labelOf(s))).append(" (P" + (s + 1) + ")");
             buttons.add(addRow(i++, rows, label, b -> {
                 SecondaryPlayers.leave(mc, slotToKick);
                 this.onClose();
             }));
         }
-        back = addRow(i, rows, Component.literal("Atrás"), b -> this.onClose());
+        back = addRow(i, rows, I18n.lit("Atrás"), b -> this.onClose());
     }
 
     @Override

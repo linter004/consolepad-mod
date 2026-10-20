@@ -98,6 +98,7 @@ public final class DragTest {
         if (t == 36) sim(slot, 1 << PadState.A); // coger la pila
         if (t == 40) sim(slot, 0);
         if (t == 50) {
+            Settings2Test.check(who + ": el cursor del mando se dibuja con el color del jugador (" + Integer.toHexString(VirtualCursor.lastRgb[slot]) + ")", VirtualCursor.lastRgb[slot] == PlayerLabels.accent(slot));
             Settings2Test.check(who + ": rereparto: coge la pila de 8 con A (en el cursor " + playerOf(mc, slot).containerMenu.getCarried().getCount() + ")",
                     screenOf(mc, slot) instanceof InventoryScreen && playerOf(mc, slot).containerMenu.getCarried().getCount() == 8);
             sim(slot, 1 << PadState.DPAD_RIGHT); // al hueco 1

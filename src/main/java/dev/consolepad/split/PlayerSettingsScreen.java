@@ -31,6 +31,9 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private static final String[] AUTO_JUMP_NAMES = {"como el juego", "sí", "no"};
     public static final float[] FOV_COMPS = {0f, 0.5f, 1f};
     private static final String[] FOV_COMP_NAMES = {"no", "media", "total"};
+    public static final int[] DROP_RATES = {2, 4, 6, 10};
+    private static final String[] DROP_RATE_NAMES = {"rápido", "medio", "lento", "muy lento"};
+    public static final float[] BRIGHTNESSES = {-1f, 0f, 0.25f, 0.5f, 0.75f, 1f};
     public static final float[] VIBRATIONS = {0f, 0.4f, 0.7f, 1f};
     private static final String[] VIBRATION_NAMES = {"no", "suave", "normal", "fuerte"};
     public static final float[] AIM_SENS = {1f, 0.75f, 0.5f, 0.35f, 0.25f};
@@ -41,13 +44,21 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private record Item(String id, Supplier<String> label, Runnable next) {}
 
     /** Categorias de los ajustes (cada una empieza en pagina nueva) y que opciones lleva cada una. */
+    /** Pruebas: el texto de todas las opciones (de todas las paginas) y los titulos de las categorias, en el idioma activo. */
+    public java.util.List<String> labelsForTest() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Item it : items) out.add(it.label().get());
+        for (String[] cat : CATEGORIES) out.add(I18n.tr(cat[0]));
+        return out;
+    }
+
     private static final String[][] CATEGORIES = {
-            {"Cámara y apuntado", "sens", "sensY", "lookCurve", "aimSens", "targetSlowdown", "invertY", "lookDead", "fov"},
-            {"Movimiento y botones", "moveDead", "doubleTap", "layout", "sneakMode", "sprintMode", "attackMode", "toggleHolds", "autoJump"},
-            {"Menús y cursor", "cursorSpeed", "snapNav", "hints", "bigHints", "iconStyle"},
-            {"Pantalla e interfaz", "guiScale", "viewDist", "fovComp", "hudMargin", "hudOpacity", "showHud", "showHand", "showCoords", "showDirection", "paperDoll", "showCompanions", "showFps", "reduceEffects"},
-            {"Jugador y mandos", "name", "labelColor", "profile", "assignPads", "vibration", "wheel"},
-            {"Copiar y restablecer", "copySource", "copyDo", "reset"},
+            {I18n.tr("Cámara y apuntado"), "sens", "sensY", "lookCurve", "aimSens", "targetSlowdown", "invertY", "lookDead", "fov"},
+            {I18n.tr("Movimiento y botones"), "moveDead", "doubleTap", "layout", "sneakMode", "sprintMode", "attackMode", "toggleHolds", "autoJump", "dropRate"},
+            {I18n.tr("Menús y cursor"), "cursorSpeed", "snapNav", "autoKeyboard", "hints", "bigHints", "iconStyle"},
+            {I18n.tr("Pantalla e interfaz"), "guiScale", "viewDist", "fovComp", "brightness", "playerColors", "lowHealthFlash", "separators", "sleepNotice", "language", "savingMode", "hudMargin", "hudOpacity", "showHud", "showHand", "showCoords", "showDirection", "paperDoll", "showCompanions", "companionDistance", "bedMarker", "showFps", "reduceEffects"},
+            {I18n.tr("Jugador y mandos"), "name", "labelColor", "profile", "assignPads", "vibration", "vibDamage", "vibActions", "vibWorld", "wheel"},
+            {I18n.tr("Copiar y restablecer"), "copySource", "copyDo", "reset"},
     };
 
     private record Page(String category, int part, int parts, List<Item> items) {}
@@ -86,7 +97,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private boolean resetArmed;
 
     public PlayerSettingsScreen(int slot, Screen parent) {
-        super(slot, Component.literal("Ajustes del jugador " + (slot + 1)));
+        super(slot, I18n.lit("Ajustes del jugador " + (slot + 1)));
         this.parent = parent;
         this.copySource = nextOther(slot);
     }
@@ -142,78 +153,111 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private static String targetName(float v) {
         int best = 0;
         for (int k = 0; k < TARGET_SLOWDOWNS.length; k++) if (Math.abs(TARGET_SLOWDOWNS[k] - v) < Math.abs(TARGET_SLOWDOWNS[best] - v)) best = k;
-        return TARGET_NAMES[best];
+        return I18n.tr(TARGET_NAMES[best]);
     }
 
     private static String fovCompName(float v) {
         int best = 0;
         for (int k = 0; k < FOV_COMPS.length; k++) if (Math.abs(FOV_COMPS[k] - v) < Math.abs(FOV_COMPS[best] - v)) best = k;
-        return FOV_COMP_NAMES[best];
+        return I18n.tr(FOV_COMP_NAMES[best]);
+    }
+
+    private static String dropRateName(int v) {
+        for (int k = 0; k < DROP_RATES.length; k++) if (DROP_RATES[k] == v) return I18n.tr(DROP_RATE_NAMES[k]);
+        return I18n.tr(DROP_RATE_NAMES[0]);
     }
 
     private static String vibrationName(float v) {
         int best = 0;
         for (int k = 0; k < VIBRATIONS.length; k++) if (Math.abs(VIBRATIONS[k] - v) < Math.abs(VIBRATIONS[best] - v)) best = k;
-        return VIBRATION_NAMES[best];
+        return I18n.tr(VIBRATION_NAMES[best]);
+    }
+
+    private static String languageName(String l) {
+        return "es".equals(l) ? "Español" : "en".equals(l) ? "English" : I18n.tr("automático (el del juego)");
+    }
+
+    private static String nextLanguage(String l) {
+        return "auto".equals(l) ? "es" : "es".equals(l) ? "en" : "auto";
     }
 
     private static String yesNo(boolean v) {
-        return v ? "sí" : "no";
+        return I18n.tr(v ? "sí" : "no");
     }
 
     private static String modeLabel(String name, boolean toggle, PadSettings s) {
-        return name + ": " + (s.toggleHolds ? "alternar (accesibilidad)" : toggle ? "alternar" : "mantener");
+        return name + ": " + (s.toggleHolds ? I18n.tr("alternar (accesibilidad)") : toggle ? "alternar" : "mantener");
     }
 
     private void buildItems() {
         items.clear();
         PadSettings s = settings();
-        items.add(new Item("guiScale", () -> "Escala de interfaz: " + (s.guiScale <= 0 ? "automática" : String.valueOf(s.guiScale)),
+        items.add(new Item("guiScale", () -> I18n.tr("Escala de interfaz: ") + (s.guiScale <= 0 ? I18n.tr("automática") : String.valueOf(s.guiScale)),
                 () -> s.guiScale = nextInt(GUI_SCALES, s.guiScale)));
-        items.add(new Item("sens", () -> "Sensibilidad horizontal: " + Math.round(s.lookSpeed), () -> s.lookSpeed = nextFloat(SPEEDS, s.lookSpeed)));
-        items.add(new Item("fov", () -> "Campo de visión: " + (s.fov <= 0 ? "global" : String.valueOf(s.fov)), () -> s.fov = nextInt(FOVS, s.fov)));
-        items.add(new Item("viewDist", () -> "Distancia de chunks: " + (s.viewDistance <= 0 ? "global" : String.valueOf(s.viewDistance)) + " (activa "
-                + PerfLimits.viewDistanceFor(slot, Minecraft.getInstance().options.renderDistance().get()) + ")", () -> s.viewDistance = nextInt(VIEW_DISTANCES, s.viewDistance)));
-        items.add(new Item("moveDead", () -> "Zona muerta del movimiento: " + dz(s.moveDeadzone), () -> s.moveDeadzone = nextFloat(DEADZONES, s.moveDeadzone)));
-        items.add(new Item("lookDead", () -> "Zona muerta de la cámara: " + dz(s.lookDeadzone), () -> s.lookDeadzone = nextFloat(DEADZONES, s.lookDeadzone)));
-        items.add(new Item("sensY", () -> "Sensibilidad vertical: " + Math.round(s.lookSpeedY()), () -> s.lookSpeedY = nextFloat(SPEEDS, s.lookSpeedY())));
-        items.add(new Item("lookCurve", () -> "Curva de cámara: " + s.lookCurve.label, () -> s.lookCurve = LookControl.Curve.values()[(s.lookCurve.ordinal() + 1) % LookControl.Curve.values().length]));
-        items.add(new Item("aimSens", () -> "Sensibilidad al apuntar: " + Math.round(s.aimSensitivity * 100) + " %", () -> s.aimSensitivity = nextFloat(AIM_SENS, s.aimSensitivity)));
-        items.add(new Item("targetSlowdown", () -> "Ayuda de apuntado: " + targetName(s.targetSlowdown), () -> s.targetSlowdown = nextFloat(TARGET_SLOWDOWNS, s.targetSlowdown)));
-        items.add(new Item("vibration", () -> "Vibración del mando: " + vibrationName(s.vibration), () -> {
+        items.add(new Item("sens", () -> I18n.tr("Sensibilidad horizontal: ") + Math.round(s.lookSpeed), () -> s.lookSpeed = nextFloat(SPEEDS, s.lookSpeed)));
+        items.add(new Item("fov", () -> I18n.tr("Campo de visión: ") + (s.fov <= 0 ? I18n.tr("global") : String.valueOf(s.fov)), () -> s.fov = nextInt(FOVS, s.fov)));
+        items.add(new Item("viewDist", () -> I18n.fmt("Distancia de chunks: {0} (activa {1})", s.viewDistance <= 0 ? I18n.tr("global") : String.valueOf(s.viewDistance), PerfLimits.viewDistanceFor(slot, Minecraft.getInstance().options.renderDistance().get())), () -> s.viewDistance = nextInt(VIEW_DISTANCES, s.viewDistance)));
+        items.add(new Item("moveDead", () -> I18n.tr("Zona muerta del movimiento: ") + dz(s.moveDeadzone), () -> s.moveDeadzone = nextFloat(DEADZONES, s.moveDeadzone)));
+        items.add(new Item("lookDead", () -> I18n.tr("Zona muerta de la cámara: ") + dz(s.lookDeadzone), () -> s.lookDeadzone = nextFloat(DEADZONES, s.lookDeadzone)));
+        items.add(new Item("sensY", () -> I18n.tr("Sensibilidad vertical: ") + Math.round(s.lookSpeedY()), () -> s.lookSpeedY = nextFloat(SPEEDS, s.lookSpeedY())));
+        items.add(new Item("lookCurve", () -> I18n.tr("Curva de cámara: ") + I18n.tr(s.lookCurve.label), () -> s.lookCurve = LookControl.Curve.values()[(s.lookCurve.ordinal() + 1) % LookControl.Curve.values().length]));
+        items.add(new Item("aimSens", () -> I18n.tr("Sensibilidad al apuntar: ") + Math.round(s.aimSensitivity * 100) + " %", () -> s.aimSensitivity = nextFloat(AIM_SENS, s.aimSensitivity)));
+        items.add(new Item("targetSlowdown", () -> I18n.tr("Ayuda de apuntado: ") + targetName(s.targetSlowdown), () -> s.targetSlowdown = nextFloat(TARGET_SLOWDOWNS, s.targetSlowdown)));
+        items.add(new Item("vibration", () -> I18n.tr("Vibración del mando: ") + vibrationName(s.vibration), () -> {
             s.vibration = nextFloat(VIBRATIONS, s.vibration);
             dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220); // se nota al elegirla
         }));
-        items.add(new Item("autoJump", () -> "Salto automático: " + AUTO_JUMP_NAMES[Math.max(0, Math.min(2, s.autoJump))], () -> s.autoJump = (s.autoJump + 1) % 3));
-        items.add(new Item("invertY", () -> "Invertir eje Y: " + yesNo(s.invertY), () -> s.invertY = !s.invertY));
-        items.add(new Item("doubleTap", () -> "Correr con doble toque: " + yesNo(s.doubleTapSprint), () -> s.doubleTapSprint = !s.doubleTapSprint));
-        items.add(new Item("cursorSpeed", () -> "Velocidad del cursor: " + Math.round(s.cursorSpeed), () -> s.cursorSpeed = nextFloat(CURSOR_SPEEDS, s.cursorSpeed)));
-        items.add(new Item("snapNav", () -> "Cursor en menús: " + (s.snapNav ? "por casillas" : "libre"), () -> s.snapNav = !s.snapNav));
-        items.add(new Item("assignPads", () -> "Asignar mandos...", () -> Minecraft.getInstance().setScreen(new PadAssignScreen(slot, this))));
-        items.add(new Item("wheel", () -> "Rueda de acciones: " + (s.wheel == null ? "la de todos" : "propia") + "...", () -> Minecraft.getInstance().setScreen(new WheelEditorScreen(slot, this))));
-        items.add(new Item("profile", () -> "Perfil: " + (Profiles.of(slot) == null ? "ninguno" : Profiles.of(slot).name) + "...", () -> Minecraft.getInstance().setScreen(new ProfilesScreen(slot, this))));
-        items.add(new Item("name", () -> "Nombre: " + PlayerLabels.labelOf(slot), () -> Minecraft.getInstance().setScreen(new PlayerNameScreen(slot, this))));
-        items.add(new Item("labelColor", () -> "Color de la etiqueta: " + PlayerLabels.COLOR_NAMES[s.labelColor % PlayerLabels.COLOR_NAMES.length], () -> {
+        items.add(new Item("autoJump", () -> I18n.tr("Salto automático: ") + I18n.tr(AUTO_JUMP_NAMES[Math.max(0, Math.min(2, s.autoJump))]), () -> s.autoJump = (s.autoJump + 1) % 3));
+        items.add(new Item("vibDamage", () -> I18n.tr("Vibración por daño: ") + vibrationName(s.vibDamage), () -> {
+            s.vibDamage = nextFloat(VIBRATIONS, s.vibDamage);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.DAMAGE);
+        }));
+        items.add(new Item("vibActions", () -> I18n.tr("Vibración por acciones: ") + vibrationName(s.vibActions), () -> {
+            s.vibActions = nextFloat(VIBRATIONS, s.vibActions);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.ACTION);
+        }));
+        items.add(new Item("vibWorld", () -> I18n.tr("Vibración del entorno: ") + vibrationName(s.vibWorld), () -> {
+            s.vibWorld = nextFloat(VIBRATIONS, s.vibWorld);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.WORLD);
+        }));
+        items.add(new Item("dropRate", () -> I18n.tr("Repetir al soltar objetos: ") + dropRateName(s.dropInterval), () -> s.dropInterval = nextInt(DROP_RATES, s.dropInterval)));
+        items.add(new Item("invertY", () -> I18n.tr("Invertir eje Y: ") + yesNo(s.invertY), () -> s.invertY = !s.invertY));
+        items.add(new Item("doubleTap", () -> I18n.tr("Correr con doble toque: ") + yesNo(s.doubleTapSprint), () -> s.doubleTapSprint = !s.doubleTapSprint));
+        items.add(new Item("cursorSpeed", () -> I18n.tr("Velocidad del cursor: ") + Math.round(s.cursorSpeed), () -> s.cursorSpeed = nextFloat(CURSOR_SPEEDS, s.cursorSpeed)));
+        items.add(new Item("autoKeyboard", () -> I18n.tr("Teclado automático: ") + yesNo(s.autoKeyboard), () -> s.autoKeyboard = !s.autoKeyboard));
+        items.add(new Item("snapNav", () -> I18n.tr("Cursor en menús: ") + (s.snapNav ? I18n.tr("por casillas") : I18n.tr("libre")), () -> s.snapNav = !s.snapNav));
+        items.add(new Item("assignPads", () -> I18n.tr("Asignar mandos..."), () -> Minecraft.getInstance().setScreen(new PadAssignScreen(slot, this))));
+        items.add(new Item("wheel", () -> I18n.tr("Rueda de acciones: ") + (s.wheel == null ? I18n.tr("la de todos") : I18n.tr("propia")) + "...", () -> Minecraft.getInstance().setScreen(new WheelEditorScreen(slot, this))));
+        items.add(new Item("profile", () -> I18n.tr("Perfil: ") + (Profiles.of(slot) == null ? I18n.tr("ninguno") : Profiles.of(slot).name) + "...", () -> Minecraft.getInstance().setScreen(new ProfilesScreen(slot, this))));
+        items.add(new Item("name", () -> I18n.tr("Nombre: ") + PlayerLabels.labelOf(slot), () -> Minecraft.getInstance().setScreen(new PlayerNameScreen(slot, this))));
+        items.add(new Item("labelColor", () -> I18n.tr("Color de la etiqueta: ") + I18n.tr(PlayerLabels.COLOR_NAMES[s.labelColor % PlayerLabels.COLOR_NAMES.length]), () -> {
             s.labelColor = (s.labelColor + 1) % PlayerLabels.COLOR_NAMES.length;
             PlayerLabels.refreshAll(Minecraft.getInstance());
         }));
-        items.add(new Item("fovComp", () -> "Compensar campo de visión: " + fovCompName(s.fovComp), () -> s.fovComp = nextFloat(FOV_COMPS, s.fovComp)));
-        items.add(new Item("hudMargin", () -> "Zona segura del HUD: " + s.hudMargin + " %", () -> s.hudMargin = nextInt(HUD_MARGINS, s.hudMargin)));
-        items.add(new Item("hudOpacity", () -> "Opacidad del HUD: " + Math.round(s.hudOpacity * 100) + " %", () -> s.hudOpacity = nextFloat(HUD_OPACITIES, s.hudOpacity)));
-        items.add(new Item("showHud", () -> "Mostrar HUD: " + yesNo(s.showHud), () -> s.showHud = !s.showHud));
-        items.add(new Item("showHand", () -> "Mostrar mano: " + yesNo(s.showHand), () -> s.showHand = !s.showHand));
-        items.add(new Item("layout", () -> "Disposición de botones: " + ButtonLayouts.name(s), () -> ButtonLayouts.apply(s, ButtonLayouts.next(s))));
-        items.add(new Item("sneakMode", () -> modeLabel("Agacharse", s.sneakToggle, s), () -> s.sneakToggle = !s.sneakToggle));
-        items.add(new Item("sprintMode", () -> modeLabel("Correr", s.sprintToggle, s), () -> s.sprintToggle = !s.sprintToggle));
-        items.add(new Item("attackMode", () -> modeLabel("Atacar", s.attackToggle, s), () -> s.attackToggle = !s.attackToggle));
-        items.add(new Item("copySource", () -> "Copiar ajustes de: " + PlayerLabels.labelOf(copySource), () -> copySource = nextOther(copySource)));
-        items.add(new Item("copyDo", () -> "Copiar ahora a este jugador", () -> {
+        items.add(new Item("fovComp", () -> I18n.tr("Compensar campo de visión: ") + fovCompName(s.fovComp), () -> s.fovComp = nextFloat(FOV_COMPS, s.fovComp)));
+        items.add(new Item("brightness", () -> I18n.tr("Brillo: ") + (s.brightness < 0f ? I18n.tr("como el juego") : Math.round(s.brightness * 100) + " %"), () -> s.brightness = nextFloat(BRIGHTNESSES, s.brightness)));
+        items.add(new Item("playerColors", () -> I18n.tr("Colores del jugador: ") + yesNo(s.playerColors), () -> s.playerColors = !s.playerColors));
+        items.add(new Item("lowHealthFlash", () -> I18n.tr("Destello con poca vida: ") + yesNo(s.lowHealthFlash), () -> s.lowHealthFlash = !s.lowHealthFlash));
+        items.add(new Item("separators", () -> I18n.tr("Línea entre jugadores (todos): ") + yesNo(SplitSettings.separators()), () -> SplitSettings.setSeparators(!SplitSettings.separators())));
+        items.add(new Item("sleepNotice", () -> I18n.tr("Aviso de quién duerme (todos): ") + yesNo(SplitSettings.sleepNotice()), () -> SplitSettings.setSleepNotice(!SplitSettings.sleepNotice())));
+        items.add(new Item("language", () -> I18n.tr("Idioma de los menús: ") + languageName(SplitSettings.language()), () -> SplitSettings.setLanguage(nextLanguage(SplitSettings.language()))));
+        items.add(new Item("savingMode", () -> I18n.tr("Modo ahorro (todos): ") + yesNo(SplitSettings.savingMode()), () -> SplitSettings.setSavingMode(!SplitSettings.savingMode())));
+        items.add(new Item("hudMargin", () -> I18n.tr("Zona segura del HUD: ") + s.hudMargin + " %", () -> s.hudMargin = nextInt(HUD_MARGINS, s.hudMargin)));
+        items.add(new Item("hudOpacity", () -> I18n.tr("Opacidad del HUD: ") + Math.round(s.hudOpacity * 100) + " %", () -> s.hudOpacity = nextFloat(HUD_OPACITIES, s.hudOpacity)));
+        items.add(new Item("showHud", () -> I18n.tr("Mostrar HUD: ") + yesNo(s.showHud), () -> s.showHud = !s.showHud));
+        items.add(new Item("showHand", () -> I18n.tr("Mostrar mano: ") + yesNo(s.showHand), () -> s.showHand = !s.showHand));
+        items.add(new Item("layout", () -> I18n.tr("Disposición de botones: ") + ButtonLayouts.name(s), () -> ButtonLayouts.apply(s, ButtonLayouts.next(s))));
+        items.add(new Item("sneakMode", () -> modeLabel(I18n.tr("Agacharse"), s.sneakToggle, s), () -> s.sneakToggle = !s.sneakToggle));
+        items.add(new Item("sprintMode", () -> modeLabel(I18n.tr("Correr"), s.sprintToggle, s), () -> s.sprintToggle = !s.sprintToggle));
+        items.add(new Item("attackMode", () -> modeLabel(I18n.tr("Atacar"), s.attackToggle, s), () -> s.attackToggle = !s.attackToggle));
+        items.add(new Item("copySource", () -> I18n.tr("Copiar ajustes de: ") + PlayerLabels.labelOf(copySource), () -> copySource = nextOther(copySource)));
+        items.add(new Item("copyDo", () -> I18n.tr("Copiar ahora a este jugador"), () -> {
             s.copyFrom(ConsolePad.PADS.slot(copySource).settings);
             ConsolePad.PADS.saveSettings();
             resetArmed = false;
             this.rebuildWidgets();
         }));
-        items.add(new Item("reset", () -> resetArmed ? "¿Seguro? Pulsa otra vez para restablecer" : "Restablecer ajustes de fábrica", () -> {
+        items.add(new Item("reset", () -> resetArmed ? I18n.tr("¿Seguro? Pulsa otra vez para restablecer") : I18n.tr("Restablecer ajustes de fábrica"), () -> {
             if (!resetArmed) {
                 resetArmed = true;
                 return;
@@ -223,16 +267,18 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
             resetArmed = false;
             this.rebuildWidgets();
         }));
-        items.add(new Item("showCoords", () -> "Mostrar coordenadas: " + yesNo(s.showCoords), () -> s.showCoords = !s.showCoords));
-        items.add(new Item("paperDoll", () -> "Muñeco del jugador: " + yesNo(s.paperDoll), () -> s.paperDoll = !s.paperDoll));
-        items.add(new Item("showCompanions", () -> "Indicador del compañero: " + yesNo(s.showCompanions), () -> s.showCompanions = !s.showCompanions));
-        items.add(new Item("showDirection",() -> "Mostrar dirección: " + yesNo(s.showDirection), () -> s.showDirection = !s.showDirection));
-        items.add(new Item("showFps", () -> "Mostrar FPS: " + yesNo(s.showFps), () -> s.showFps = !s.showFps));
-        items.add(new Item("bigHints", () -> "Ayuda de botones grande: " + yesNo(s.bigHints), () -> s.bigHints = !s.bigHints));
-        items.add(new Item("reduceEffects", () -> "Menos efectos de pantalla: " + yesNo(s.reduceEffects), () -> s.reduceEffects = !s.reduceEffects));
-        items.add(new Item("toggleHolds", () -> "Mantener como alternar: " + yesNo(s.toggleHolds), () -> s.toggleHolds = !s.toggleHolds));
-        items.add(new Item("iconStyle", () -> "Iconos de botones: " + ICON_STYLES[Math.floorMod(s.iconStyle, ICON_STYLES.length)], () -> s.iconStyle = (s.iconStyle + 1) % ICON_STYLES.length));
-        items.add(new Item("hints", () -> "Ayuda de botones: " + yesNo(s.showHints), () -> s.showHints = !s.showHints));
+        items.add(new Item("showCoords", () -> I18n.tr("Mostrar coordenadas: ") + yesNo(s.showCoords), () -> s.showCoords = !s.showCoords));
+        items.add(new Item("paperDoll", () -> I18n.tr("Muñeco del jugador: ") + yesNo(s.paperDoll), () -> s.paperDoll = !s.paperDoll));
+        items.add(new Item("bedMarker", () -> I18n.tr("Marcar mi cama: ") + yesNo(s.showBedMarker), () -> s.showBedMarker = !s.showBedMarker));
+        items.add(new Item("companionDistance", () -> I18n.tr("Distancia del compañero: ") + yesNo(s.showCompanionDistance), () -> s.showCompanionDistance = !s.showCompanionDistance));
+        items.add(new Item("showCompanions", () -> I18n.tr("Indicador del compañero: ") + yesNo(s.showCompanions), () -> s.showCompanions = !s.showCompanions));
+        items.add(new Item("showDirection",() -> I18n.tr("Mostrar dirección: ") + yesNo(s.showDirection), () -> s.showDirection = !s.showDirection));
+        items.add(new Item("showFps", () -> I18n.tr("Mostrar FPS: ") + yesNo(s.showFps), () -> s.showFps = !s.showFps));
+        items.add(new Item("bigHints", () -> I18n.tr("Ayuda de botones grande: ") + yesNo(s.bigHints), () -> s.bigHints = !s.bigHints));
+        items.add(new Item("reduceEffects", () -> I18n.tr("Menos efectos de pantalla: ") + yesNo(s.reduceEffects), () -> s.reduceEffects = !s.reduceEffects));
+        items.add(new Item("toggleHolds", () -> I18n.tr("Mantener como alternar: ") + yesNo(s.toggleHolds), () -> s.toggleHolds = !s.toggleHolds));
+        items.add(new Item("iconStyle", () -> I18n.tr("Iconos de botones: ") + I18n.tr(ICON_STYLES[Math.floorMod(s.iconStyle, ICON_STYLES.length)]), () -> s.iconStyle = (s.iconStyle + 1) % ICON_STYLES.length));
+        items.add(new Item("hints", () -> I18n.tr("Ayuda de botones: ") + yesNo(s.showHints), () -> s.showHints = !s.showHints));
         prevActions.clear();
         prevActions.put("guiScale", () -> s.guiScale = prevInt(GUI_SCALES, s.guiScale));
         prevActions.put("sens", () -> s.lookSpeed = prevFloat(SPEEDS, s.lookSpeed));
@@ -249,6 +295,20 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         });
         prevActions.put("autoJump", () -> s.autoJump = (s.autoJump + 2) % 3);
         prevActions.put("fovComp", () -> s.fovComp = prevFloat(FOV_COMPS, s.fovComp));
+        prevActions.put("vibDamage", () -> {
+            s.vibDamage = prevFloat(VIBRATIONS, s.vibDamage);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.DAMAGE);
+        });
+        prevActions.put("vibActions", () -> {
+            s.vibActions = prevFloat(VIBRATIONS, s.vibActions);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.ACTION);
+        });
+        prevActions.put("vibWorld", () -> {
+            s.vibWorld = prevFloat(VIBRATIONS, s.vibWorld);
+            dev.consolepad.pad.Rumble.pulse(slot, 0.6f, 0.6f, 220, dev.consolepad.pad.Rumble.Kind.WORLD);
+        });
+        prevActions.put("dropRate", () -> s.dropInterval = prevInt(DROP_RATES, s.dropInterval));
+        prevActions.put("brightness", () -> s.brightness = prevFloat(BRIGHTNESSES, s.brightness));
         prevActions.put("aimSens", () -> s.aimSensitivity = prevFloat(AIM_SENS, s.aimSensitivity));
         prevActions.put("cursorSpeed", () -> s.cursorSpeed = prevFloat(CURSOR_SPEEDS, s.cursorSpeed));
         prevActions.put("hudMargin", () -> s.hudMargin = prevInt(HUD_MARGINS, s.hudMargin));
@@ -287,7 +347,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         }
         List<Item> rest = new ArrayList<>(); // una opcion sin categoria (nueva) no se pierde
         for (Item it : items) if (!placed.contains(it.id())) rest.add(it);
-        if (!rest.isEmpty()) pages.add(new Page("Otras", 0, 1, rest));
+        if (!rest.isEmpty()) pages.add(new Page(I18n.tr("Otras"), 0, 1, rest));
     }
 
     @Override
@@ -302,32 +362,32 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         for (int k = 0; k < shown.size(); k++) {
             Item it = shown.get(k);
             Runnable back = prevActions.getOrDefault(it.id(), it.next());
-            Button b = addRenderableWidget(new StepButton(x, 28 + k * PITCH, ROW_W, ROW_H, Component.literal(it.label().get()), btn -> {
+            Button b = addRenderableWidget(new StepButton(x, 28 + k * PITCH, ROW_W, ROW_H, I18n.lit(it.label().get()), btn -> {
                 it.next().run();
                 if (Minecraft.getInstance().screen != this) return; // la opcion abrio otra pantalla
-                btn.setMessage(Component.literal(it.label().get()));
+                btn.setMessage(I18n.lit(it.label().get()));
             }, () -> {
                 back.run();
                 if (Minecraft.getInstance().screen != this) return;
                 Button self = buttons.get(it.id());
-                if (self != null) self.setMessage(Component.literal(it.label().get()));
+                if (self != null) self.setMessage(I18n.lit(it.label().get()));
             }));
             buttons.put(it.id(), b);
         }
         int pages = pageCount;
         if (pages > 1) {
-            prev = addRenderableWidget(Button.builder(Component.literal("<"), b -> {
+            prev = addRenderableWidget(Button.builder(I18n.lit("<"), b -> {
                 page = (page + pages - 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x, footerY, 30, ROW_H).build());
-            back = addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
-            nextPage = addRenderableWidget(Button.builder(Component.literal(">"), b -> {
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
+            nextPage = addRenderableWidget(Button.builder(I18n.lit(">"), b -> {
                 page = (page + 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x + ROW_W - 30, footerY, 30, ROW_H).build());
         } else {
             prev = nextPage = null;
-            back = addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
         }
     }
 

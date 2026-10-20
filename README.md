@@ -1,4 +1,4 @@
-# ConsolePad 0.11.0-beta
+# ConsolePad 0.13.0-beta
 
 **[Español](#español) · [English](#english)**
 
@@ -25,7 +25,7 @@ This is a **beta**: it works end to end in my tests, but it has had little testi
 - Controls screen with a controller diagram (Xbox, PlayStation, Switch Pro or Joy-Con): each button is linked by a line to its current function, and you remap by picking a label and pressing the new button. Button icons can be switched per player (Xbox, PlayStation, Nintendo).
 - Console-style crafting: recipe book with categories, LB/RB to change category, one button to craft.
 - Quick actions wheel: hold the D-pad left button, pick an entry with the right stick and release to run it as a command (time, weather, game mode, heal, go to a player, bring a player...). Edit the entries in the game (player settings > "Quick wheel", each player can have their own) or in `config/consolepad/wheel.json` (shared by everyone). Assign controllers to players from each player's settings ("Assign controllers").
-- Partner indicator, as in Bedrock's locator bar: a dot in the partner's colour moves along your experience bar to show where the other player is (centre = straight ahead, an end = to that side or behind), with their name and distance above your hearts, when they are far away; turn it off in player settings ("Partner indicator").
+- Partner indicator, as in Bedrock's locator bar: a square in the partner's colour moves along your experience bar to show where the other player is (centre = straight ahead, an end = to that side or behind). Only the direction is shown by default; turn on "Partner distance" in player settings to also see their name and distance above your hearts. It appears from 10 blocks away and can be turned off ("Partner indicator").
 - Rumble per player on controllers Windows sees as XInput (Xbox-compatible, or PlayStation/Nintendo through Steam Input): strength off/soft/normal/strong in player settings; it fires when you take damage or die, break a block, hit, eat, draw a bow or something blows up near you.
 - The pause menu shows a preview of your player with your skin when there is room.
 - Contextual button prompts: the use button says what it will do for what you are looking at ("Open", "Sleep", "Ride", "Trade", "Feed", "Milk", "Shear", "Eat"...), as on consoles.
@@ -34,6 +34,17 @@ This is a **beta**: it works end to end in my tests, but it has had little testi
 - Riding works for every player: jump bar and mount hearts in each HUD. D-pad targets for the stonecutter recipes and the loom patterns.
 - Sound per player: each sound is played by the nearest local player (moved to the listener with its distance and direction kept), so what happens next to players 2 to 4 is heard. Ambient particles (torches, lava, portals) around every player.
 - Player 1 can remove an extra player from the pause menu ("Remove a player"). Field of view compensation for narrow split-screen regions (off / half / full). Automatic performance: with several players, if the frame rate stays under 40 FPS the view distance and entity drawing are lowered a bit more and restored when there is room (`"adaptivePerformance"`, `"targetFps"` in `split.json`).
+- Partner indicator extras: the marker blinks red when the partner is under 4 hearts, and "Mark my bed" adds a second, ring-shaped marker towards your bed or respawn point.
+- More rumble: a fish biting, a soft heartbeat under 3 hearts, and a separate strength for damage, actions (hits, breaking, eating, bow, fishing) and the environment (explosions).
+- Input: press **LB and RB together** to jump to the previously used hotbar slot (again to go back); new **Nintendo layout** (A and B, X and Y swapped, also in menus); speed of the repeat when holding the drop button.
+- Performance: the world of a player with a menu open (it is blurred behind) is drawn with half the entities; under high pressure the automatic regulator also thins out particles; and a manual **Saving mode** (all players) starts at the regulator's level 2.
+- Menus in English: the mod's menus start in Spanish; "Menu language" in player settings switches them to English, or to follow the language of Minecraft (auto).
+- Player colours: the controller cursor, the selected hotbar slot and the partner marker use each player's colour (blue, red, green, yellow, or the label colour they chose); a thin black line separates the regions. Both can be turned off.
+- A soft red flash on the edges of a player's region with 3 hearts or less, in time with the heartbeat (per player, can be turned off).
+- Sleeping together: a notice on every screen says who is in bed and who is missing ("Sleeping: ..." / "Missing: ..."); it stays for 12 seconds and fades out, and can be turned off in settings.
+- Brightness per player (as the game / 0 to 100 %): each region already has its own light map, so every player can have their own gamma.
+- On-screen keyboard: it no longer pops up by itself in the chat, signs and name fields; press **Y** (or **A** on a text field) to open it and **B** to close it. "Automatic keyboard" in player settings brings the old behaviour back.
+- Players 2 to 4 can get out of bed: they get a "Leave bed" screen like player 1 (**B** also works).
 - Mob sounds get quieter through blocks (vanilla plays them at full volume through the floor). Turn it off with `"soundOcclusion": false` in `config/consolepad/split.json`.
 - When a world opens with two or more controllers connected, the game asks "How many players?" and brings them all in one after another (turn it off with "No volver a preguntar" or `"askPlayers": false` in `config/consolepad/split.json`). The screen layout (side by side / stacked) is remembered per world.
 - An extra player whose controller stays disconnected for 30 s leaves the game (their inventory is saved); change it with `"padLostLeaveSeconds"` in `split.json` (0 = never).
@@ -79,7 +90,7 @@ Everything can be remapped per player from the pause menu.
 
 ### Installation
 
-See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.11.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
+See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.13.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
 
 ### Known issues
 
@@ -115,7 +126,7 @@ Es una **beta**: funciona de principio a fin en mis pruebas, pero se ha probado 
 - Pantalla dividida para 2, 3 o 4 jugadores (lado a lado o apilada), cada uno con su cámara, campo de visión, HUD, chat, avisos y barras de jefe.
 - Menú de pausa, inventario, contenedores, comercio, yunque, encantamiento, carteles, teclado en pantalla y cursor virtual con navegación por cruceta, todo por jugador.
 - Pantalla de controles con diagrama del mando (Xbox, PlayStation, Switch Pro o Joy-Con): cada botón se une con una línea a su función actual, y se remapea eligiendo una etiqueta y pulsando el botón nuevo. Los iconos de botones se pueden cambiar por jugador (Xbox, PlayStation, Nintendo).
-- Indicador del compañero, como la barra de localización de Bedrock: un punto del color del compañero se mueve por tu barra de experiencia y marca dónde está el otro jugador (centro = justo delante, un extremo = a ese lado o detrás), con su nombre y distancia sobre tus corazones, cuando está lejos; se apaga en los ajustes del jugador («Indicador del compañero»).
+- Indicador del compañero, como la barra de localización de Bedrock: un cuadrado del color del compañero se mueve por tu barra de experiencia y marca dónde está el otro jugador (centro = justo delante, un extremo = a ese lado o detrás). Por defecto solo se ve la dirección; activa «Distancia del compañero» en los ajustes del jugador para ver también su nombre y distancia sobre tus corazones. Sale desde 10 bloques y se puede apagar («Indicador del compañero»).
 - Vibración por jugador en los mandos que Windows ve como XInput (compatibles con Xbox, o PlayStation/Nintendo por Steam Input): fuerza no/suave/normal/fuerte en los ajustes del jugador; salta al recibir daño o morir, romper un bloque, golpear, comer, tensar un arco o explotar algo cerca.
 - El menú de pausa muestra una vista previa de tu jugador con su skin cuando hay sitio.
 - Avisos de botones contextuales: el botón de usar dice qué hará con lo que miras («Abrir», «Dormir», «Montar», «Comerciar», «Dar de comer», «Ordeñar», «Esquilar», «Comer»...), como en consola.
@@ -124,6 +135,17 @@ Es una **beta**: funciona de principio a fin en mis pruebas, pero se ha probado 
 - Las cabalgaduras funcionan para todos: barra de salto y corazones de la montura en cada HUD. La cruceta llega a las recetas de la mesa de corte y a los patrones del telar.
 - Sonido por jugador: cada sonido lo reproduce el jugador local más cercano (movido al oyente conservando distancia y dirección), así que se oye lo que pasa junto a P2 a P4. Partículas ambientales (antorchas, lava, portales) alrededor de cada jugador.
 - P1 puede sacar a un jugador extra desde el menú de pausa («Sacar a un jugador»). Compensación del campo de visión en regiones estrechas (no / media / total). Rendimiento automático: con varios jugadores, si los FPS se quedan por debajo de 40 se baja un poco más la distancia de visión y el dibujo de entidades, y se devuelve cuando hay margen (`"adaptivePerformance"`, `"targetFps"` en `split.json`).
+- Extras del indicador: el marcador parpadea en rojo cuando el compañero tiene menos de 4 corazones, y «Marcar mi cama» añade un segundo marcador en forma de anillo hacia tu cama o punto de reaparición.
+- Más vibración: un pez que pica, un latido suave con menos de 3 corazones y una fuerza por separado para daño, acciones (golpes, romper, comer, arco, pesca) y entorno (explosiones).
+- Entrada: pulsa **LB y RB a la vez** para saltar a la casilla usada antes (otra vez, vuelve); nueva **disposición Nintendo** (A y B, X e Y intercambiados, también en los menús); velocidad de la repetición al mantener el botón de soltar.
+- Rendimiento: el mundo de un jugador con un menú abierto (queda difuminado detrás) se dibuja con la mitad de entidades; con presión alta el regulador automático también adelgaza las partículas; y un **Modo ahorro** manual (todos los jugadores) empieza ya en el nivel 2 del regulador.
+- Menús en inglés: los menús del mod empiezan en español; «Idioma de los menús» en los ajustes del jugador los pasa a inglés, o al idioma de Minecraft (automático).
+- Colores por jugador: el cursor del mando, la casilla seleccionada de la barra y el marcador del compañero usan el color de cada jugador (azul, rojo, verde, amarillo, o el de la etiqueta que haya elegido); una línea fina negra separa las regiones. Ambas cosas se pueden apagar.
+- Un destello rojo suave en los bordes de la región de un jugador con 3 corazones o menos, al ritmo del latido (por jugador, se puede apagar).
+- Dormir juntos: un aviso en todas las pantallas dice quién está en la cama y quién falta («Durmiendo: ...» / «Faltan: ...»); dura 12 segundos y se difumina, y se apaga en los ajustes.
+- Brillo por jugador (como el juego / 0 a 100 %): cada región ya tiene su propio mapa de luz, así que cada uno puede tener su gamma.
+- Teclado en pantalla: ya no sale solo en el chat, los carteles y los nombres; pulsa **Y** (o **A** sobre un campo de texto) para abrirlo y **B** para cerrarlo. «Teclado automático» en los ajustes del jugador devuelve el comportamiento anterior.
+- Los jugadores 2 a 4 pueden levantarse de la cama: tienen su pantalla «Salir de la cama» como el jugador 1 (también vale **B**).
 - Los sonidos de los mobs bajan de volumen detrás de bloques (vanilla los oye a tope a través del suelo). Se apaga con `"soundOcclusion": false` en `config/consolepad/split.json`.
 - Al abrir un mundo con dos o más mandos conectados, el juego pregunta «¿Cuántos jugadores sois?» y mete a todos uno tras otro (se apaga con «No volver a preguntar» o `"askPlayers": false` en `config/consolepad/split.json`). El reparto de pantalla (lado a lado / apilado) se recuerda por mundo.
 - Un jugador extra cuyo mando lleva 30 s desconectado sale de la partida (su inventario se guarda); se cambia con `"padLostLeaveSeconds"` en `split.json` (0 = nunca).
@@ -165,7 +187,7 @@ Todo se puede remapear por jugador desde el menú de pausa.
 
 ### Instalación
 
-Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.11.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
+Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.13.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
 
 ### Problemas conocidos
 

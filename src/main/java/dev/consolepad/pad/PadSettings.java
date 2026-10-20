@@ -46,12 +46,26 @@ public final class PadSettings {
     public boolean showFps = false;
     /** Punto sobre la barra de experiencia que apunta hacia los demas jugadores cuando estan lejos (como la barra de localizacion de Bedrock), con su nombre y distancia. */
     public boolean showCompanions = true;
+    /** Ademas del cuadrado que marca la direccion del companero, mostrar su nombre y la distancia encima de los corazones (por defecto no: solo la direccion). */
+    public boolean showCompanionDistance = false;
+    /** Ademas del compañero, un segundo marcador en la misma barra hacia la cama o el punto de reaparicion propio (por defecto no). */
+    public boolean showBedMarker = false;
     /** Salto automatico de este jugador al subir bloques de uno en uno: 0 = como la opcion del juego, 1 = si, 2 = no. */
     public int autoJump = 0;
     /** Muñeco del jugador en una esquina mientras corre, se agacha, nada o planea (como en Bedrock). */
     public boolean paperDoll = true;
+    /** Teclado en pantalla: false = solo se abre al pulsar Y en una pantalla de texto (chat, carteles...) o A sobre un campo; true = se abre solo al entrar en ellas. */
+    public boolean autoKeyboard = false;
+    /** Cursor del mando y casilla seleccionada con el color del jugador (azul, rojo, verde, amarillo o el de su etiqueta). */
+    public boolean playerColors = true;
+    /** Destello rojo suave en los bordes de su pantalla con 3 corazones o menos, al ritmo del latido. */
+    public boolean lowHealthFlash = true;
+    /** Brillo propio de este jugador (0 a 1); un valor negativo = el de las opciones del juego. */
+    public float brightness = -1f;
     /** Fuerza de la vibracion del mando de este jugador (0 = apagada, 1 = maxima). */
     public float vibration = 0.7f;
+    /** Fuerza por tipo de evento, que se multiplica por la general: daño (y latido con poca vida), acciones (golpear, romper, comer, arco, pesca) y entorno (explosiones). */
+    public float vibDamage = 1f, vibActions = 1f, vibWorld = 1f;
     /** Color de la etiqueta con el nombre sobre la cabeza (indice de PlayerLabels.COLORS; 0 = sin color). */
     public int labelColor = 0;
     /** Navegacion en pantallas: false = cursor libre con el stick izquierdo; true = el stick salta de casilla en casilla (como el D-pad). */
@@ -67,6 +81,10 @@ public final class PadSettings {
 
     /** Sticks intercambiados (zurdo): el izquierdo gira la camara y el derecho mueve, tambien en menus y teclado en pantalla. */
     public boolean swapSticks = false;
+    /** Disposicion Nintendo: los botones A y B, y X e Y, se intercambian (el A de Nintendo esta a la derecha, el de Xbox abajo); vale en el juego y en los menus. */
+    public boolean swapFace = false;
+    /** Soltar objetos mantenido: ticks entre un objeto y el siguiente (2 = rapido, como Q mantenida en el teclado). */
+    public int dropInterval = 2;
 
     /** Agacharse, correr y atacar: true = una pulsacion alterna, false = vale mientras se mantiene el boton. */
     public boolean sneakToggle = true;

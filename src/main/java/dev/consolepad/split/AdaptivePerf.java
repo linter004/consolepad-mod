@@ -20,16 +20,24 @@ public final class AdaptivePerf {
 
     private AdaptivePerf() {}
 
+    /** Nivel efectivo: el del regulador, y como minimo 2 con el modo ahorro (con varios jugadores). */
     public static int level() {
-        return level;
+        return Math.max(level, SplitSettings.savingMode() ? 2 : 0);
     }
 
     public static double viewFactor() {
-        return VIEW[level];
+        return VIEW[level()];
     }
 
     public static double entityFactor() {
-        return ENTITIES[level];
+        return ENTITIES[level()];
+    }
+
+    /** Adelgaza las particulas con presion alta: nivel 2 dibuja 3 de cada 4 y nivel 3 la mitad (segun el hash de cada particula, sin parpadeos). */
+    public static boolean drawParticle(int hash, int level) {
+        if (level >= 3) return (hash & 1) == 0;
+        if (level == 2) return (hash & 3) != 0;
+        return true;
     }
 
     private static boolean enabled() {

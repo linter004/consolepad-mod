@@ -201,6 +201,8 @@ public final class PadDriver {
             if (tmp[0] != 0f || tmp[1] != 0f) player.turn(tmp[0], tmp[1]);
         }
 
+        hotbar.tick(player.getInventory().selected, System.nanoTime() / 1_000_000L);
+
         // Botones segun los bindings del jugador.
         for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
             int code = e.getKey();
@@ -220,13 +222,27 @@ public final class PadDriver {
         if (dropDown && dropHeld > 0f) {
             dropHeld += dt;
             if (dropHeld >= DROP_DELAY) {
-                dropHeld -= DROP_INTERVAL;
+                dropHeld -= Math.max(1, cfg.dropInterval) * 0.05f; // un tick por unidad (2 = 0,1 s, como antes)
                 tap(o.keyDrop);
                 dropRepeats++;
             }
         } else {
             dropHeld = 0f;
         }
+    }
+
+    private final dev.consolepad.split.HotbarHistory hotbar = new dev.consolepad.split.HotbarHistory();
+
+    /** LB o RB: cambia de casilla; con los dos a la vez, va a la casilla anterior. */
+    private void hotbarStep(LocalPlayer player, PadAction action, PadSettings cfg) {
+        PadAction other = action == PadAction.HOTBAR_PREV ? PadAction.HOTBAR_NEXT : PadAction.HOTBAR_PREV;
+        boolean otherDown = false;
+        var device = pads.slot(0).device;
+        if (device != null) for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) if (e.getValue() == other && device.state.isDown(e.getKey())) otherDown = true;
+        int r = hotbar.press(player.getInventory().selected, otherDown, System.nanoTime() / 1_000_000L);
+        if (r == dev.consolepad.split.HotbarHistory.IGNORE) return;
+        if (r >= 0) player.getInventory().selected = r;
+        else player.getInventory().swapPaint(action == PadAction.HOTBAR_PREV ? 1.0 : -1.0);
     }
 
     private static final float DROP_DELAY = 0.35f;
@@ -309,6 +325,7 @@ public final class PadDriver {
             if (!craftedNow) mouseButton(mouse, window, s, PadState.A, GLFW.GLFW_MOUSE_BUTTON_LEFT);
         }
         mouseButton(mouse, window, s, PadState.X, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+        if (s.pressed(PadState.Y) && mc.screen != null) PadKeyboard.of(0).tryOpenFromButton(mc.screen); // Y en una pantalla de escribir abre el teclado
         if (s.pressed(PadState.A) && mc.screen != null) PadKeyboard.of(0).tryOpenFromClick(mc.screen); // A sobre un campo de texto abre el teclado
 
         if (s.pressed(PadState.Y) && mc.screen instanceof AbstractContainerScreen<?> container) {
@@ -448,8 +465,7 @@ public final class PadDriver {
             case PERSPECTIVE -> tap(o.keyTogglePerspective);
             case PICK_BLOCK -> tap(o.keyPickItem);
             case CHAT -> tap(o.keyChat);
-            case HOTBAR_PREV -> player.getInventory().swapPaint(1.0);
-            case HOTBAR_NEXT -> player.getInventory().swapPaint(-1.0);
+            case HOTBAR_PREV, HOTBAR_NEXT -> hotbarStep(player, action, cfg);
             case SPRINT_TOGGLE -> {
                 sprintLatch = HoldToggle.next(cfg.isToggle(action), sprintLatch, true, true);
                 o.keySprint.setDown(sprintLatch);

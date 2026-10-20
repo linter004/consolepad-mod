@@ -14,7 +14,7 @@ public final class PlayerCountScreen extends PlayerMenuScreen {
     private final Button[] counts = new Button[4];
 
     public PlayerCountScreen(Screen parent) {
-        super(0, Component.literal("¿Cuántos jugadores sois?"));
+        super(0, I18n.lit("¿Cuántos jugadores sois?"));
         this.parent = parent;
     }
 
@@ -24,12 +24,12 @@ public final class PlayerCountScreen extends PlayerMenuScreen {
         int rows = 5;
         for (int n = 1; n <= 4; n++) {
             final int count = n;
-            String text = n == 1 ? "1 jugador (solo yo)" : n + " jugadores";
-            if (n == pads) text += "  (mandos conectados)";
-            counts[n - 1] = addRow(n - 1, rows, Component.literal(text), b -> choose(count));
+            String text = n == 1 ? I18n.tr("1 jugador (solo yo)") : I18n.fmt("{0} jugadores", n);
+            if (n == pads) text += I18n.tr("  (mandos conectados)");
+            counts[n - 1] = addRow(n - 1, rows, I18n.lit(text), b -> choose(count));
             counts[n - 1].active = n <= Math.max(1, pads);
         }
-        addRow(4, rows, Component.literal("No volver a preguntar"), b -> {
+        addRow(4, rows, I18n.lit("No volver a preguntar"), b -> {
             SplitSettings.setAskPlayers(false);
             this.onClose();
         });

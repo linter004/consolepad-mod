@@ -108,7 +108,7 @@ public abstract class GameRendererMixin {
             if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX, mouseY, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
-            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, mouseX, mouseY);
+            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, mouseX, mouseY, 0);
             return;
         }
         int oldW = SplitView.guiWidth, oldH = SplitView.guiHeight;
@@ -123,7 +123,7 @@ public abstract class GameRendererMixin {
             if (dev.consolepad.split.ConsoleCraft.applies(screen)) dev.consolepad.split.ConsoleCraft.renderPanel(Minecraft.getInstance(), graphics, 0, screen, mouseX / k, mouseY / k, screen.width, screen.height);
             dev.consolepad.split.PadHints.renderScreenBar(Minecraft.getInstance(), graphics, 0, screen, screen.width, screen.height);
             dev.consolepad.split.PadKeyboard.of(0).render(graphics, Minecraft.getInstance().font, screen.width, screen.height);
-            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, Math.round(mouseX / k), Math.round(mouseY / k));
+            if (dev.consolepad.client.PadDriver.padCursor) dev.consolepad.split.VirtualCursor.draw(graphics, Math.round(mouseX / k), Math.round(mouseY / k), 0);
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;

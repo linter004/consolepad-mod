@@ -129,6 +129,8 @@ public final class PlayerContext {
     /** Lo que SecondaryTick recuerda de un tick al siguiente. */
     public static final class InputState {
         public boolean prevAttack, prevUse, prevLb, prevRb;
+        /** Casilla anterior (LB y RB a la vez). */
+        public final HotbarHistory hotbar = new HotbarHistory();
         public boolean sprintLatch, sneakLatch, comboLatch;
         /** Atacar y usar en modo alternar (PadSettings.isToggle): quedan activos hasta la siguiente pulsacion. */
         public boolean attackOn, useOn;

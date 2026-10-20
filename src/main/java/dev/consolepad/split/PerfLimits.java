@@ -75,12 +75,18 @@ public final class PerfLimits {
      * 2 jugadores = 1, 3 = 0,8, 4 = 0,65. Apagado con "playerLimits": false en split.json.
      */
     public static double entityScale() {
-        if (!SplitSettings.playerLimits()) return 1.0;
-        return switch (playerCount) {
+        return entityScaleFor(playerCount, SplitRender.passMenuOpen, SplitSettings.playerLimits());
+    }
+
+    /** El factor de entidades segun el numero de jugadores y si el que se dibuja tiene un menu abierto (la mitad: su mundo se ve difuminado detras). */
+    public static double entityScaleFor(int players, boolean menuOpen, boolean limitsOn) {
+        if (!limitsOn) return 1.0;
+        double base = switch (players) {
             case 3 -> 0.8;
             case 4 -> 0.65;
             default -> 1.0;
         };
+        return players > 1 && menuOpen ? base * 0.5 : base;
     }
 
     /**

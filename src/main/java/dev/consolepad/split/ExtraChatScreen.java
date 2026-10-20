@@ -21,13 +21,17 @@ public final class ExtraChatScreen extends Screen implements PlayerScreen {
     @Override
     protected void init() {
         String keep = input == null ? initial : input.getValue();
-        int y = Math.max(2, this.height - (PadIcons.H + 3) - PadKeyboard.HEIGHT - 16);
-        input = new EditBox(this.font, 4, y, this.width - 8, 12, Component.translatable("chat.editBox"));
+        input = new EditBox(this.font, 4, inputY(false), this.width - 8, 12, Component.translatable("chat.editBox"));
         input.setMaxLength(256);
         input.setBordered(true);
         input.setValue(keep);
         this.addWidget(input);
         this.setInitialFocus(input);
+    }
+
+    /** Fila del campo: sobre el teclado en pantalla si esta abierto, y sobre la barra de ayuda si no. */
+    private int inputY(boolean keyboardOpen) {
+        return Math.max(2, this.height - (PadIcons.H + 3) - (keyboardOpen ? PadKeyboard.HEIGHT + 16 : 18));
     }
 
     /** Centro del campo de texto (para el autotest). */
@@ -75,6 +79,8 @@ public final class ExtraChatScreen extends Screen implements PlayerScreen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        var ctx = ContextSwitcher.current();
+        input.setY(inputY(ctx != null && PadKeyboard.of(ctx.slotIndex).active()));
         super.render(graphics, mouseX, mouseY, partialTick);
         input.render(graphics, mouseX, mouseY, partialTick);
     }

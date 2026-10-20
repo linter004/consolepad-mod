@@ -41,7 +41,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
     private ControlsLayout.Result lay;
 
     public PlayerControlsScreen(int slot, Screen parent) {
-        super(slot, Component.literal("Controles del jugador " + (slot + 1) + " · " + (forcedKind != null ? forcedKind : ControlsLayout.kindFor(ConsolePad.PADS.slot(slot).device, ConsolePad.PADS.slot(slot).settings.iconStyle)).label));
+        super(slot, I18n.lit("Controles del jugador " + (slot + 1) + " · " + (forcedKind != null ? forcedKind : ControlsLayout.kindFor(ConsolePad.PADS.slot(slot).device, ConsolePad.PADS.slot(slot).settings.iconStyle)).label));
         this.parent = parent;
     }
 
@@ -68,7 +68,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
     /** Etiqueta de un boton: la accion que tiene hoy ("Sin acción" si ninguna). */
     public String labelText(int code) {
         PadAction a = settings().bindings.get(code);
-        return a == null ? "Sin acción" : PadNames.action(a);
+        return a == null ? I18n.tr("Sin acción") : PadNames.action(a);
     }
 
     /** Una etiqueta del diagrama: un boton de la pantalla (el D-pad y el cursor la alcanzan como cualquier otro) que dibuja icono y funcion. */
@@ -77,7 +77,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
         final boolean left;
 
         ControlLabel(int code, int[] box) {
-            super(box[0], box[1], box[2], box[3], Component.literal(PadNames.button(code, padType())), b -> select(code), DEFAULT_NARRATION);
+            super(box[0], box[1], box[2], box[3], I18n.lit(PadNames.button(code, padType())), b -> select(code), DEFAULT_NARRATION);
             this.code = code;
             this.left = ControlsLayout.leftSide(code);
         }
@@ -95,7 +95,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
                 g.fill(x, y + h - 1, x + w, y + h, 0xFFFFFFFF);
             }
             int adv = PadIcons.width(f, code, padType()) + 1;
-            String text = sel ? "Pulsa un botón" : labelText(code);
+            String text = sel ? I18n.tr("Pulsa un botón") : labelText(code);
             int room = w - 4 - adv;
             if (f.width(text) > room) text = f.plainSubstrByWidth(text, Math.max(0, room - f.width("…"))) + "…";
             int ty = y + (h - f.lineHeight) / 2 + 1;
@@ -116,7 +116,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
         PadAction a = settings().bindings.get(code);
         if (a == null) {
             cancelListening();
-            warning = Component.literal(PadNames.button(code, padType()) + " no tiene acción: elige otra etiqueta y pulsa este botón");
+            warning = I18n.lit(I18n.fmt("{0} no tiene acción: elige otra etiqueta y pulsa este botón", PadNames.button(code, padType())));
             return;
         }
         startListening(a, code);
@@ -132,8 +132,8 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
             labels.add(l);
         }
         int bw = Math.min(88, (this.width - 12) / 2);
-        reset = addRenderableWidget(Button.builder(Component.literal("Restablecer"), b -> resetDefaults()).bounds(this.width / 2 - bw - 2, this.height - 22, bw, 18).build());
-        back = addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(this.width / 2 + 2, this.height - 22, bw, 18).build());
+        reset = addRenderableWidget(Button.builder(I18n.lit("Restablecer"), b -> resetDefaults()).bounds(this.width / 2 - bw - 2, this.height - 22, bw, 18).build());
+        back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(this.width / 2 + 2, this.height - 22, bw, 18).build());
     }
 
     private void startListening(PadAction a, int code) {
@@ -141,7 +141,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
         listenCode = code;
         listenTicks = LISTEN_TICKS;
         pendingConfirm = -1;
-        warning = Component.literal("Pulsa el botón nuevo para «" + PadNames.action(a) + "»");
+        warning = I18n.lit("Pulsa el botón nuevo para «" + PadNames.action(a) + "»");
     }
 
     private void cancelListening() {
@@ -159,7 +159,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
         listening = null;
         listenCode = -1;
         pendingConfirm = -1;
-        warning = Component.literal("Controles de fábrica restablecidos");
+        warning = I18n.lit("Controles de fábrica restablecidos");
     }
 
     @Override
@@ -187,7 +187,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
                 pendingConfirm = code;
                 listenTicks = LISTEN_TICKS;
                 String btn = PadNames.button(code, type);
-                warning = Component.literal("«" + PadNames.action(other) + "» ya usa " + btn + ". Pulsa " + btn + " otra vez para intercambiar");
+                warning = I18n.lit(I18n.fmt("«{0}» ya usa {1}. Pulsa {1} otra vez para intercambiar", PadNames.action(other), btn));
                 return;
             }
             for (int c : mine) b.remove(c); // intercambio: la otra accion se queda con el boton que dejas
@@ -197,7 +197,7 @@ public final class PlayerControlsScreen extends PlayerMenuScreen {
         }
         b.put(code, listening);
         ConsolePad.PADS.saveSettings();
-        warning = Component.literal("«" + PadNames.action(listening) + "» ahora es " + PadNames.button(code, type));
+        warning = I18n.lit(I18n.fmt("«{0}» ahora es {1}", PadNames.action(listening), PadNames.button(code, type)));
         listening = null;
         listenCode = -1;
         pendingConfirm = -1;

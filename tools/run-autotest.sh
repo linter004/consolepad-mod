@@ -7,7 +7,7 @@ PROJ="$(basename "$PWD")"
 OUT="${1:-autotest.log}"
 BK="$(mktemp -d)"
 cp -r run/config/consolepad "$BK/"
-export JAVA_HOME=C:/Users/alvar/.jdks/jbr-21.0.11 CONSOLEPAD_AUTOTEST="New World"
+export JAVA_HOME=C:/Users/<usuario>/.jdks/jbr-21.0.11 CONSOLEPAD_AUTOTEST="New World"
 ./gradlew runClient > "$OUT" 2>&1 &
 GP=$!
 for i in $(seq 1 240); do

@@ -55,16 +55,16 @@ public final class PadHints {
     public static String attackLabel(HitResult hit) {
         if (hit == null) return null;
         return switch (hit.getType()) {
-            case BLOCK -> "Romper";
-            case ENTITY -> "Atacar";
+            case BLOCK -> I18n.tr("Romper");
+            case ENTITY -> I18n.tr("Atacar");
             default -> null;
         };
     }
 
     /** Texto del boton de usar: colocar bloque si lleva un bloque en la mano, usar objeto en el resto. */
     public static String useLabel(net.minecraft.world.entity.player.Player player) {
-        if (player != null && player.getMainHandItem().getItem() instanceof BlockItem) return "Colocar bloque";
-        return "Usar objeto";
+        if (player != null && player.getMainHandItem().getItem() instanceof BlockItem) return I18n.tr("Colocar bloque");
+        return I18n.tr("Usar objeto");
     }
 
     /** Ayuda del HUD de un jugador en su region de w x h (unidades de GUI de su interfaz). Dentro de su contexto: mc.player y mc.hitResult son los suyos. */
@@ -81,9 +81,9 @@ public final class PadHints {
 
         List<Hint> left = new ArrayList<>();
         int drop = buttonFor(cfg, PadAction.DROP);
-        if (drop >= 0) left.add(new Hint(drop, "Tirar objeto"));
+        if (drop >= 0) left.add(new Hint(drop, I18n.tr("Tirar objeto")));
         int inv = buttonFor(cfg, PadAction.INVENTORY);
-        if (inv >= 0) left.add(new Hint(inv, "Inventario"));
+        if (inv >= 0) left.add(new Hint(inv, I18n.tr("Inventario")));
 
         List<Hint> right = new ArrayList<>();
         int attack = buttonFor(cfg, PadAction.ATTACK);
@@ -156,10 +156,10 @@ public final class PadHints {
         if (screen == null) return out;
         if (screen instanceof PlayerScreen ps && ps.listeningForPad()) return out;
         if (keyboardSlot >= 0 && PadKeyboard.of(keyboardSlot).active()) {
-            out.add(new Hint(PadState.A, "Escribir"));
-            out.add(new Hint(PadState.B, "Cerrar"));
-            out.add(new Hint(PadState.X, "Borrar"));
-            out.add(new Hint(PadState.Y, "Espacio"));
+            out.add(new Hint(PadState.A, I18n.tr("Escribir")));
+            out.add(new Hint(PadState.B, I18n.tr("Cerrar")));
+            out.add(new Hint(PadState.X, I18n.tr("Borrar")));
+            out.add(new Hint(PadState.Y, I18n.tr("Espacio")));
             out.add(new Hint(PadState.LB, "<"));
             out.add(new Hint(PadState.RB, ">"));
             return out;
@@ -167,30 +167,32 @@ public final class PadHints {
         boolean craftBook = ConsoleCraft.applies(screen);
         boolean container = screen instanceof AbstractContainerScreen<?>;
         // Textos de la barra de Bedrock con mando en los contenedores: Coger / Coger la mitad / Movimiento rápido / Salir.
-        out.add(new Hint(PadState.A, craftBook && ConsoleCraft.hovering(keyboardSlot) ? "Fabricar" : container ? "Coger" : "Seleccionar"));
-        out.add(new Hint(PadState.B, screen instanceof PlayerMenuScreen || screen instanceof net.minecraft.client.gui.screens.PauseScreen ? "Volver" : "Salir"));
+        out.add(new Hint(PadState.A, craftBook && ConsoleCraft.hovering(keyboardSlot) ? I18n.tr("Fabricar") : container ? I18n.tr("Coger") : I18n.tr("Seleccionar")));
+        out.add(new Hint(PadState.B, screen instanceof PlayerMenuScreen || screen instanceof net.minecraft.client.gui.screens.PauseScreen ? I18n.tr("Volver") : I18n.tr("Salir")));
+        if (screen instanceof ExtraBedScreen || screen instanceof net.minecraft.client.gui.screens.InBedChatScreen) out.set(1, new Hint(PadState.B, I18n.tr("Levantarse")));
+        else if (!container && PadKeyboard.wantsKeyboard(screen)) out.add(new Hint(PadState.Y, I18n.tr("Teclado"))); // el teclado se abre con Y
         if (screen instanceof AbstractContainerScreen<?>) {
-            out.add(new Hint(PadState.X, "Coger la mitad"));
-            out.add(new Hint(PadState.Y, craftBook && ConsoleCraft.hovering(keyboardSlot) ? "Fabricar todo" : "Movimiento rápido"));
+            out.add(new Hint(PadState.X, I18n.tr("Coger la mitad")));
+            out.add(new Hint(PadState.Y, craftBook && ConsoleCraft.hovering(keyboardSlot) ? I18n.tr("Fabricar todo") : I18n.tr("Movimiento rápido")));
         }
-        if (screen instanceof PlayerSettingsScreen) out.add(new Hint(PadState.X, "Valor anterior"));
+        if (screen instanceof PlayerSettingsScreen) out.add(new Hint(PadState.X, I18n.tr("Valor anterior")));
         if (screen instanceof PlayerScreen ps && ps.hintTabs()) {
-            out.add(new Hint(PadState.LB, "Página anterior"));
-            out.add(new Hint(PadState.RB, "Página siguiente"));
+            out.add(new Hint(PadState.LB, I18n.tr("Página anterior")));
+            out.add(new Hint(PadState.RB, I18n.tr("Página siguiente")));
         }
         if (screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen) {
-            out.add(new Hint(PadState.LB, "Categoría"));
-            out.add(new Hint(PadState.RB, "Categoría"));
-            out.add(new Hint(PadState.LT, "Página anterior"));
-            out.add(new Hint(PadState.RT, "Página siguiente"));
+            out.add(new Hint(PadState.LB, I18n.tr("Categoría")));
+            out.add(new Hint(PadState.RB, I18n.tr("Categoría")));
+            out.add(new Hint(PadState.LT, I18n.tr("Página anterior")));
+            out.add(new Hint(PadState.RT, I18n.tr("Página siguiente")));
         }
         if (craftBook) {
-            out.add(new Hint(PadState.L3, "Libro de recetas"));
+            out.add(new Hint(PadState.L3, I18n.tr("Libro de recetas")));
             if (ConsoleCraft.bookVisible(screen)) {
-                out.add(new Hint(PadState.LB, "Categoría"));
-                out.add(new Hint(PadState.RB, "Categoría"));
-                out.add(new Hint(PadState.LT, "Página anterior"));
-                out.add(new Hint(PadState.RT, "Página siguiente"));
+                out.add(new Hint(PadState.LB, I18n.tr("Categoría")));
+                out.add(new Hint(PadState.RB, I18n.tr("Categoría")));
+                out.add(new Hint(PadState.LT, I18n.tr("Página anterior")));
+                out.add(new Hint(PadState.RT, I18n.tr("Página siguiente")));
             }
         }
         return out;

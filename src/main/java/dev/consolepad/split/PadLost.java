@@ -82,7 +82,7 @@ public final class PadLost {
                     if (lostSince[slot] == 0) lostSince[slot] = System.nanoTime();
                     else if ((System.nanoTime() - lostSince[slot]) / 1e9 >= leaveSeconds()) {
                         lostSince[slot] = 0;
-                        mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("El jugador " + (slot + 1) + " salió de la partida: su mando lleva " + (int) leaveSeconds() + " s desconectado."), false);
+                        mc.player.displayClientMessage(I18n.lit(I18n.fmt("El jugador {0} salió de la partida: su mando lleva {1} s desconectado.", slot + 1, (int) leaveSeconds())), false);
                         SecondaryPlayers.leave(mc, slot);
                     }
                 }

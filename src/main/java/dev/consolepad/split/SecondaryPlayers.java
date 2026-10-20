@@ -129,7 +129,7 @@ public final class SecondaryPlayers {
         Entry e = ENTRIES[slot];
         if (e.connection != null) {
             ConsolePad.LOGGER.info("Jugador {}: ya esta dentro", slot + 1);
-            mc.player.displayClientMessage(Component.literal("Jugador " + (slot + 1) + " ya está dentro."), false);
+            mc.player.displayClientMessage(I18n.lit(I18n.fmt("Jugador {0} ya está dentro.", slot + 1)), false);
             return;
         }
         String name = secondaryName(mc, slot);

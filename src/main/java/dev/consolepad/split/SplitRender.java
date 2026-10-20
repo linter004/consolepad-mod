@@ -27,6 +27,9 @@ public final class SplitRender {
     /** Slot del jugador cuyo mundo se esta dibujando (0 = P1, tambien fuera de la pantalla dividida). */
     public static volatile int passSlot;
 
+    /** El jugador cuyo mundo se dibuja tiene un menu abierto (su vista queda difuminada detras): se dibuja con menos entidades. Solo con la pantalla dividida. */
+    public static volatile boolean passMenuOpen;
+
     /** Estado estatico de FogRenderer por jugador (color y transicion entre biomas): cada pasada carga el suyo y lo guarda al terminar. */
     private static final class Fog {
         float r, g, b;
@@ -114,6 +117,7 @@ public final class SplitRender {
             pass(mc, renderer, deltaTracker, null, p[0], p[1], p[2], p[3]);
             PerfProbe.segment("post");
         } finally {
+            passMenuOpen = false;
             RenderSystem.disableScissor();
             RenderSystem.viewport(0, 0, w, h);
             SplitView.width = 0;
@@ -134,6 +138,7 @@ public final class SplitRender {
         SplitView.height = h;
         SplitDiag.beginPass(ctx != null ? ctx.label() : "P1", w, h);
         passSlot = ctx != null ? ctx.slotIndex : 0;
+        passMenuOpen = ctx != null ? ctx.screen != null : mc.screen != null;
         ClientLevel level = ctx != null ? ctx.level : mc.level;
         // Los dispatchers de entidades y bloques son compartidos: apuntan al nivel del jugador que se dibuja.
         mc.getEntityRenderDispatcher().setLevel(level);

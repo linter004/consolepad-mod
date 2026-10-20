@@ -59,6 +59,15 @@ public final class PadState {
 
     public int downBits() { return down; }
 
+    /** Nintendo: intercambia A con B y X con Y en los botones ya leidos (se llama tras update/tickSim, como swapSticks). */
+    public void swapFaceButtons() {
+        int d = down;
+        int a = (d >> A) & 1, bb = (d >> B) & 1, x = (d >> X) & 1, y = (d >> Y) & 1;
+        d &= ~((1 << A) | (1 << B) | (1 << X) | (1 << Y));
+        d |= (bb << A) | (a << B) | (y << X) | (x << Y);
+        down = d;
+    }
+
     /** Zurdo: intercambia los sticks ya leidos (se llama tras update/tickSim). */
     public void swapSticks() {
         float tx = lx, ty = ly;

@@ -104,7 +104,8 @@ public final class TabNav {
         net.minecraft.world.inventory.Slot slot = screen.getSlotUnderMouse();
         if (slot == null) return;
         int x = screen.getGuiLeft() + slot.x - 1, y = screen.getGuiTop() + slot.y - 1;
-        int c = 0xFFFFFFFF, e = 0xFF000000;
+        var cur = ContextSwitcher.current();
+        int c = 0xFF000000 | PlayerLabels.accent(cur == null ? 0 : cur.slotIndex), e = 0xFF000000; // anillo del color del jugador (blanco si apago los colores)
         g.fill(x - 1, y - 1, x + 19, y, e); // anillo oscuro por fuera
         g.fill(x - 1, y + 18, x + 19, y + 19, e);
         g.fill(x - 1, y, x, y + 18, e);

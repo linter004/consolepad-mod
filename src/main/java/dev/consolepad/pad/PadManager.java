@@ -171,6 +171,7 @@ public final class PadManager {
             d.state.tickSim();
             Slot vs = slotOf(d);
             if (vs != null && vs.settings.swapSticks) d.state.swapSticks();
+            if (vs != null && vs.settings.swapFace) d.state.swapFaceButtons();
         }
         long now = System.nanoTime();
         if (now - lastScan > SCAN_INTERVAL_NANOS) {
@@ -187,6 +188,7 @@ public final class PadManager {
             Slot s = slotOf(dev);
             dev.state.update(buffer, s != null ? s.settings.triggerThreshold : 0.5f);
             if (s != null && s.settings.swapSticks) dev.state.swapSticks();
+            if (s != null && s.settings.swapFace) dev.state.swapFaceButtons();
             if (PADLOG && dev.state.downBits() != lastLoggedBits[jid]) {
                 lastLoggedBits[jid] = dev.state.downBits();
                 ConsolePad.LOGGER.info("[padlog] jid={} slot={} '{}' botones=0x{} LT={} RT={} stickIzq=({}, {}) stickDer=({}, {})", jid,

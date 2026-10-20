@@ -28,10 +28,24 @@ public final class PlayerLabels {
         return COLOR_RGB[colorIndex(slot)];
     }
 
+    /** Colores de tema de cada jugador cuando no ha elegido color de etiqueta: azul, rojo, verde y amarillo. */
+    public static final int[] DEFAULT_THEME = {0x6C8CFF, 0xFF5555, 0x55FF55, 0xFFD84A};
+
+    /** Color de tema del jugador: el de su etiqueta si lo eligio, si no el de su numero. Lo usan el marcador del companero, las lineas entre regiones y el realce de su cursor. */
+    public static int themeRgb(int slot) {
+        int c = colorIndex(slot);
+        return c != 0 ? COLOR_RGB[c] : DEFAULT_THEME[Math.floorMod(slot, DEFAULT_THEME.length)];
+    }
+
+    /** Color de realce del cursor y de la casilla seleccionada: el de tema, o blanco si el jugador apago "Colores del jugador". */
+    public static int accent(int slot) {
+        return ConsolePad.PADS.slot(slot).settings.playerColors ? themeRgb(slot) : 0xFFFFFF;
+    }
+
     /** Nombre visible del slot ya con su color de etiqueta. */
     public static Component styled(int slot, String text) {
         int c = colorIndex(slot);
-        net.minecraft.network.chat.MutableComponent out = Component.literal(text);
+        net.minecraft.network.chat.MutableComponent out = I18n.lit(text);
         return c == 0 ? out : out.withStyle(net.minecraft.network.chat.Style.EMPTY.withColor(COLOR_RGB[c]));
     }
 
@@ -48,7 +62,7 @@ public final class PlayerLabels {
     /** Nombre elegido por el jugador del slot, o "Jugador N". */
     public static String labelOf(int slot) {
         String own = ConsolePad.PADS.slot(slot).settings.playerName;
-        return own == null || own.isBlank() ? "Jugador " + (slot + 1) : own.trim();
+        return own == null || own.isBlank() ? I18n.fmt("Jugador {0}", slot + 1) : own.trim();
     }
 
     public static void onNameFormat(PlayerEvent.NameFormat e) {

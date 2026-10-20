@@ -24,7 +24,10 @@ public final class SplitDiag {
     /** Sincronizaciones de registros de NeoForge omitidas para jugadores extra (RegistrySyncMixin). */
     public static volatile int registrySyncSkipped;
     /** Sonidos que suenan (jugador 1) y que se silencian (paquetes y ticks de los jugadores extra: el servidor se los manda a todos y sonarian duplicados). */
-    public static volatile int soundsPlayed, soundsMuted, tickingQueued, tickingMuted, soundsOccluded, soundsRouted;
+    public static volatile int soundsPlayed, soundsMuted, tickingQueued, tickingMuted, soundsOccluded, soundsRouted, particlesThinned;
+    /** Cuantas veces se tino la casilla seleccionada y se sustituyo el brillo por el del jugador, por slot; y el ultimo brillo aplicado. */
+    public static final int[] hotbarTinted = new int[4], gammaOverrides = new int[4];
+    public static final float[] lastGamma = new float[]{-1f, -1f, -1f, -1f};
     /** Particulas dibujadas / saltadas por ser de otro nivel, por pasada de dibujo (slot del jugador). */
     public static final int[] particlesDrawn = new int[4], particlesForeign = new int[4];
     /** Fotogramas en que el chat de P1 se dibujo / se oculto por tener un contenedor abierto (ChatGuardsMixin). */

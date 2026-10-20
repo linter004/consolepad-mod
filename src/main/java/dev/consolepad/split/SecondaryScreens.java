@@ -77,7 +77,7 @@ public final class SecondaryScreens {
             if (ConsoleCraft.applies(screen)) ConsoleCraft.renderPanel(mc, graphics, ctx.slotIndex, screen, ctx.cursorX, ctx.cursorY, w, h);
             PadHints.renderScreenBar(mc, graphics, ctx.slotIndex, screen, w, h);
             PadKeyboard.of(ctx.slotIndex).render(graphics, mc.font, w, h);
-            VirtualCursor.draw(graphics, (int) ctx.cursorX, (int) ctx.cursorY);
+            VirtualCursor.draw(graphics, (int) ctx.cursorX, (int) ctx.cursorY, ctx.slotIndex);
         } finally {
             SplitView.guiWidth = oldW;
             SplitView.guiHeight = oldH;
@@ -126,6 +126,7 @@ public final class SecondaryScreens {
             // Clics: pulsar y soltar por separado, para poder arrastrar.
             boolean craftedNow = ConsoleCraft.handle(mc, screen, s, ctx.slotIndex, ctx.cursorX, ctx.cursorY); // libro de recetas: L3, LB/RB, A sobre una receta
             if (!craftedNow) click(screen, ctx, s, PadState.A, 0);
+            if (s.pressed(PadState.Y)) kb.tryOpenFromButton(screen); // Y en una pantalla de escribir abre el teclado
             if (s.pressed(PadState.A) && !craftedNow) kb.tryOpenFromClick(screen); // A sobre un campo de texto abre el teclado
             click(screen, ctx, s, PadState.X, 1);
             if (s.pressed(PadState.Y) && screen instanceof AbstractContainerScreen<?> container) {
@@ -146,8 +147,9 @@ public final class SecondaryScreens {
             if (s.pressed(PadState.START)) closing |= 1 << PadState.START;
             // En pantallas de contenedor el boton de inventario (Y) solo mueve rapido: cerrar es B o Start (o la pausa). En el resto de pantallas propias sigue cerrando.
             boolean container = screen instanceof AbstractContainerScreen<?>;
+            boolean textScreen = PadKeyboard.wantsKeyboard(screen); // en el chat, los carteles y los nombres Y abre el teclado: no cierra
             for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
-                boolean closer = e.getValue() == PadAction.PAUSE || (e.getValue() == PadAction.INVENTORY && !container);
+                boolean closer = e.getValue() == PadAction.PAUSE || (e.getValue() == PadAction.INVENTORY && !container && !textScreen);
                 if (closer && s.pressed(e.getKey())) closing |= 1 << e.getKey();
             }
             if (closing != 0 && screen.shouldCloseOnEsc()) {

@@ -38,6 +38,10 @@ public final class SplitSettings {
         Boolean soundOcclusion = Boolean.TRUE;
         Boolean soundPerPlayer = Boolean.TRUE;
         Boolean adaptivePerformance = Boolean.TRUE;
+        Boolean savingMode = Boolean.FALSE;
+        String language = "es";
+        Boolean separators = Boolean.TRUE;
+        Boolean sleepNotice = Boolean.TRUE;
         Integer targetFps = 40;
         Integer padLostLeaveSeconds = 30;
         Boolean askPlayers = Boolean.TRUE;
@@ -81,6 +85,14 @@ public final class SplitSettings {
                         if (read.soundPerPlayer != null) d.soundPerPlayer = read.soundPerPlayer;
                         else complete = false;
                         if (read.adaptivePerformance != null) d.adaptivePerformance = read.adaptivePerformance;
+                        else complete = false;
+                        if (read.savingMode != null) d.savingMode = read.savingMode;
+                        else complete = false;
+                        if (read.language != null && java.util.List.of("auto", "es", "en").contains(read.language)) d.language = read.language;
+                        else complete = false;
+                        if (read.separators != null) d.separators = read.separators;
+                        else complete = false;
+                        if (read.sleepNotice != null) d.sleepNotice = read.sleepNotice;
                         else complete = false;
                         if (read.targetFps != null) d.targetFps = Math.max(15, Math.min(240, read.targetFps));
                         else complete = false;
@@ -152,6 +164,46 @@ public final class SplitSettings {
     /** Regulador de rendimiento automatico con varios jugadores (opcion "adaptivePerformance" de split.json). */
     public static boolean adaptivePerformance() {
         return data().adaptivePerformance;
+    }
+
+    /** Idioma de los textos del mod: "auto" (el del juego: espanol o ingles), "es" o "en" (opcion "language" de split.json). */
+    public static String language() {
+        return data().language;
+    }
+
+    /** Linea de color entre las regiones de los jugadores (opcion "separators" de split.json). */
+    public static boolean separators() {
+        return data().separators;
+    }
+
+    public static void setSeparators(boolean on) {
+        data().separators = on;
+        save();
+    }
+
+    /** Aviso de quien duerme y quien falta (opcion "sleepNotice" de split.json). */
+    public static boolean sleepNotice() {
+        return data().sleepNotice;
+    }
+
+    public static void setSleepNotice(boolean on) {
+        data().sleepNotice = on;
+        save();
+    }
+
+    public static void setLanguage(String lang) {
+        data().language = lang;
+        save();
+    }
+
+    /** Modo ahorro: con varios jugadores se empieza ya en el nivel 2 del regulador (menos distancia, entidades y particulas), pase lo que pase con los FPS. */
+    public static boolean savingMode() {
+        return data().savingMode;
+    }
+
+    public static void setSavingMode(boolean on) {
+        data().savingMode = on;
+        save();
     }
 
     /** FPS objetivo del regulador automatico ("targetFps" de split.json, entre 15 y 240). */

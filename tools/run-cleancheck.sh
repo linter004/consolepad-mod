@@ -8,7 +8,7 @@ OUT="${1:-cleancheck.log}"
 BK="$(mktemp -d)"
 [ -d run/config/consolepad ] && cp -r run/config/consolepad "$BK/consolepad" && rm -rf run/config/consolepad
 [ -f run/options.txt ] && cp run/options.txt "$BK/options.txt" && rm -f run/options.txt
-export JAVA_HOME=C:/Users/alvar/.jdks/jbr-21.0.11 CONSOLEPAD_CLEANCHECK=1
+export JAVA_HOME=C:/Users/<usuario>/.jdks/jbr-21.0.11 CONSOLEPAD_CLEANCHECK=1
 ./gradlew runClient > "$OUT" 2>&1 &
 for i in $(seq 1 48); do
   grep -aq "\[cleancheck\] terminado\|BUILD FAILED" "$OUT" 2>/dev/null && break

@@ -10,30 +10,30 @@ public final class PadNames {
 
     public static String action(PadAction a) {
         return switch (a) {
-            case JUMP -> "Saltar";
-            case ATTACK -> "Atacar";
-            case USE -> "Usar";
-            case DROP -> "Soltar";
-            case SWAP_HANDS -> "Cambiar de mano";
-            case INVENTORY -> "Inventario";
-            case PERSPECTIVE -> "Perspectiva";
-            case HOTBAR_PREV -> "Barra anterior";
-            case HOTBAR_NEXT -> "Barra siguiente";
-            case SPRINT_TOGGLE -> "Correr";
-            case SNEAK_TOGGLE -> "Agacharse";
-            case PICK_BLOCK -> "Copiar bloque";
-            case PLAYER_LIST -> "Jugadores";
-            case CHAT -> "Chat";
-            case PAUSE -> "Pausa";
-            case QUICK_WHEEL -> "Acciones";
+            case JUMP -> I18n.tr("Saltar");
+            case ATTACK -> I18n.tr("Atacar");
+            case USE -> I18n.tr("Usar");
+            case DROP -> I18n.tr("Soltar");
+            case SWAP_HANDS -> I18n.tr("Cambiar de mano");
+            case INVENTORY -> I18n.tr("Inventario");
+            case PERSPECTIVE -> I18n.tr("Perspectiva");
+            case HOTBAR_PREV -> I18n.tr("Barra anterior");
+            case HOTBAR_NEXT -> I18n.tr("Barra siguiente");
+            case SPRINT_TOGGLE -> I18n.tr("Correr");
+            case SNEAK_TOGGLE -> I18n.tr("Agacharse");
+            case PICK_BLOCK -> I18n.tr("Copiar bloque");
+            case PLAYER_LIST -> I18n.tr("Jugadores");
+            case CHAT -> I18n.tr("Chat");
+            case PAUSE -> I18n.tr("Pausa");
+            case QUICK_WHEEL -> I18n.tr("Acciones");
         };
     }
 
     public static String button(int code, PadType type) {
-        if (code == PadState.DPAD_UP) return "Cruceta arriba";
-        if (code == PadState.DPAD_DOWN) return "Cruceta abajo";
-        if (code == PadState.DPAD_LEFT) return "Cruceta izquierda";
-        if (code == PadState.DPAD_RIGHT) return "Cruceta derecha";
+        if (code == PadState.DPAD_UP) return I18n.tr("Cruceta arriba");
+        if (code == PadState.DPAD_DOWN) return I18n.tr("Cruceta abajo");
+        if (code == PadState.DPAD_LEFT) return I18n.tr("Cruceta izquierda");
+        if (code == PadState.DPAD_RIGHT) return I18n.tr("Cruceta derecha");
         if (code == PadState.L3) return "L3";
         if (code == PadState.R3) return "R3";
         return switch (type) {
@@ -52,23 +52,23 @@ public final class PadNames {
         if (c == PadState.RB) return "RB";
         if (c == PadState.LT) return "LT";
         if (c == PadState.RT) return "RT";
-        if (c == PadState.BACK) return "Vista";
-        if (c == PadState.START) return "Menú";
-        return "Botón " + c;
+        if (c == PadState.BACK) return I18n.tr("Vista");
+        if (c == PadState.START) return I18n.tr("Menú");
+        return I18n.fmt("Botón {0}", c);
     }
 
     private static String ps(int c) {
-        if (c == PadState.A) return "Cruz";
-        if (c == PadState.B) return "Círculo";
-        if (c == PadState.X) return "Cuadrado";
-        if (c == PadState.Y) return "Triángulo";
+        if (c == PadState.A) return I18n.tr("Cruz");
+        if (c == PadState.B) return I18n.tr("Círculo");
+        if (c == PadState.X) return I18n.tr("Cuadrado");
+        if (c == PadState.Y) return I18n.tr("Triángulo");
         if (c == PadState.LB) return "L1";
         if (c == PadState.RB) return "R1";
         if (c == PadState.LT) return "L2";
         if (c == PadState.RT) return "R2";
-        if (c == PadState.BACK) return "Share";
-        if (c == PadState.START) return "Options";
-        return "Botón " + c;
+        if (c == PadState.BACK) return I18n.tr("Share");
+        if (c == PadState.START) return I18n.tr("Options");
+        return I18n.fmt("Botón {0}", c);
     }
 
     private static String nintendo(int c) {
@@ -82,6 +82,6 @@ public final class PadNames {
         if (c == PadState.RT) return "ZR";
         if (c == PadState.BACK) return "-";
         if (c == PadState.START) return "+";
-        return "Botón " + c;
+        return I18n.fmt("Botón {0}", c);
     }
 }

@@ -24,13 +24,13 @@ public final class PadSetupScreen extends Screen implements PlayerScreen {
     private int[][] cell = new int[PadManager.MAX_PLAYERS][];
 
     public PadSetupScreen(Screen parent) {
-        super(Component.literal("Asignar mandos"));
+        super(I18n.lit("Asignar mandos"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        addRenderableWidget(Button.builder(Component.literal("Listo"), b -> this.onClose()).bounds(this.width / 2 - 50, this.height - 24, 100, 20).build());
+        addRenderableWidget(Button.builder(I18n.lit("Listo"), b -> this.onClose()).bounds(this.width / 2 - 50, this.height - 24, 100, 20).build());
     }
 
     @Override
@@ -101,7 +101,7 @@ public final class PadSetupScreen extends Screen implements PlayerScreen {
         listen();
         super.render(g, mouseX, mouseY, partialTick);
         g.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFD84A);
-        String hint = "Pulsa A en cada mando, por orden, para unirte · B sale · A otra vez continúa";
+        String hint = I18n.tr("Pulsa A en cada mando, por orden, para unirte · B sale · A otra vez continúa");
         g.drawCenteredString(this.font, this.font.plainSubstrByWidth(hint, this.width - 8), this.width / 2, 20, 0xFFB0B0B0);
         int top = 34, bottom = this.height - 30, gap = 6;
         int qw = (this.width - 3 * gap) / 2, qh = (bottom - top - gap) / 2;
@@ -113,7 +113,7 @@ public final class PadSetupScreen extends Screen implements PlayerScreen {
         int free = 0;
         for (PadManager.Device d : ConsolePad.PADS.allDevices()) if (ConsolePad.PADS.slotOfDevice(d) == null) free++;
         if (free > 0) {
-            String extra = free + (free == 1 ? " mando sin jugador (todos los cuadrantes ocupados)" : " mandos sin jugador");
+            String extra = I18n.fmt(free == 1 ? "{0} mando sin jugador (todos los cuadrantes ocupados)" : "{0} mandos sin jugador", free);
             g.drawCenteredString(this.font, extra, this.width / 2, this.height - 38, 0xFFFFD84A);
         }
     }
@@ -125,7 +125,7 @@ public final class PadSetupScreen extends Screen implements PlayerScreen {
         int border = claimed[i] ? 0xFF55FF55 : on ? 0xFF9A9A9A : 0xFF4A4A4A;
         g.fill(x, y, x + w, y + h, border);
         g.fill(x + 1, y + 1, x + w - 1, y + h - 1, claimed[i] ? 0xFF1C2C1C : 0xFF1C1C2C);
-        String who = "Jugador " + (i + 1);
+        String who = I18n.fmt("Jugador {0}", i + 1);
         g.drawString(this.font, who, x + 6, y + 5, claimed[i] ? 0xFF55FF55 : 0xFFFFFFFF, false);
         ControlsLayout.Kind kind = ControlsLayout.kindFor(d, s.settings.iconStyle);
         int footer = 14;
@@ -142,13 +142,13 @@ public final class PadSetupScreen extends Screen implements PlayerScreen {
         String line;
         int color;
         if (!on) {
-            line = "Sin mando";
+            line = I18n.tr("Sin mando");
             color = 0xFF808080;
         } else if (claimed[i]) {
             line = d.name;
             color = 0xFFFFFFFF;
         } else {
-            line = "Pulsa A";
+            line = I18n.tr("Pulsa A");
             color = 0xFFFFD84A;
         }
         String shown = this.font.plainSubstrByWidth(line, w - 14);

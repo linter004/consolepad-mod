@@ -33,7 +33,7 @@ public final class SecondaryTick {
 
     // Contadores de diagnostico: cuantas veces ejecuta P2 cada accion.
     public static volatile int dbgStartAttack, dbgContinueTrue, dbgStartUse, dbgJumpTicks, dbgHotbarSteps;
-    public static volatile int dbgDrop, dbgDropRepeat, dbgSwapHands, dbgPerspective, dbgInventoryRequests;
+    public static volatile int dbgDrop, dbgDropRepeat, dbgSwapHands, dbgPerspective, dbgInventoryRequests, dbgPickBlock;
 
     private static final float TICK_SECONDS = 0.05f;
     private static final int MAX_LOGGED_ERRORS = 5;
@@ -179,7 +179,7 @@ public final class SecondaryTick {
             st.dropRepeat = false;
         } else if (downSet.contains(PadAction.DROP) && st.dropTicks > 0) {
             st.dropTicks++;
-            st.dropRepeat = st.dropTicks >= 7 && (st.dropTicks - 7) % 2 == 0;
+            st.dropRepeat = st.dropTicks >= 7 && (st.dropTicks - 7) % Math.max(1, cfg.dropInterval) == 0;
         } else {
             st.dropTicks = 0;
             st.dropRepeat = false;
@@ -213,6 +213,15 @@ public final class SecondaryTick {
     /** Particulas ambientales de los extra (Minecraft.tick solo llama a animateTick con el jugador 1). */
     public static boolean ctxAmbientParticles = true;
 
+    /** LB o RB: cambia de casilla; con los dos a la vez, va a la casilla anterior. */
+    private static void hotbarStep(LocalPlayer player, PlayerContext.InputState st, boolean otherDown, double dir, long nowMs) {
+        int r = st.hotbar.press(player.getInventory().selected, otherDown, nowMs);
+        if (r == HotbarHistory.IGNORE) return;
+        if (r >= 0) player.getInventory().selected = r;
+        else player.getInventory().swapPaint(dir);
+        dbgHotbarSteps++;
+    }
+
     private static void secondaryTick(PlayerContext self, float forward, float left, float lookX, float lookY,
                                       boolean jump, boolean attack, boolean use, boolean lb, boolean rb, PadSettings cfg) {
         Minecraft mc = Minecraft.getInstance();
@@ -225,6 +234,7 @@ public final class SecondaryTick {
         } else {
             st.deadTicks = 0;
         }
+        if (player.isSleeping() && mc.screen == null && !player.isDeadOrDying()) mc.setScreen(new ExtraBedScreen()); // vanilla solo abre la pantalla de la cama para P1: sin ella no se puede salir
         if (mc.screen != null) mc.screen.tick();
         if (!(player.input instanceof PadInput)) player.input = new PadInput();
         PadInput input = (PadInput) player.input;
@@ -302,14 +312,10 @@ public final class SecondaryTick {
         st.prevUse = use;
 
         // Hotbar de P2 (misma logica que P1: LB = anterior, RB = siguiente) sobre el inventario de P2.
-        if (lb && !st.prevLb) {
-            player.getInventory().swapPaint(1.0);
-            dbgHotbarSteps++;
-        }
-        if (rb && !st.prevRb) {
-            player.getInventory().swapPaint(-1.0);
-            dbgHotbarSteps++;
-        }
+        long nowMs = System.nanoTime() / 1_000_000L;
+        st.hotbar.tick(player.getInventory().selected, nowMs);
+        if (lb && !st.prevLb) hotbarStep(player, st, rb, 1.0, nowMs);
+        if (rb && !st.prevRb) hotbarStep(player, st, lb, -1.0, nowMs);
         st.prevLb = lb;
         st.prevRb = rb;
         // Acciones por flanco, con los bindings de P2 (por defecto, los de P1): como Minecraft.handleKeybinds / PadDriver.onPress.
@@ -330,6 +336,10 @@ public final class SecondaryTick {
                                 net.minecraft.core.BlockPos.ZERO, net.minecraft.core.Direction.DOWN));
                     }
                     dbgSwapHands++;
+                }
+                case PICK_BLOCK -> { // "Copiar bloque": con el contexto de este jugador (su mira, su inventario)
+                    if (!player.isSpectator()) inv.consolepad$pickBlock();
+                    dbgPickBlock++;
                 }
                 case PERSPECTIVE -> {
                     var opts = (dev.consolepad.mixin.OptionsAccessor) mc.options; // dentro del contexto: el tipo de camara es el de P2

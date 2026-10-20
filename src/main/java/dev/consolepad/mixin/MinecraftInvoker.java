@@ -28,4 +28,7 @@ public interface MinecraftInvoker {
 
     @Invoker("startUseItem")
     void consolepad$startUseItem();
+
+    @Invoker("pickBlock")
+    void consolepad$pickBlock();
 }

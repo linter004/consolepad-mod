@@ -14,20 +14,20 @@ public final class PlayerNameScreen extends PlayerMenuScreen {
     private Button done, reset;
 
     public PlayerNameScreen(int slot, Screen parent) {
-        super(slot, Component.literal("Nombre del jugador " + (slot + 1)));
+        super(slot, I18n.lit("Nombre del jugador " + (slot + 1)));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
         String keep = box == null ? (settings().playerName == null ? "" : settings().playerName) : box.getValue();
-        box = new EditBox(this.font, this.width / 2 - ROW_W / 2, 26, ROW_W, 16, Component.literal("Nombre"));
+        box = new EditBox(this.font, this.width / 2 - ROW_W / 2, 26, ROW_W, 16, I18n.lit("Nombre"));
         box.setMaxLength(16);
         box.setValue(keep);
         this.addRenderableWidget(box);
         this.setInitialFocus(box);
-        done = addRenderableWidget(Button.builder(Component.literal("Hecho"), b -> save(box.getValue())).bounds(this.width / 2 - ROW_W / 2, 48, ROW_W / 2 - 2, ROW_H).build());
-        reset = addRenderableWidget(Button.builder(Component.literal("Por defecto"), b -> save("")).bounds(this.width / 2 + 2, 48, ROW_W / 2 - 2, ROW_H).build());
+        done = addRenderableWidget(Button.builder(I18n.lit("Hecho"), b -> save(box.getValue())).bounds(this.width / 2 - ROW_W / 2, 48, ROW_W / 2 - 2, ROW_H).build());
+        reset = addRenderableWidget(Button.builder(I18n.lit("Por defecto"), b -> save("")).bounds(this.width / 2 + 2, 48, ROW_W / 2 - 2, ROW_H).build());
     }
 
     private void save(String name) {

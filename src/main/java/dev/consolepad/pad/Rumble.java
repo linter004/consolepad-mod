@@ -75,10 +75,23 @@ public final class Rumble {
         return n < 4 ? n : -1;
     }
 
-    /** Pide un impulso al mando de un jugador: grave (motor grande) y agudo (motor pequeno) de 0 a 1, durante ms; se escala con la fuerza de sus ajustes. */
+    /** Tipo de impulso: cada uno tiene su propia fuerza en los ajustes del jugador (GENERAL solo usa la fuerza general). */
+    public enum Kind { GENERAL, DAMAGE, ACTION, WORLD }
+
     public static void pulse(int slot, float lowMotor, float highMotor, int ms) {
+        pulse(slot, lowMotor, highMotor, ms, Kind.GENERAL);
+    }
+
+    /** Pide un impulso al mando de un jugador: grave (motor grande) y agudo (motor pequeno) de 0 a 1, durante ms; se escala con la fuerza general y la del tipo. */
+    public static void pulse(int slot, float lowMotor, float highMotor, int ms, Kind kind) {
         if (slot < 0 || slot >= 4) return;
-        float k = ConsolePad.PADS.slot(slot).settings.vibration;
+        var cfg = ConsolePad.PADS.slot(slot).settings;
+        float k = cfg.vibration * switch (kind) {
+            case DAMAGE -> cfg.vibDamage;
+            case ACTION -> cfg.vibActions;
+            case WORLD -> cfg.vibWorld;
+            default -> 1f;
+        };
         float l = Math.max(0f, Math.min(1f, lowMotor * k)), h = Math.max(0f, Math.min(1f, highMotor * k));
         pulses[slot]++;
         lastLow[slot] = l;

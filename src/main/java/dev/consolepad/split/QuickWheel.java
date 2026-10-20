@@ -44,16 +44,21 @@ public final class QuickWheel {
 
     private QuickWheel() {}
 
+    /** Pruebas: las entradas de fabrica en el idioma activo. */
+    public static List<Entry> defaultEntriesForTest() {
+        return defaults();
+    }
+
     private static List<Entry> defaults() {
         List<Entry> l = new ArrayList<>();
-        l.add(new Entry("Día", "time set day"));
-        l.add(new Entry("Despejar", "weather clear"));
-        l.add(new Entry("Noche", "time set night"));
-        l.add(new Entry("Ir con alguien", "tp @s @a[sort=furthest,limit=1,distance=0.01..]"));
-        l.add(new Entry("Supervivencia", "gamemode survival"));
-        l.add(new Entry("Curarme", "effect give @s minecraft:instant_health 1 10 true"));
-        l.add(new Entry("Creativo", "gamemode creative"));
-        l.add(new Entry("Traer a alguien", "tp @a[sort=furthest,limit=1,distance=0.01..] @s"));
+        l.add(new Entry(I18n.tr("Día"), "time set day"));
+        l.add(new Entry(I18n.tr("Despejar"), "weather clear"));
+        l.add(new Entry(I18n.tr("Noche"), "time set night"));
+        l.add(new Entry(I18n.tr("Ir con alguien"), "tp @s @a[sort=furthest,limit=1,distance=0.01..]"));
+        l.add(new Entry(I18n.tr("Supervivencia"), "gamemode survival"));
+        l.add(new Entry(I18n.tr("Curarme"), "effect give @s minecraft:instant_health 1 10 true"));
+        l.add(new Entry(I18n.tr("Creativo"), "gamemode creative"));
+        l.add(new Entry(I18n.tr("Traer a alguien"), "tp @a[sort=furthest,limit=1,distance=0.01..] @s"));
         return l;
     }
 

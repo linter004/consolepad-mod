@@ -109,6 +109,27 @@ public final class Settings2Test {
                 { String wt = workstationTargets(mc); check("estaciones de trabajo: la cruceta llega a las recetas de la mesa de corte y a los patrones del telar - " + (wt == null ? "OK" : wt), wt == null); }
                 { String fc = FovComp.selfTest(); check("campo de vision al dividir: la compensacion sube el FOV vertical en regiones estrechas hasta recuperar parte o todo el horizontal, y no toca las anchas - " + (fc == null ? "OK" : fc), fc == null); }
                 { String ap = AdaptivePerf.selfTest(); check("rendimiento automatico: sube un nivel con FPS bajos (maximo 3), espera una ventana tras cada cambio y baja con 3 ventanas muy por encima del objetivo - " + (ap == null ? "OK" : ap), ap == null); }
+                { String hb = HotbarHistory.selfTest(); check("casilla anterior: LB y RB a la vez van a la casilla usada antes (y otra vez, vuelven), un boton solo cambia como siempre, y el acorde se deshace si un boton llega primero - " + (hb == null ? "OK" : hb), hb == null); }
+                { String nt = nintendoLogic(); check("disposicion Nintendo: A y B, X e Y se intercambian al leer el mando, no cambia el resto y se reconoce como disposicion - " + (nt == null ? "OK" : nt), nt == null); }
+                { String pl = perfLogic(); check("rendimiento: entidades a la mitad en el mundo de quien tiene un menu, particulas adelgazadas con presion alta y modo ahorro - " + (pl == null ? "OK" : pl), pl == null); }
+                { String ie = I18nTest.spanishUnchanged(mc); check("idiomas: con el espanol forzado salen los textos de siempre y con el ingles se traducen (plantillas y nombre de fabrica incluidos) - " + (ie == null ? "OK" : ie), ie == null); }
+                { String il = I18nTest.englishLeftovers(mc); check("idiomas: en ingles no queda ningun texto en espanol en las pantallas, ayudas, nombres de botones ni avisos - " + (il == null ? "OK" : il), il == null); }
+                { String a1 = SplitSeparators.selfTest(), a2 = LowHealthFlash.selfTest(), a3 = SleepNotice.selfTest(); check("estetica: bordes entre regiones, destello con poca vida y aviso de dormir (logica) - " + (a1 == null && a2 == null && a3 == null ? "OK" : a1 + " / " + a2 + " / " + a3), a1 == null && a2 == null && a3 == null); }
+                {
+                    var cs = new PadSettings();
+                    cs.labelColor = 0;
+                    boolean def = PlayerLabels.themeRgb(0) == 0x6C8CFF && PlayerLabels.themeRgb(1) == 0xFF5555 && PlayerLabels.themeRgb(2) == 0x55FF55 && PlayerLabels.themeRgb(3) == 0xFFD84A;
+                    var st0 = ConsolePad.PADS.slot(0).settings;
+                    int oldColor = st0.labelColor;
+                    boolean oldPc = st0.playerColors;
+                    st0.labelColor = 5; // cian
+                    boolean chosen = PlayerLabels.themeRgb(0) == PlayerLabels.COLOR_RGB[5];
+                    st0.labelColor = oldColor;
+                    st0.playerColors = false;
+                    boolean off = PlayerLabels.accent(0) == 0xFFFFFF;
+                    st0.playerColors = oldPc;
+                    check("colores del jugador: azul, rojo, verde y amarillo por defecto, el de su etiqueta si lo elige y blanco si apaga los colores (" + def + ", " + chosen + ", " + off + ")", def && chosen && off);
+                }
                 lookLogic();
                 viewLogic();
                 phase = 1;
@@ -560,6 +581,51 @@ public final class Settings2Test {
         return null;
     }
 
+    /** Disposicion Nintendo: comprobacion sin juego. null si bien. */
+    private static String nintendoLogic() {
+        var st = new dev.consolepad.pad.PadState();
+        st.simDown = (1 << dev.consolepad.pad.PadState.A) | (1 << dev.consolepad.pad.PadState.X) | (1 << dev.consolepad.pad.PadState.LB);
+        st.tickSim();
+        st.swapFaceButtons();
+        if (!st.isDown(dev.consolepad.pad.PadState.B) || !st.isDown(dev.consolepad.pad.PadState.Y) || st.isDown(dev.consolepad.pad.PadState.A) || st.isDown(dev.consolepad.pad.PadState.X)
+                || !st.isDown(dev.consolepad.pad.PadState.LB)) return "A+X+LB deberia salir B+Y+LB";
+        st.simDown = 1 << dev.consolepad.pad.PadState.B;
+        st.tickSim();
+        st.swapFaceButtons();
+        if (!st.isDown(dev.consolepad.pad.PadState.A) || st.isDown(dev.consolepad.pad.PadState.B)) return "B deberia salir A";
+        var cfgN = new PadSettings();
+        dev.consolepad.pad.ButtonLayouts.apply(cfgN, dev.consolepad.pad.ButtonLayouts.Layout.NINTENDO);
+        if (!cfgN.swapFace || cfgN.swapSticks || dev.consolepad.pad.ButtonLayouts.detect(cfgN) != dev.consolepad.pad.ButtonLayouts.Layout.NINTENDO) return "la disposicion Nintendo no se reconoce: " + dev.consolepad.pad.ButtonLayouts.name(cfgN);
+        dev.consolepad.pad.ButtonLayouts.apply(cfgN, dev.consolepad.pad.ButtonLayouts.Layout.BEDROCK);
+        if (cfgN.swapFace || dev.consolepad.pad.ButtonLayouts.detect(cfgN) != dev.consolepad.pad.ButtonLayouts.Layout.BEDROCK) return "volver a Bedrock debe apagar el intercambio";
+        return null;
+    }
+
+    /** Rendimiento sin juego: factor de entidades con menu, adelgazar particulas y modo ahorro. null si bien. */
+    private static String perfLogic() {
+        if (PerfLimits.entityScaleFor(2, true, true) != 0.5 || PerfLimits.entityScaleFor(2, false, true) != 1.0
+                || Math.abs(PerfLimits.entityScaleFor(4, true, true) - 0.325) > 1e-9 || PerfLimits.entityScaleFor(4, false, false) != 1.0 || PerfLimits.entityScaleFor(1, true, true) != 1.0) {
+            return "entityScaleFor " + PerfLimits.entityScaleFor(2, true, true) + ", " + PerfLimits.entityScaleFor(2, false, true) + ", " + PerfLimits.entityScaleFor(4, true, true);
+        }
+        int l2 = 0, l3 = 0, l1 = 0;
+        for (int h = 0; h < 100; h++) {
+            if (AdaptivePerf.drawParticle(h, 1)) l1++;
+            if (AdaptivePerf.drawParticle(h, 2)) l2++;
+            if (AdaptivePerf.drawParticle(h, 3)) l3++;
+        }
+        if (l1 != 100 || l2 != 75 || l3 != 50) return "particulas dibujadas de 100: nivel 1 " + l1 + ", nivel 2 " + l2 + ", nivel 3 " + l3;
+        boolean was = SplitSettings.savingMode();
+        AdaptivePerf.resetForTest();
+        SplitSettings.setSavingMode(true);
+        int forced = AdaptivePerf.level();
+        double view = AdaptivePerf.viewFactor();
+        SplitSettings.setSavingMode(false);
+        int free = AdaptivePerf.level();
+        SplitSettings.setSavingMode(was);
+        if (forced != 2 || Math.abs(view - 0.7) > 1e-9 || free != 0) return "modo ahorro: nivel " + forced + " (vista " + view + ") y sin el " + free;
+        return null;
+    }
+
     private static int soundsRouted0, soundsPlayed0;
     private static int rumbleBefore;
     private static float rumbleVib;
@@ -573,6 +639,21 @@ public final class Settings2Test {
             s1.showDirection = true;
             s0.showFps = true;
             Companions.minDistanceOverride = 0; // P2 esta cerca: se baja el minimo para ver la flecha
+            s1.showCompanionDistance = true; // P1 con la opcion de fabrica (solo direccion) y P2 con la distancia
+            s0.brightness = 0f;
+            s1.brightness = 1f; // brillo propio de cada jugador
+            LowHealthFlash.resetForTest();
+            java.util.Arrays.fill(SplitDiag.hotbarTinted, 0);
+            s0.showBedMarker = true; // P1 tambien marca su cama (a 60 bloques) y P2 tiene poca vida
+            {
+                var srv = mc.getSingleplayerServer();
+                var sp1 = srv.getPlayerList().getPlayer(mc.player.getUUID());
+                var sp2 = srv.getPlayerList().getPlayer(c.player.getUUID());
+                srv.execute(() -> {
+                    sp1.setRespawnPosition(sp1.level().dimension(), sp1.blockPosition().offset(60, 0, 0), 0f, true, false);
+                    sp2.setHealth(6f);
+                });
+            }
             soundsRouted0 = SplitDiag.soundsRouted;
             soundsPlayed0 = SplitDiag.soundsPlayed;
             {
@@ -606,6 +687,8 @@ public final class Settings2Test {
         check("P1 solo muestra lo suyo (FPS) y no las coordenadas de P2: '" + t0 + "'", t0.contains("FPS") && !t0.contains("XYZ") && !t0.contains("Mira al"));
         check("P3 (no esta dentro) no muestra nada: '" + PlayerInfo.lastText[2] + "'", PlayerInfo.lastText[2].isEmpty());
         String c0 = Companions.lastText[0], c1 = Companions.lastText[1];
+        int dots0 = Companions.lastDots[0] == null ? 0 : Companions.lastDots[0].length, dots1 = Companions.lastDots[1] == null ? 0 : Companions.lastDots[1].length, low0 = Companions.lastLow[0], low1 = Companions.lastLow[1];
+        int lab0 = Companions.lastLabels[0], lab1 = Companions.lastLabels[1]; // antes de que mas abajo se apague a P2 y se vuelva a llamar a render
         check("indicador del companero: P1 ve a P2 con su nombre ('" + c0 + "') y P2 ve a P1 ('" + c1 + "')",
                 c0.startsWith(PlayerLabels.labelOf(1) + " ") && c0.contains(" m") && c1.startsWith(PlayerLabels.labelOf(0) + " ") && c1.contains(" m"));
         check("muñeco del jugador: P1 y P2 lo dibujan en su region tras correr (" + java.util.Arrays.toString(PaperDoll.lastBox[0]) + ", " + java.util.Arrays.toString(PaperDoll.lastBox[1]) + ")",
@@ -619,6 +702,32 @@ public final class Settings2Test {
                 SplitDiag.soundsRouted > soundsRouted0);
         s1.showCompanions = false;
         Companions.render(mc, null, 1, 200, 120); // apagada: sale antes de dibujar
+        check("indicador del companero: por defecto solo la direccion (P1: " + lab0 + " etiquetas) y con la opcion de distancia tambien el nombre y los metros (P2: " + lab1 + ")",
+                !ConsolePad.PADS.slot(0).settings.showCompanionDistance && lab0 == 0 && lab1 == 1);
+        {
+            check("indicador del companero: P1 ve dos marcadores (P2 y su cama a 60 bloques: " + dots0 + ") y P2 solo uno (" + dots1 + ")", dots0 == 2 && dots1 == 1);
+            check("indicador del companero: con P2 a poca vida (3 corazones) su marcador parpadea para P1 (" + low0 + ") y no el de su cama; P2 ve a P1 con vida (" + low1 + ")",
+                    low0 == 1 && low1 == 0 && Companions.isLow(6f) && !Companions.isLow(9f) && !Companions.isLow(0f));
+            var srv = mc.getSingleplayerServer();
+            var sp1 = srv.getPlayerList().getPlayer(mc.player.getUUID());
+            var sp2 = srv.getPlayerList().getPlayer(c.player.getUUID());
+            srv.execute(() -> {
+                sp1.setRespawnPosition(sp1.level().dimension(), null, 0f, false, false);
+                sp2.setHealth(20f);
+            });
+            s0.showBedMarker = false;
+        }
+        s1.showCompanionDistance = false;
+        {
+            var colorsOk = SplitSeparators.lastColors.length == 1 && SplitSeparators.lastColors[0][0] == SplitSeparators.RGB && SplitSeparators.lastColors[0][1] == SplitSeparators.RGB;
+            check("linea entre jugadores: un tramo entre P1 y P2, sin color (negra, " + SplitSeparators.lastCount + " tramos)", SplitSeparators.lastCount == 1 && colorsOk);
+            check("casilla seleccionada con el color de cada jugador: P1 " + SplitDiag.hotbarTinted[0] + " veces, P2 " + SplitDiag.hotbarTinted[1], SplitDiag.hotbarTinted[0] > 0 && SplitDiag.hotbarTinted[1] > 0);
+            check("destello con poca vida: P2 (3 corazones) lo ve (" + LowHealthFlash.maxAlpha[1] + ") y P1 con vida no (" + LowHealthFlash.maxAlpha[0] + ")", LowHealthFlash.maxAlpha[1] > 0f && LowHealthFlash.maxAlpha[0] == 0f);
+            check("brillo propio por jugador: P1 " + SplitDiag.lastGamma[0] + " (" + SplitDiag.gammaOverrides[0] + " veces) y P2 " + SplitDiag.lastGamma[1] + " (" + SplitDiag.gammaOverrides[1] + ")",
+                    SplitDiag.lastGamma[0] == 0f && SplitDiag.lastGamma[1] == 1f && SplitDiag.gammaOverrides[0] > 0 && SplitDiag.gammaOverrides[1] > 0);
+            s0.brightness = -1f;
+            s1.brightness = -1f;
+        }
         check("indicador del companero: apagado en los ajustes de P2 no dibuja nada ('" + Companions.lastText[1] + "')", Companions.lastText[1].isEmpty());
         s1.showCompanions = true;
         Companions.minDistanceOverride = -1;

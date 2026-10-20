@@ -15,7 +15,7 @@ public final class JoinPrompt {
     /** Ultimo dibujo (para el autotest): mascara de slots avisados, caja {x, y, ancho, alto} en unidades de GUI de P1 y tamano de la region. */
     public static volatile int lastSlots;
     /** Diagnostico del ultimo fotograma: por que se dibujo o no. */
-    public static volatile String lastWhy = "sin llamar";
+    public static volatile String lastWhy = I18n.tr("sin llamar");
     public static volatile int[] lastBox = {0, 0, 0, 0};
     public static volatile int[] lastRegion = {0, 0};
 
@@ -58,7 +58,7 @@ public final class JoinPrompt {
         lastWhy = "pantalla/oculto";
         if (mc.screen != null || mc.options.hideGui) return;
         int mask = pendingSlots(mc);
-        lastWhy = "sin pendientes";
+        lastWhy = I18n.tr("sin pendientes");
         if (mask == 0) return;
         Font font = mc.font;
         PadManager pads = ConsolePad.PADS;
@@ -75,7 +75,7 @@ public final class JoinPrompt {
         for (int i = 1; i <= SecondaryPlayers.MAX_EXTRA; i++) {
             if ((mask & (1 << i)) == 0) continue;
             var type = pads.slot(i).iconType();
-            String text = "Unirse como el jugador " + (i + 1);
+            String text = I18n.fmt("Unirse como el jugador {0}", i + 1);
             int iconW = PadIcons.width(font, PadState.START, type);
             int totalW = iconW + 4 + font.width(text);
             int x = (w - totalW) / 2;

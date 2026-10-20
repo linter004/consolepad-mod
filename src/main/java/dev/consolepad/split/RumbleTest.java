@@ -87,6 +87,43 @@ public final class RumbleTest {
                     + RumbleEvents.bowRumble(net.minecraft.world.item.UseAnim.BOW, 0) + ", comiendo " + RumbleEvents.bowRumble(net.minecraft.world.item.UseAnim.EAT, 20) + ")",
                     RumbleEvents.bowRumble(net.minecraft.world.item.UseAnim.BOW, 20) == 0.5f && RumbleEvents.bowRumble(net.minecraft.world.item.UseAnim.BOW, 0) == 0f
                             && RumbleEvents.bowRumble(net.minecraft.world.item.UseAnim.EAT, 20) == 0f);
+            before = pulses();
+            server.execute(() -> {
+                var hook = new net.minecraft.world.entity.projectile.FishingHook(sp, (ServerLevel) sp.level(), 0, 0);
+                try {
+                    var f = net.minecraft.world.entity.projectile.FishingHook.class.getDeclaredField("nibble");
+                    f.setAccessible(true);
+                    f.setInt(hook, 30); // un pez acaba de picar
+                } catch (ReflectiveOperationException ex) {
+                    throw new IllegalStateException(ex);
+                }
+                sp.fishing = hook;
+            });
+        }
+        if (t == 58) {
+            check("vibracion: cuando pica un pez el mando de P2 vibra una vez (" + before + " -> " + pulses() + ")", pulses() == before + 1);
+            server.execute(() -> sp.fishing = null);
+            check("vibracion: el latido solo suena con poca vida (4 corazones no, 3 si, muerto no): " + RumbleTick.heartbeatDue(8f, 24) + ", " + RumbleTick.heartbeatDue(6f, 24) + ", " + RumbleTick.heartbeatDue(0f, 24) + ", fuera de tiempo " + RumbleTick.heartbeatDue(6f, 25),
+                    !RumbleTick.heartbeatDue(8f, 24) && RumbleTick.heartbeatDue(6f, 24) && !RumbleTick.heartbeatDue(0f, 24) && !RumbleTick.heartbeatDue(6f, 25));
+            before = RumbleTick.heartbeats[1];
+            server.execute(() -> sp.setHealth(4f));
+        }
+        if (t > 58 && t < 168 && t % 6 == 0) server.execute(() -> sp.setHealth(4f)); // en pacifico se regenera enseguida: se le mantiene a 2 corazones
+        if (t == 170) {
+            check("vibracion: con P2 a 2 corazones el mando late cada segundo (" + (RumbleTick.heartbeats[1] - before) + " latidos en 5 s, vida de P2 vista por su cliente " + c.player.getHealth() + ")", RumbleTick.heartbeats[1] - before >= 3);
+            server.execute(() -> sp.setHealth(20f));
+            cfg.vibActions = 0f;
+            Rumble.pulse(1, 1f, 1f, 50, Rumble.Kind.ACTION);
+            float actionLow = Rumble.lastLow[1];
+            Rumble.pulse(1, 1f, 1f, 50, Rumble.Kind.DAMAGE);
+            float damageLow = Rumble.lastLow[1];
+            cfg.vibWorld = 0.5f;
+            Rumble.pulse(1, 1f, 1f, 50, Rumble.Kind.WORLD);
+            float worldLow = Rumble.lastLow[1];
+            cfg.vibActions = 1f;
+            cfg.vibWorld = 1f;
+            check("vibracion: cada tipo tiene su fuerza (acciones a 0 -> " + actionLow + ", daño a 1 -> " + damageLow + ", entorno a 0,5 -> " + worldLow + ")",
+                    actionLow == 0f && damageLow == 1f && Math.abs(worldLow - 0.5f) < 0.01f);
             cfg.vibration = vib;
             Rumble.stopAll();
             t = 0;

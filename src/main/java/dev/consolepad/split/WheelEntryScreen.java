@@ -22,7 +22,7 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
 
     /** index = -1: entrada nueva. */
     public WheelEntryScreen(int slot, int index, Screen parent) {
-        super(slot, Component.literal(index < 0 ? "Entrada nueva" : "Entrada de la rueda"));
+        super(slot, I18n.lit(index < 0 ? I18n.tr("Entrada nueva") : I18n.tr("Entrada de la rueda")));
         this.parent = parent;
         this.index = index;
     }
@@ -34,21 +34,21 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
         String l = label != null ? label.getValue() : has ? list.get(index).label() : "";
         String c = command != null ? command.getValue() : has ? list.get(index).command() : "";
         int x = this.width / 2 - ROW_W / 2;
-        label = new EditBox(this.font, x, 34, ROW_W, 16, Component.literal("Nombre"));
+        label = new EditBox(this.font, x, 34, ROW_W, 16, I18n.lit("Nombre"));
         label.setMaxLength(14);
         label.setValue(l);
         addRenderableWidget(label);
-        command = new EditBox(this.font, x, 66, ROW_W, 16, Component.literal("Comando"));
+        command = new EditBox(this.font, x, 66, ROW_W, 16, I18n.lit("Comando"));
         command.setMaxLength(120);
         command.setValue(c);
         addRenderableWidget(command);
         setInitialFocus(label);
-        save = addRenderableWidget(Button.builder(Component.literal("Guardar"), b -> save()).bounds(x, 90, ROW_W / 2 - 2, ROW_H).build());
-        delete = addRenderableWidget(Button.builder(Component.literal(index >= 0 ? "Borrar" : "Atrás"), b -> {
+        save = addRenderableWidget(Button.builder(I18n.lit("Guardar"), b -> save()).bounds(x, 90, ROW_W / 2 - 2, ROW_H).build());
+        delete = addRenderableWidget(Button.builder(I18n.lit(index >= 0 ? I18n.tr("Borrar") : I18n.tr("Atrás")), b -> {
             if (index >= 0) delete();
             else this.onClose();
         }).bounds(x + ROW_W / 2 + 2, 90, ROW_W / 2 - 2, ROW_H).build());
-        if (index >= 0) addRenderableWidget(Button.builder(Component.literal("Atrás"), b -> this.onClose()).bounds(x, 114, ROW_W, ROW_H).build());
+        if (index >= 0) addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x, 114, ROW_W, ROW_H).build());
     }
 
     private void store(List<QuickWheel.Entry> list) {
@@ -63,7 +63,7 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
         String l = label.getValue().trim(), c = command.getValue().trim();
         if (c.startsWith("/")) c = c.substring(1).trim();
         if (l.isEmpty() || c.isEmpty()) {
-            message = "Escribe un nombre y un comando";
+            message = I18n.tr("Escribe un nombre y un comando");
             return message;
         }
         List<QuickWheel.Entry> list = new ArrayList<>(QuickWheel.listFor(settings()));
@@ -73,7 +73,7 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
         } else if (list.size() < QuickWheel.MAX_ENTRIES) {
             list.add(e);
         } else {
-            message = "La rueda ya tiene " + QuickWheel.MAX_ENTRIES + " entradas";
+            message = I18n.fmt("La rueda ya tiene {0} entradas", QuickWheel.MAX_ENTRIES);
             return message;
         }
         store(list);
@@ -86,7 +86,7 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
         if (index >= 0 && index < list.size() && list.size() > 1) {
             list.remove(index);
         } else {
-            message = "La rueda necesita al menos una entrada";
+            message = I18n.tr("La rueda necesita al menos una entrada");
             return;
         }
         store(list);
@@ -106,8 +106,8 @@ public final class WheelEntryScreen extends PlayerMenuScreen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, "Nombre", this.width / 2, 24, 0xFFA0A0A0);
-        graphics.drawCenteredString(this.font, "Comando (sin la barra)", this.width / 2, 56, 0xFFA0A0A0);
+        graphics.drawCenteredString(this.font, I18n.tr("Nombre"), this.width / 2, 24, 0xFFA0A0A0);
+        graphics.drawCenteredString(this.font, I18n.tr("Comando (sin la barra)"), this.width / 2, 56, 0xFFA0A0A0);
         if (!message.isEmpty()) graphics.drawCenteredString(this.font, this.font.plainSubstrByWidth(message, this.width - 8), this.width / 2, this.height - 12, 0xFFFFD84A);
     }
 
