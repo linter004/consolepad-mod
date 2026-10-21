@@ -130,6 +130,7 @@ public final class Settings2Test {
                     st0.playerColors = oldPc;
                     check("colores del jugador: azul, rojo, verde y amarillo por defecto, el de su etiqueta si lo elige y blanco si apaga los colores (" + def + ", " + chosen + ", " + off + ")", def && chosen && off);
                 }
+                { String ir = IrisCompat.selfTest(); check("shaders: un pack con el marcador (carpeta o zip) es seguro para la pantalla dividida, uno sin el no, y se lee el pack de iris.properties (" + (ir == null ? "OK" : ir) + ")", ir == null); }
                 lookLogic();
                 viewLogic();
                 phase = 1;

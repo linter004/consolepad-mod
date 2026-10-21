@@ -61,7 +61,7 @@ Rumble works on controllers Windows sees as XInput (Xbox-compatible; PlayStation
 |---|---|
 | A controller is not detected | Reconnect it; open the title screen's **Controllers** button to see what the game detects. |
 | Choppy with 3 or 4 players | Keep `autoViewDistance` and `playerLimits` on in `config/consolepad/split.json` and lower render distance in the player's settings. |
-| Shaders turn off | Normal: Iris shaders cannot split. They return when one player is left (`"keepShaders": true` keeps them on). |
+| Shaders turn off | Normal: most Iris shader packs cannot split. They return when one player is left. The **ConsolePad Lite** pack stays on with several players (`"keepShaders": true` keeps any pack on). |
 | A player's controller disconnects | That player pauses; after 30 s they leave the game and their inventory is saved. |
 | No rumble | The controller must be XInput on Windows; check the strength is not "no". |
 
@@ -132,7 +132,7 @@ Funciona en los mandos que Windows ve como XInput (compatibles con Xbox; los de 
 |---|---|
 | Un mando no se detecta | Vuelve a conectarlo; el botón **Mandos** del título muestra lo que ve el juego. |
 | Tirones con 3 o 4 jugadores | Deja `autoViewDistance` y `playerLimits` activos en `config/consolepad/split.json` y baja la distancia de visión en los ajustes del jugador. |
-| Los shaders se apagan | Es normal: los shaders de Iris no se pueden dividir. Vuelven al quedar un jugador (`"keepShaders": true` los mantiene). |
+| Los shaders se apagan | Es normal: casi todos los packs de Iris no se pueden dividir. Vuelven al quedar un jugador. El pack **ConsolePad Lite** se queda puesto con varios jugadores (`"keepShaders": true` deja puesto cualquier pack). |
 | Se desconecta el mando de un jugador | Ese jugador queda en pausa; a los 30 s sale de la partida y su inventario se guarda. |
 | No vibra | El mando debe ser XInput en Windows; comprueba que la fuerza no esté en «no». |
 

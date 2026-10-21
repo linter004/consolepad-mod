@@ -834,7 +834,7 @@ public final class AutoTest {
                         gold == 5 && chestEmpty && !p1Gold);
                 simP2(1 << PadState.B);
             }
-            case 171 -> simP2(0);
+            case 178 -> simP2(0); // la pulsacion de B dura 8 ticks: con 1 podia no coincidir con ningun fotograma
             case 185 -> {
                 verdict("cerrar el cofre con B: pantalla de P2 null=" + (c.screen == null) + ", contenedor cerrado en el servidor=" + (p2.containerMenu == p2.inventoryMenu),
                         c.screen == null && p2.containerMenu == p2.inventoryMenu);

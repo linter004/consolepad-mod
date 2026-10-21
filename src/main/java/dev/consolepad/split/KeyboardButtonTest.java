@@ -25,6 +25,12 @@ public final class KeyboardButtonTest {
         if (d != null) d.state.simDown = bits;
     }
 
+    /** Pulsa el boton del slot durante 8 ticks desde el tick start (las pulsaciones cortas pueden no coincidir con ningun fotograma si hay un tiron). */
+    private static void hold(int start, int slot, int button) {
+        if (t == start) pad(slot, 1 << button);
+        if (t == start + 8) pad(slot, 0);
+    }
+
     /** Una vez por tick; true cuando ha terminado. */
     public static boolean run(Minecraft mc) {
         t++;
@@ -45,28 +51,22 @@ public final class KeyboardButtonTest {
         // ---- P2: su chat
         if (t == 3) SecondaryTick.scriptActions = java.util.EnumSet.of(PadAction.CHAT);
         if (t == 6) SecondaryTick.scriptActions = java.util.EnumSet.noneOf(PadAction.class);
-        if (t == 15) check("teclado por boton (P2): el chat se abre sin teclado (pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ")", c.screen instanceof ExtraChatScreen && !PadKeyboard.of(1).active());
-        if (t == 16) pad(1, 1 << PadState.Y);
-        if (t == 19) pad(1, 0);
-        if (t == 25) check("teclado por boton (P2): Y abre el teclado (teclado=" + PadKeyboard.of(1).active() + ")", PadKeyboard.of(1).active());
-        if (t == 26) pad(1, 1 << PadState.B);
-        if (t == 29) pad(1, 0);
-        if (t == 35) check("teclado por boton (P2): B cierra el teclado y el chat sigue (teclado=" + PadKeyboard.of(1).active() + ", pantalla " + c.screen + ")", !PadKeyboard.of(1).active() && c.screen instanceof ExtraChatScreen);
-        if (t == 36) pad(1, 1 << PadState.B);
-        if (t == 39) pad(1, 0);
-        if (t == 45) check("teclado por boton (P2): otra B cierra el chat (pantalla " + c.screen + ")", c.screen == null);
+        if (t == 20) check("teclado por boton (P2): el chat se abre sin teclado (pantalla " + c.screen + ", teclado=" + PadKeyboard.of(1).active() + ")", c.screen instanceof ExtraChatScreen && !PadKeyboard.of(1).active());
+        hold(21, 1, PadState.Y);
+        if (t == 36) check("teclado por boton (P2): Y abre el teclado (teclado=" + PadKeyboard.of(1).active() + ")", PadKeyboard.of(1).active());
+        hold(37, 1, PadState.B);
+        if (t == 52) check("teclado por boton (P2): B cierra el teclado y el chat sigue (teclado=" + PadKeyboard.of(1).active() + ", pantalla " + c.screen + ")", !PadKeyboard.of(1).active() && c.screen instanceof ExtraChatScreen);
+        hold(53, 1, PadState.B);
+        if (t == 68) check("teclado por boton (P2): otra B cierra el chat (pantalla " + c.screen + ")", c.screen == null);
         // ---- P1: el chat de vanilla
-        if (t == 50) mc.setScreen(new ChatScreen(""));
-        if (t == 60) check("teclado por boton (P1): el chat se abre sin teclado (teclado=" + PadKeyboard.of(0).active() + ")", mc.screen instanceof ChatScreen && !PadKeyboard.of(0).active());
-        if (t == 61) pad(0, 1 << PadState.Y);
-        if (t == 64) pad(0, 0);
-        if (t == 70) check("teclado por boton (P1): Y abre el teclado (teclado=" + PadKeyboard.of(0).active() + ")", PadKeyboard.of(0).active());
-        if (t == 71) pad(0, 1 << PadState.B);
-        if (t == 74) pad(0, 0);
-        if (t == 78) check("teclado por boton (P1): B cierra el teclado y el chat sigue (teclado=" + PadKeyboard.of(0).active() + ", pantalla " + mc.screen + ")", !PadKeyboard.of(0).active() && mc.screen instanceof ChatScreen);
-        if (t == 79) pad(0, 1 << PadState.B);
-        if (t == 82) pad(0, 0);
-        if (t == 90) {
+        if (t == 70) mc.setScreen(new ChatScreen(""));
+        if (t == 85) check("teclado por boton (P1): el chat se abre sin teclado (teclado=" + PadKeyboard.of(0).active() + ")", mc.screen instanceof ChatScreen && !PadKeyboard.of(0).active());
+        hold(86, 0, PadState.Y);
+        if (t == 101) check("teclado por boton (P1): Y abre el teclado (teclado=" + PadKeyboard.of(0).active() + ")", PadKeyboard.of(0).active());
+        hold(102, 0, PadState.B);
+        if (t == 117) check("teclado por boton (P1): B cierra el teclado y el chat sigue (teclado=" + PadKeyboard.of(0).active() + ", pantalla " + mc.screen + ")", !PadKeyboard.of(0).active() && mc.screen instanceof ChatScreen);
+        hold(118, 0, PadState.B);
+        if (t == 133) {
             check("teclado por boton (P1): otra B cierra el chat (pantalla " + mc.screen + ")", mc.screen == null);
             if (mc.screen != null) mc.setScreen(null);
             s0.autoKeyboard = prev0;

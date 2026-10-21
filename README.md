@@ -1,4 +1,4 @@
-# ConsolePad 0.13.0-beta
+# ConsolePad 0.14.0-beta
 
 **[Español](#español) · [English](#english)**
 
@@ -90,11 +90,11 @@ Everything can be remapped per player from the pause menu.
 
 ### Installation
 
-See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.13.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
+See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.14.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
 
 ### Known issues
 
-- **Sodium and Iris:** the game starts and 4-player split screen renders correctly with Sodium 0.8.13 and Iris 1.8.14 on NeoForge 21.1.248. Iris shaders do not work with split screen (each player's pass is composited over the whole window and only the last one looks right), so ConsolePad turns shaders off while extra players are in and back on when one player is left (set `"keepShaders": true` in `config/consolepad/split.json` to keep them on). Other renderer mods are unverified.
+- **Sodium and Iris:** the game starts and 4-player split screen renders correctly with Sodium 0.8.13 and Iris 1.8.14 on NeoForge 21.1.248. Most Iris shader packs do not work with split screen (each player's pass is composited over the whole window and only the last one looks right), so ConsolePad turns shaders off while extra players are in and back on when one player is left. The exception is a pack that is safe for split screen: it carries the file `shaders/consolepad-splitscreen-safe` (like the separate **ConsolePad Lite** pack, which only adds richer colour), and ConsolePad keeps it on. Set `"keepShaders": true` in `config/consolepad/split.json` to keep any pack on. Other renderer mods are unverified.
 - **Local worlds only** (single player, LAN, or servers without authentication): extra players connect from inside the game and cannot join an authenticated server.
 - Rumble only works on XInput controllers (Windows). Sound per player moves other players' sounds to player 1's listener (distance and direction are kept; there is one OpenAL listener).
 - An extra player whose controller disconnects stays paused with a notice until it returns.
@@ -187,11 +187,11 @@ Todo se puede remapear por jugador desde el menú de pausa.
 
 ### Instalación
 
-Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.13.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
+Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.14.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
 
 ### Problemas conocidos
 
-- **Sodium e Iris:** el juego arranca y la pantalla dividida de 4 jugadores se dibuja bien con Sodium 0.8.13 e Iris 1.8.14 en NeoForge 21.1.248. Los shaders de Iris no funcionan con la pantalla dividida (cada pasada se compone sobre toda la ventana y solo la última se ve bien), así que ConsolePad los apaga mientras haya jugadores extra y los vuelve a encender al quedar uno (con `"keepShaders": true` en `config/consolepad/split.json` se dejan puestos). Otros mods de renderizado, sin verificar.
+- **Sodium e Iris:** el juego arranca y la pantalla dividida de 4 jugadores se dibuja bien con Sodium 0.8.13 e Iris 1.8.14 en NeoForge 21.1.248. La mayoría de los packs de shaders de Iris no funcionan con la pantalla dividida (cada pasada se compone sobre toda la ventana y solo la última se ve bien), así que ConsolePad los apaga mientras haya jugadores extra y los vuelve a encender al quedar uno. La excepción es un pack seguro para la pantalla dividida: lleva el archivo `shaders/consolepad-splitscreen-safe` (como el pack aparte **ConsolePad Lite**, que solo da más color) y ConsolePad lo deja puesto. Con `"keepShaders": true` en `config/consolepad/split.json` se deja puesto cualquier pack. Otros mods de renderizado, sin verificar.
 - **Solo mundos locales, LAN o servidores sin autenticación:** los jugadores extra se conectan por dentro del juego y no pueden entrar en un servidor con autenticación.
 - La vibración solo funciona en mandos XInput (Windows). El sonido por jugador mueve los sonidos de los demás al oyente de P1 (se conservan distancia y dirección; OpenAL tiene un solo oyente).
 - Un jugador extra con el mando desconectado queda en pausa con un aviso hasta que el mando vuelva.

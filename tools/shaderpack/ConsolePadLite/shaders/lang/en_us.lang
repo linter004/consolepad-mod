@@ -1,0 +1,6 @@
+option.SATURATION=Saturation
+option.SATURATION.comment=How vivid the colours are. 1.00 leaves them as vanilla.
+option.CONTRAST=Contrast
+option.CONTRAST.comment=Difference between dark and light areas. 1.00 leaves it as vanilla.
+option.WARMTH=Warmth
+option.WARMTH.comment=Positive values tint the image warm (orange), negative values cool (blue).

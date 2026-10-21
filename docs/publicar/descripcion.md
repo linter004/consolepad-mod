@@ -1,5 +1,7 @@
 # Texto de la ficha (Modrinth y CurseForge)
 
+> **Sustituido por `docs/publicar/webs/`** (paquete actualizado a la 0.13.0-beta: textos, icono, registro de cambios y pasos). Este borrador queda como referencia.
+
 Borrador listo para pegar. **No se publica nada hasta que el usuario diga «publica».** Ambas webs admiten Markdown; las imágenes se suben desde `docs/screenshots/`.
 
 Datos de la ficha:

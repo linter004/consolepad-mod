@@ -12,8 +12,8 @@ ConsolePad añade soporte de mandos estilo consola y pantalla dividida local de 
 ## Instalar
 
 1. Instala NeoForge 21.1.x para Minecraft 1.21.1 con su instalador y crea un perfil en el lanzador.
-2. Copia `consolepad-0.13.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
-3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.13.0-beta**.
+2. Copia `consolepad-0.14.0-beta.jar` (`build/libs/` al compilar el proyecto con `./gradlew build`) a la carpeta `mods` de la instancia (`%APPDATA%\.minecraft\mods` en Windows).
+3. Arranca el perfil de NeoForge. En la lista de mods debe aparecer **ConsolePad 0.14.0-beta**.
 
 ## Cómo se unen los jugadores
 
@@ -51,7 +51,7 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 ## Lista de comprobación para una instalación limpia
 
 1. [ ] Minecraft 1.21.1 con NeoForge 21.1.x y Java 21.
-2. [ ] `consolepad-0.13.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
+2. [ ] `consolepad-0.14.0-beta.jar` en `mods`, sin otra copia ni versión anterior.
 3. [ ] El juego arranca y **ConsolePad** aparece en la lista de mods.
 4. [ ] Con un mando conectado, P1 se mueve y gira con él y Start abre su menú de pausa.
 5. [ ] En un mundo de un jugador, con un segundo mando, aparece «Unirse como el jugador 2»; Start lo mete y la pantalla se divide.
@@ -62,7 +62,7 @@ Los demás valores del archivo (`orientation`, `promptStyle`) no hace falta toca
 
 ## Problemas conocidos
 
-- **Sodium e Iris:** el juego arranca y la pantalla dividida de 4 jugadores se dibuja bien con Sodium 0.8.13 e Iris 1.8.14 en NeoForge 21.1.248. Los shaders de Iris no funcionan con la pantalla dividida (se ve bien solo la última pasada): ConsolePad los apaga mientras haya jugadores extra y los enciende al quedar uno; con `"keepShaders": true` en `config/consolepad/split.json` se dejan puestos. Otros mods de renderizado, sin verificar.
+- **Sodium e Iris:** el juego arranca y la pantalla dividida de 4 jugadores se dibuja bien con Sodium 0.8.13 e Iris 1.8.14 en NeoForge 21.1.248. La mayoría de los packs de shaders de Iris no funcionan con la pantalla dividida (cada pasada se compone sobre toda la ventana y solo la última se ve bien), así que ConsolePad los apaga mientras haya jugadores extra y los vuelve a encender al quedar uno. La excepción es un pack seguro para la pantalla dividida: lleva el archivo `shaders/consolepad-splitscreen-safe` (como el pack aparte **ConsolePad Lite**, que solo da más color) y ConsolePad lo deja puesto. Con `"keepShaders": true` en `config/consolepad/split.json` se deja puesto cualquier pack. Otros mods de renderizado, sin verificar.
 - **Solo mundos locales, LAN o servidores sin autenticación:** los jugadores extra se conectan por dentro del juego. En un servidor con autenticación no pueden entrar.
 - **Cierre del mundo:** las tres excepciones (`NullPointerException` en `handleSoundEvent` y `hurtTo` al salir un jugador extra con paquetes todavía en cola) están corregidas; el cierre con 1 y con 4 jugadores no deja ningún `ERROR` en el log.
 - **Un fallo raro del servidor al entrar un jugador extra** (`IndexOutOfBoundsException` al preparar un chunk, visto 1 vez en unas 20 pruebas, justo cuando cambiaba la distancia de visión): el informe queda en `crash-reports`. Si te pasa, guarda el informe y avisa.

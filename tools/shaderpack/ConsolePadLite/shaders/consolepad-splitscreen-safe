@@ -1,0 +1,4 @@
+Marcador de pack seguro para la pantalla dividida de ConsolePad.
+Quien pone este archivo en un pack se compromete a que el pack no guarda estado entre fotogramas (sin exposicion automatica, TAA, mapa de sombras ni texturas anteriores)
+y a que los pasos composite/final sacan sus coordenadas de gl_FragCoord.xy / vec2(viewWidth, viewHeight), no de las coordenadas de textura del cuadrado.
+ConsolePad deja encendido un pack con este archivo aunque haya jugadores extra; a los demas los apaga mientras dura la pantalla dividida.

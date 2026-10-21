@@ -1,0 +1,6 @@
+option.SATURATION=Saturación
+option.SATURATION.comment=Lo vivos que son los colores. 1.00 los deja como en vanilla.
+option.CONTRAST=Contraste
+option.CONTRAST.comment=Diferencia entre las zonas oscuras y las claras. 1.00 lo deja como en vanilla.
+option.WARMTH=Calidez
+option.WARMTH.comment=Los valores positivos dan un tono cálido (naranja) y los negativos uno frío (azul).
