@@ -14,15 +14,22 @@ public final class AdaptivePerf {
     private static final double[] ENTITIES = {1.0, 0.9, 0.8, 0.7};
 
     private static volatile int level;
+    /** El modo ahorro de split.json, leido una vez por fotograma (level() se llama por cada particula dibujada). */
+    private static volatile boolean savingCached;
     private static double windowTime;
     private static int windowFrames, calmWindows, cooldown;
     private static long lastNanos;
 
     private AdaptivePerf() {}
 
+    /** Cambio del modo ahorro: la copia que lee level() se actualiza ya, sin esperar al siguiente fotograma. */
+    public static void savingChanged(boolean on) {
+        savingCached = on;
+    }
+
     /** Nivel efectivo: el del regulador, y como minimo 2 con el modo ahorro (con varios jugadores). */
     public static int level() {
-        return Math.max(level, SplitSettings.savingMode() ? 2 : 0);
+        return Math.max(level, savingCached ? 2 : 0);
     }
 
     public static double viewFactor() {
@@ -46,6 +53,7 @@ public final class AdaptivePerf {
 
     /** Una vez por fotograma. */
     public static void frame() {
+        savingCached = SplitSettings.savingMode();
         long now = System.nanoTime();
         double dt = lastNanos == 0 ? 0 : (now - lastNanos) / 1e9;
         lastNanos = now;

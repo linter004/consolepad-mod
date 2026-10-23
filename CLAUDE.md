@@ -131,3 +131,19 @@ Resumen de las 9 primeras entradas de `routing-log.md` (2026-10-07):
 
 - **Un shader sirve para la pantalla dividida si no guarda estado entre fotogramas (sin exposicion automatica, TAA, mapa de sombras ni texturas "anteriores") y saca las coordenadas de `gl_FragCoord.xy / vec2(viewWidth, viewHeight)`, no de las coordenadas de textura del cuadrado:** el cuadrado de los pasos composite/final solo cubre la region del jugador y las texturas de Iris tienen el tamano de la ventana. `tools/shaderpack/ConsolePadLite` (solo `final.vsh/fsh`, saturacion y contraste) se ve igual en las 4 regiones; Complementary Reimagined sale blanco en P2 a P4.
 - **Iris acepta un pack en carpeta dentro de `run/shaderpacks/` (`shaderPack=ConsolePadLite` en `run/config/iris.properties`)** y usa los programas de vanilla para lo que el pack no define. Receta de prueba: Sodium 0.6.13 + Iris 1.8.12 en `run/mods`, `ORG_GRADLE_PROJECT_neo_version=21.1.248`, `keepShaders=true` en `split.json`, `CONSOLEPAD_SHOTS=<carpeta> tools/run-autotest.sh <log>`, y al terminar quitar los jars y restaurar `iris.properties` y `split.json`.
+
+### Reglas aprendidas de jugar con shaders (2026-10-21)
+
+- **"Arranca el juego" del usuario = con shaders y sin quitarlos al cerrar:** `tools/jugar.sh` instala (si falta) el kit de `run/shader-kit` (Sodium 0.6.13 + Iris 1.8.12) en `run/mods`, deja el pack `ConsolePadLite.zip` elegido en `run/config/iris.properties` y lanza con `ORG_GRADLE_PROJECT_neo_version=21.1.248` (sus modulos de Fabric API no cargan con el NeoForge 21.1.92 de desarrollo). No lanzar nunca `./gradlew runClient` a pelo con esos jars puestos.
+- **El autotest va sin shaders:** `tools/run-autotest.sh` mueve los jars de `run/mods` a `run/mods.off` mientras corre y los devuelve al terminar (miden colores de pixel y la version de NeoForge cambia). `CONSOLEPAD_KEEP_MODS=1` los deja puestos (pruebas de shaders, con `ORG_GRADLE_PROJECT_neo_version=21.1.248`). Si una ejecucion se corta con los jars escondidos, `jugar.sh` los devuelve.
+- **El oro (u otro objeto) que una prueba deja en el inventario de P2 en el mundo compartido falsea la siguiente pasada:** limpiar lo que se cuenta antes de preparar la prueba (asi se arreglo "mover rapido del cofre").
+
+### Reglas aprendidas del perfil de CPU (2026-10-22)
+
+- **Para saber donde se va el tiempo, perfilar antes de optimizar:** `tools/perfil-jfr.sh <etiqueta> [jugadores]` y `python tools/analiza-jfr.py run/perf/<etiqueta>.jfr main GameRenderer.render [funcion]`. El hilo del juego en JFR se llama `main` (no "Render thread"); el perfilador atribuye mal algunas llamadas (salian `ServerChunkCache.getChunk` inexistentes): confirmar con una linea de log antes de actuar. Comparar en las 4 pasadas (`cpuPorPasada`), no solo en FPS (el ruido entre pasadas es de +-15 %).
+- **El `ParticleEngine` es uno y cada pasada recorre las particulas de todos los mundos:** cualquier trabajo por particula (caja de dibujo, prueba de campo de vision, ajustes) hay que filtrarlo por mundo ANTES (`ParticleEngineMixin`) y los ajustes leerlos una vez por fotograma, no por particula (`AdaptivePerf.savingChanged`).
+- **Una copia en cache de un ajuste debe actualizarse al cambiarlo, no solo en el siguiente fotograma:** las pruebas lo cambian y lo leen al instante.
+
+### Cambio (2026-10-23): shaders apagados por defecto
+
+- **"Arranca el juego" ya NO lleva shaders** (el usuario pidio "quita los shader"): `tools/jugar.sh` no instala el kit salvo con `CONSOLEPAD_SHADERS=1`; `run/mods` queda vacio (los jars siguen en `run/shader-kit`). Esto sustituye a la regla de "jugar con shaders" de arriba.

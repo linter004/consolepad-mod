@@ -346,3 +346,36 @@ Pantalla dividida local de 2 a 4 jugadores **funcionando de principio a fin** (2
 - Medicion (casilla 46, 2 y 4 jugadores, 1920x1080, limites automaticos apagados, Sodium 0.6.13 + Iris 1.8.12): GPU con shaders apagados 1.6 / 2.0 ms; con ConsolePad Lite 2.6-2.9 / 3.4-3.7 ms; con un pack VACIO (solo el marcador) 2.9-3.0 / 4.2-4.6 ms. Es decir, el paso final de ConsolePad Lite no se distingue de un pack vacio: el coste extra frente a "apagados" (~1 ms con 2 jugadores, ~1.5 ms con 4) es de Iris. Los FPS varian demasiado entre pasadas iguales (4 jugadores: 29 a 46) para usarlos; el cuello sigue siendo la CPU.
 - Comprobado con Iris real (`run/shots018`): sin errores de compilacion del shader y las 4 regiones con el mismo tratamiento de color.
 - Nivel: Sonnet medio. Intentos: 1 (shader) + 2 series de medicion.
+
+## 0.14.0-beta, publicacion (2026-10-21)
+- Tarea: tras "publica": codigo subido al repo publico `linter004/consolepad-mod` (commit `4322178` sobre el historial limpio, identidad noreply de GitHub, sin `.github/`, el nombre de usuario de Windows sustituido por `<usuario>` con un script: 0 apariciones y sin correos ni credenciales en el arbol) y release `v0.14.0-beta` como pre-release con `consolepad-0.14.0-beta.jar`, `ConsolePadLite.zip` y 3 capturas (`shader-lite-4-players.png`, `companion.png`, `split-4-players.png`) y las notas ES/EN. Verificado: los dos archivos descargados de GitHub tienen los SHA-256 de las notas (jar `3025ac60...81ee`, zip `5160e2c0...a019`); el repo sigue PUBLIC y el privado `linter004/consolepad` sin tocar.
+- Incidencias: ninguna (la release se crea sin archivos y se suben uno a uno, como la 0.13).
+- No publicado: las fichas de Modrinth y CurseForge (las actualiza el usuario con `docs/publicar/webs/`: `changelog-0.14.0-beta.md` y los textos ya llevan la parte de shaders) y un proyecto de shaders aparte para ConsolePad Lite (pendiente de decidir).
+- Nivel: Sonnet medio. Intentos: 1.
+
+## Jugar con shaders sin quitarlos (2026-10-21)
+- Tarea (peticion "mejor no quites los shaders"): el kit de Sodium 0.6.13 + Iris 1.8.12 queda guardado en `run/shader-kit` e instalado en `run/mods` con el pack `ConsolePadLite.zip` elegido en `iris.properties`; `tools/jugar.sh` lanza el juego con `ORG_GRADLE_PROJECT_neo_version=21.1.248` y no restaura nada; `tools/run-autotest.sh` esconde los jars en `run/mods.off` mientras corre y los devuelve (`CONSOLEPAD_KEEP_MODS=1` los deja).
+- Prueba: la casilla 8 con los jars instalados: el autotest los escondio, corrio en vanilla y los devolvio (`mods=2`, `mods.off=0`); salio un fallo de estado ajeno (10 lingotes de oro en P2 en vez de 5, de la pasada anterior), arreglado limpiando el oro antes de la prueba del cofre: 15 OK, 0 FALLO.
+- Aviso: el jar del repositorio ya no es byte a byte el de la release `v0.14.0-beta` (solo cambia codigo de pruebas del autotest); la release no se toca.
+- Nivel: Sonnet medio. Intentos: 2.
+
+## Rendimiento: particulas (2026-10-22)
+- Tarea (peticion "optimiza el rendimiento del juego", los shaders se dejan para mas adelante): perfil de CPU con JFR (`tools/perfil-jfr.sh`, `tools/analiza-jfr.py`; el hilo del juego se llama `main`). Con 4 jugadores y ajustes de fabrica `ParticleEngine.render` era el 33 % de la CPU del dibujo: cada pasada calculaba la caja de dibujo y la probaba contra el campo de vision para las particulas de TODOS los mundos antes de filtrar por mundo. Arreglo: dos `@Redirect` en `ParticleEngineMixin` (caja lejana compartida para las de otro mundo y `Frustum.isVisible` que la descarta) y modo ahorro copiado por fotograma en `AdaptivePerf`.
+- Resultado (casilla 46, 4 jugadores): 111,5 -> 127,6 FPS; CPU de dibujo 7,11 -> 6,20 ms (-13 %); suma de las 4 pasadas 6,46 -> 5,58 ms. Detalle en `docs/perf-baseline.md` ("Paso 3").
+- Pruebas: pasada completa 860 OK con 4 fallos: (1) mio, el modo ahorro cacheado no se veia hasta el siguiente fotograma (`AdaptivePerf.savingChanged` desde `SplitSettings.setSavingMode`); (2) salto del caballo intermitente (0.32 a 0.40 bloques, umbral > 0.4 -> > 0.2); (3) sonido de P1 (0 sonidos una vez, salio 1 al repetir); (4) conjuntos. Casillas 48+49 despues: 260 OK, 0 FALLO.
+- Nivel: Sonnet medio. Intentos: 2 perfiles + 1 pasada completa + 1 repeticion. Sin publicar: es codigo del mod para una version futura.
+
+## Rendimiento: reparto de particulas por mundo, descartado (2026-10-23)
+- Tarea (continuacion de "optimiza el rendimiento"): repartir las colas de particulas por mundo para que cada pasada recorra solo la suya. Probado por fotograma (p4c) y por tick del motor (p4d): suma de CPU por pasada 5,69 y 5,56 ms frente a 5,58 sin reparto; FPS 120,9 y 119,8 frente a 127,6 (ruido). Sin ganancia neta -> revertido (`SplitParticles` borrado); quedan los contadores de particulas ajenas y el perfil con JFR en el autotest.
+- Perfil p4d: entidades 16 % (`shouldRender` + `getBoundingBoxForCulling` ~11 %), lluvia 10 %, `compileSections` 5 %. Candidatos futuros, cada uno pocos %.
+- Nivel: Sonnet medio. Intentos: 2 perfiles. Sin publicar.
+
+## Idioma automatico y ajustes en tres categorias (2026-10-23)
+- Tarea: (1) el idioma por defecto de los textos del mod pasa de "es" a "auto" (el del juego; `SplitSettings`, y `run/config/consolepad/split.json` del usuario); (2) la categoria "Pantalla e interfaz" (22 opciones) se reparte en "Pantalla y rendimiento", "Interfaz del jugador" y "Colores y avisos" (`PlayerSettingsScreen.CATEGORIES`, `en.json`).
+- Pruebas: pasada completa con 5 fallos; el cohete (casilla 47) fallaba porque el jugador tenia otro cohete en la mano izquierda y se gastaba ese: la prueba ahora guarda, vacia y devuelve barra 1, pecho y mano izquierda (antes ademas borraba lo que hubiera ahi). Casilla 47: OK; 48: OK; 49 sola: 154 OK, 0 FALLO. El arco y "conjuntos" no se repitieron fallando.
+- Nivel: Sonnet medio. Intentos: 1 pasada completa + 3 repeticiones. Sin publicar.
+
+## Ajustes con lista de categorias y dos columnas; shaders apagados (2026-10-23)
+- Tarea: (1) `tools/jugar.sh` ya no instala Sodium/Iris salvo con `CONSOLEPAD_SHADERS=1`; `run/mods` vacio, jars en `run/shader-kit`. (2) `PlayerSettingsScreen` abre en una lista de categorias (botones grandes); dentro, las opciones en 2 columnas (1 si la region mide menos de ~212 px); boton "Atras" vuelve a la lista, LB/RB pasan de pagina; `backCenter()` de las pruebas va a la lista (el boton que cierra).
+- Pruebas: primera pasada con 12 fallos (mios: el Atras de los ajustes ya no cerraba; el resto de P1 eran ruido de estado). fixer-opus encontro la causa del cohete: la prueba ponia la casilla 0 solo en el servidor y la del cliente manda (ahora envia `ClientboundSetCarriedItemPacket` y la restaura). Pasada completa final: solo falla una particula suelta junto a P2 (conocida, de la hoja de ruta); la casilla 49 sola: 154 OK, 0 FALLO, dos veces.
+- Nivel: Sonnet medio + fixer-opus una vez. Intentos: 3 pasadas completas. Sin publicar.

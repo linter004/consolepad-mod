@@ -801,6 +801,8 @@ public final class AutoTest {
                     level.setBlockAndUpdate(s2Pos, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
                     var be = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(s2Pos);
                     be.setItem(0, new ItemStack(Items.GOLD_INGOT, 5));
+                    for (var pl : new ServerPlayer[] {p1, p2}) // el oro que dejo una pasada anterior en P2 (o en P1) falsea el recuento
+                        for (int i = 0; i < 36; i++) if (pl.getInventory().getItem(i).is(Items.GOLD_INGOT)) pl.getInventory().setItem(i, ItemStack.EMPTY);
                     p2.openMenu(be);
                 });
             }
@@ -2067,6 +2069,7 @@ public final class AutoTest {
                 }
                 if (t == 125) {
                     var cs = screenOf(mc, ccSlot);
+                    if (cs instanceof PlayerSettingsScreen st0) st0.openCategory(0); // se abre en la lista de categorias
                     ccVerdict(who + ": los ajustes tienen varias paginas y anuncian LB/RB", cs instanceof PlayerSettingsScreen st && st.hintTabs());
                     ccAll0 = cs instanceof PlayerSettingsScreen st ? st.page() : -1;
                     simSlot(ccSlot, 1 << PadState.RB);
@@ -5441,6 +5444,7 @@ public final class AutoTest {
     private static boolean pfPrevVsync, pfPrevRain;
     private static final java.util.List<net.minecraft.world.entity.Entity> pfEntities = new java.util.ArrayList<>();
     private static long pfPrevUsed = -1;
+    private static int[][] pfPart0;
     private static final String PF_TAG = System.getenv("CONSOLEPAD_PERF_TAG") == null ? "base" : System.getenv("CONSOLEPAD_PERF_TAG");
     private static final int[] PF_COUNTS = pfCounts();
 
@@ -5571,6 +5575,7 @@ public final class AutoTest {
                     pfGcCount = pfGc(true);
                     pfGcMs = pfGc(false);
                     PerfProbe.start();
+                    pfPart0 = new int[][] {SplitDiag.particlesDrawn.clone(), SplitDiag.particlesForeign.clone()}; // cuantas particulas mueve cada pasada (se resta al final)
                     pfPhase = 4;
                     ticks = 0;
                 }
@@ -5595,6 +5600,8 @@ public final class AutoTest {
                 }
                 pf("N={} distancia efectiva={} (pedida {}), automatica={}, limites={}, servidor={}", n, mc.options.getEffectiveRenderDistance(), mc.options.renderDistance().get(),
                         SplitSettings.autoViewDistance(), SplitSettings.playerLimits(), server.getPlayerList().getViewDistance());
+                pf("N={} niveles: P1 {} con {}", n, mc.level.getClass().getSimpleName(), mc.level.getChunkSource().getClass().getSimpleName());
+                for (PlayerContext pc : SecondaryPlayers.contexts()) if (pc.level != null) pf("N={} niveles: {} {} con {}", n, pc.label(), pc.level.getClass().getSimpleName(), pc.level.getChunkSource().getClass().getSimpleName());
                 pf("N={} fotogramas={} FPS={} frameMs={} cpuRenderMs={} cpuTickMs/fotograma={} gpuMs={} cuello={} montonUsadoMB={} (antes de medir {}) montonMaxMB={} directaMB={} extraMB/jugador={}",
                         n, r.frames(), String.format(java.util.Locale.ROOT, "%.1f", r.fps()), f2(r.frameMs()), f2(r.renderCpuMs()), f2(r.tickCpuMsPerFrame()), f2(r.gpuMs()),
                         r.bottleneck(), used, pfHeap, rt.maxMemory() >> 20, pfDirectMb(), pfPrevUsed < 0 ? "-" : String.valueOf(used - pfPrevUsed));
@@ -5605,6 +5612,11 @@ public final class AutoTest {
                         batchers, java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().stream().filter(a -> a.startsWith("-X")).toList());
                 pf("N={} ticks={} maxTickMs={} duracionMs={} msPorTick={}", n, r.tickCalls(), f2(r.tickMaxMs()), f2(r.wallMs()), f2(r.tickCpuMsPerFrame() * r.frames() / Math.max(1, r.tickCalls())));
                 pf("N={} cpuPorPasada={} gpuPorPasada={}", n, fmtMap(r.cpuByPass()), fmtMap(r.gpuByPass()));
+                if (pfPart0 != null) {
+                    StringBuilder pp = new StringBuilder();
+                    for (int sl = 0; sl < Math.min(n, 4); sl++) pp.append(" P").append(sl + 1).append("=").append(String.format(java.util.Locale.ROOT, "%.0f", (SplitDiag.particlesDrawn[sl] - pfPart0[0][sl]) / (double) Math.max(1, r.frames()))).append("/").append(String.format(java.util.Locale.ROOT, "%.0f", (SplitDiag.particlesForeign[sl] - pfPart0[1][sl]) / (double) Math.max(1, r.frames())));
+                    pf("N={} particulas por fotograma (propias/ajenas saltadas):{}", n, pp);
+                }
                 pf("N={} secciones {}", n, sec);
                 pf("N={} entidades {}", n, ent);
                 pfPrevUsed = used;
@@ -5689,9 +5701,11 @@ public final class AutoTest {
     }
 
     // ------------------------------------------------------------------ elitros con mando (casilla 47) ------------------------------------------------------------------
-    private static int elSlot, elStep;
+    private static int elSlot, elStep, elPrevSelected;
     private static boolean elOk = true;
     private static net.minecraft.world.level.GameType elPrevMode;
+    /** Lo que el jugador tenia en la barra 1, el pecho y la mano izquierda: la prueba lo cambia (un cohete en la otra mano se gastaba en vez del de la prueba) y lo devuelve. */
+    private static ItemStack elSave0 = ItemStack.EMPTY, elSaveChest = ItemStack.EMPTY, elSaveOff = ItemStack.EMPTY;
     private static Vec3 elPrevPos;
     private static float elYaw0, elPitch0;
     private static double elSpeed0;
@@ -5735,9 +5749,16 @@ public final class AutoTest {
                     elPrevPos = sp.position();
                     Vec3 p = elPrevPos;
                     server.execute(() -> {
+                        elPrevSelected = sp.getInventory().selected;
+                        elSave0 = sp.getInventory().getItem(0).copy();
+                        elSaveChest = sp.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).copy();
+                        elSaveOff = sp.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND).copy();
+                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
                         sp.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
                         sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.ELYTRA));
+                        // La casilla elegida la manda el cliente: cambiarla solo en el servidor no basta (con otra casilla en el cliente el cohete no se usaba).
                         sp.getInventory().selected = 0;
+                        sp.connection.send(new net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket(0));
                         sp.getInventory().setItem(0, new ItemStack(Items.FIREWORK_ROCKET, 3));
                         sp.teleportTo((net.minecraft.server.level.ServerLevel) sp.level(), p.x, p.y + 200, p.z, 0f, 0f);
                         sp.fallDistance = 0f;
@@ -5782,8 +5803,11 @@ public final class AutoTest {
                             + ", cohetes " + elRockets0 + " -> " + left + ")", left == elRockets0 - 1 && v > elSpeed0 + 0.2);
                     server.execute(() -> {
                         sp.stopFallFlying();
-                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
-                        sp.getInventory().setItem(0, ItemStack.EMPTY);
+                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, elSaveChest);
+                        sp.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, elSaveOff);
+                        sp.getInventory().setItem(0, elSave0);
+                        sp.getInventory().selected = elPrevSelected;
+                        sp.connection.send(new net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket(elPrevSelected));
                         sp.setGameMode(elPrevMode);
                         sp.teleportTo((net.minecraft.server.level.ServerLevel) sp.level(), elPrevPos.x, elPrevPos.y, elPrevPos.z, 0f, 0f);
                         sp.fallDistance = 0f;

@@ -56,7 +56,9 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
             {I18n.tr("Cámara y apuntado"), "sens", "sensY", "lookCurve", "aimSens", "targetSlowdown", "invertY", "lookDead", "fov"},
             {I18n.tr("Movimiento y botones"), "moveDead", "doubleTap", "layout", "sneakMode", "sprintMode", "attackMode", "toggleHolds", "autoJump", "dropRate"},
             {I18n.tr("Menús y cursor"), "cursorSpeed", "snapNav", "autoKeyboard", "hints", "bigHints", "iconStyle"},
-            {I18n.tr("Pantalla e interfaz"), "guiScale", "viewDist", "fovComp", "brightness", "playerColors", "lowHealthFlash", "separators", "sleepNotice", "language", "savingMode", "hudMargin", "hudOpacity", "showHud", "showHand", "showCoords", "showDirection", "paperDoll", "showCompanions", "companionDistance", "bedMarker", "showFps", "reduceEffects"},
+            {I18n.tr("Pantalla y rendimiento"), "guiScale", "viewDist", "fovComp", "brightness", "language", "savingMode", "reduceEffects", "showFps"},
+            {I18n.tr("Interfaz del jugador"), "showHud", "hudMargin", "hudOpacity", "showHand", "showCoords", "showDirection", "paperDoll", "showCompanions", "companionDistance", "bedMarker"},
+            {I18n.tr("Colores y avisos"), "playerColors", "lowHealthFlash", "separators", "sleepNotice"},
             {I18n.tr("Jugador y mandos"), "name", "labelColor", "profile", "assignPads", "vibration", "vibDamage", "vibActions", "vibWorld", "wheel"},
             {I18n.tr("Copiar y restablecer"), "copySource", "copyDo", "reset"},
     };
@@ -92,6 +94,8 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     private final java.util.Map<String, Button> buttons = new java.util.HashMap<>();
     private Button back, prev, nextPage;
     private int page;
+    /** Al abrir se ve la lista de categorias (botones grandes); al elegir una se ven sus opciones en dos columnas. */
+    private boolean inMenu = true;
     /** Jugador del que se copian los ajustes (por defecto el siguiente al propio). */
     private int copySource;
     private boolean resetArmed;
@@ -321,8 +325,43 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         buildPages();
     }
 
-    private int perPage() {
+    private int rowsPerPage() {
         return Math.max(3, (footerY() - 32) / PITCH);
+    }
+
+    /** 2 columnas si caben (cada una de al menos 100 px), si no 1. */
+    private int columns() {
+        return Math.min(ROW_W, (this.width - 12) / 2) >= 100 ? 2 : 1;
+    }
+
+    private int colWidth() {
+        return columns() == 2 ? Math.min(ROW_W, (this.width - 12) / 2) : ROW_W;
+    }
+
+    private int perPage() {
+        return rowsPerPage() * columns();
+    }
+
+    /** Pasa de la lista de categorias a las opciones de la categoria `index` (su primera pagina). */
+    public void openCategory(int index) {
+        int seen = -1;
+        String last = null;
+        for (int k = 0; k < pages.size(); k++) {
+            if (!pages.get(k).category().equals(last)) {
+                last = pages.get(k).category();
+                seen++;
+            }
+            if (seen == index) {
+                page = k;
+                break;
+            }
+        }
+        inMenu = false;
+        this.rebuildWidgets();
+    }
+
+    public boolean inMenu() {
+        return inMenu;
     }
 
     /** Reparte las opciones por categorias y cada categoria por paginas (una categoria nunca comparte pagina con otra). */
@@ -357,12 +396,29 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         int footerY = footerY();
         int pageCount = pages.size();
         page = Math.min(page, pageCount - 1);
+        int cols = columns(), cw = colWidth(), gap = 4;
+        int gridW = cols * cw + (cols - 1) * gap;
         int x = this.width / 2 - ROW_W / 2;
+        int gx = this.width / 2 - gridW / 2;
+        if (inMenu) {
+            prev = nextPage = null;
+            List<String> names = new ArrayList<>();
+            for (Page pg : pages) if (!names.contains(pg.category())) names.add(pg.category());
+            int rows = (names.size() + cols - 1) / cols;
+            int y0 = Math.max(28, 28 + (footerY() - 28 - rows * PITCH) / 2);
+            for (int k = 0; k < names.size(); k++) {
+                final int idx = k;
+                addRenderableWidget(Button.builder(I18n.lit(names.get(k)), b -> openCategory(idx))
+                        .bounds(gx + (k % cols) * (cw + gap), y0 + (k / cols) * PITCH, cw, ROW_H).build());
+            }
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
+            return;
+        }
         List<Item> shown = pages.get(page).items();
         for (int k = 0; k < shown.size(); k++) {
             Item it = shown.get(k);
             Runnable back = prevActions.getOrDefault(it.id(), it.next());
-            Button b = addRenderableWidget(new StepButton(x, 28 + k * PITCH, ROW_W, ROW_H, I18n.lit(it.label().get()), btn -> {
+            Button b = addRenderableWidget(new StepButton(gx + (k % cols) * (cw + gap), 28 + (k / cols) * PITCH, cw, ROW_H, I18n.lit(it.label().get()), btn -> {
                 it.next().run();
                 if (Minecraft.getInstance().screen != this) return; // la opcion abrio otra pantalla
                 btn.setMessage(I18n.lit(it.label().get()));
@@ -380,15 +436,20 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
                 page = (page + pages - 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x, footerY, 30, ROW_H).build());
-            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> toMenu()).bounds(x + 34, footerY, ROW_W - 68, ROW_H).build());
             nextPage = addRenderableWidget(Button.builder(I18n.lit(">"), b -> {
                 page = (page + 1) % pages;
                 this.rebuildWidgets();
             }).bounds(x + ROW_W - 30, footerY, 30, ROW_H).build());
         } else {
             prev = nextPage = null;
-            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> this.onClose()).bounds(x, footerY, ROW_W, ROW_H).build());
+            back = addRenderableWidget(Button.builder(I18n.lit("Atrás"), b -> toMenu()).bounds(x, footerY, ROW_W, ROW_H).build());
         }
+    }
+
+    private void toMenu() {
+        inMenu = true;
+        this.rebuildWidgets();
     }
 
     private int pageCount() {
@@ -397,14 +458,14 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
 
     @Override
     public boolean hintTabs() {
-        return pageCount() > 1;
+        return !inMenu && pageCount() > 1;
     }
 
     /** LB/RB: pagina anterior / siguiente. */
     @Override
     public void tab(int dir) {
         int pages = pageCount();
-        if (pages < 2) return;
+        if (inMenu || pages < 2) return;
         page = Math.floorMod(page + dir, pages);
         this.rebuildWidgets();
     }
@@ -422,6 +483,10 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         if (pages.isEmpty()) return;
+        if (inMenu) {
+            graphics.drawCenteredString(this.font, this.font.plainSubstrByWidth(I18n.tr("Elige una categoría"), this.width - 8), this.width / 2, 18, 0xFFFFD84A);
+            return;
+        }
         Page pg = pages.get(Math.min(page, pages.size() - 1));
         String head = pg.category() + (pg.parts() > 1 ? "  " + (pg.part() + 1) + "/" + pg.parts() : "") + "  ·  " + (page + 1) + "/" + pages.size();
         graphics.drawCenteredString(this.font, this.font.plainSubstrByWidth(head, this.width - 8), this.width / 2, 18, 0xFFFFD84A);
@@ -446,6 +511,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
                 for (Item it : pages.get(k).items()) {
                     if (it.id().equals(id)) {
                         page = k;
+                        inMenu = false;
                         this.rebuildWidgets();
                         return centerOf(id);
                     }
@@ -488,6 +554,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
     }
 
     public int[] backCenter() {
+        if (!inMenu) toMenu(); // las pruebas quieren el boton que cierra la pantalla, que es el de la lista de categorias
         return center(back);
     }
 }

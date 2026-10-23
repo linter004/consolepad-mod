@@ -39,7 +39,7 @@ public final class SplitSettings {
         Boolean soundPerPlayer = Boolean.TRUE;
         Boolean adaptivePerformance = Boolean.TRUE;
         Boolean savingMode = Boolean.FALSE;
-        String language = "es";
+        String language = "auto";
         Boolean separators = Boolean.TRUE;
         Boolean sleepNotice = Boolean.TRUE;
         Integer targetFps = 40;
@@ -203,6 +203,7 @@ public final class SplitSettings {
 
     public static void setSavingMode(boolean on) {
         data().savingMode = on;
+        AdaptivePerf.savingChanged(on);
         save();
     }
 

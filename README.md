@@ -1,4 +1,4 @@
-# ConsolePad 0.14.0-beta
+# ConsolePad 0.15.0-beta
 
 **[Español](#español) · [English](#english)**
 
@@ -90,7 +90,7 @@ Everything can be remapped per player from the pause menu.
 
 ### Installation
 
-See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.14.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
+See [docs/INSTALL.md](docs/INSTALL.md) (in Spanish). In short: put `consolepad-0.15.0-beta.jar` in the `mods` folder of a NeoForge 1.21.1 instance, open a single-player world, connect a second controller and press Start on it.
 
 ### Known issues
 
@@ -187,7 +187,7 @@ Todo se puede remapear por jugador desde el menú de pausa.
 
 ### Instalación
 
-Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.14.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
+Ver [docs/INSTALL.md](docs/INSTALL.md). En resumen: copia `consolepad-0.15.0-beta.jar` a la carpeta `mods` de una instancia de NeoForge 1.21.1, abre un mundo de un jugador, conecta un segundo mando y pulsa Start en él.
 
 ### Problemas conocidos
 

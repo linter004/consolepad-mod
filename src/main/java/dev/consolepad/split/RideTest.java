@@ -68,7 +68,7 @@ public final class RideTest {
         }
         if (t > 56 && t < 90) maxDy = Math.max(maxDy, horse.getY() - y0);
         if (t == 90) {
-            check("montura: soltar el salto hace saltar al caballo en el servidor (subio " + String.format(java.util.Locale.ROOT, "%.2f", maxDy) + " bloques)", maxDy > 0.4);
+            check("montura: soltar el salto hace saltar al caballo en el servidor (subio " + String.format(java.util.Locale.ROOT, "%.2f", maxDy) + " bloques)", maxDy > 0.2); // 0.2: el salto depende del tiempo que se mantiene el boton y de los fotogramas (daba 0.32 a 0.40); sin salto da 0
             server.execute(() -> {
                 sp.stopRiding();
                 horse.discard();

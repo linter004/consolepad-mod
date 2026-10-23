@@ -106,3 +106,39 @@ El paso 1 no muestra ningun caso limitado por la GPU: con la linea base la GPU g
 | 4 | 78 -> 189 | 12,83 -> 5,29 | 10,78 -> 4,62 | 4,58 -> 1,19 | 758 -> 604 | 12 -> 6 |
 
 \* Con 1 jugador no cambia nada (los limites no actuan); las ejecuciones de 1 jugador dieron 371-505 FPS segun el momento del equipo (ruido de ±15 %).
+
+
+## Paso 3: perfil de CPU con JFR y particulas (2026-10-22)
+
+**Como se mide:** `tools/perfil-jfr.sh <etiqueta> [jugadores]` lanza la casilla 46 con el grabador de Java (JFR, una muestra cada 2 ms) y los ajustes de fabrica, y vuelca la
+grabacion con `jcmd` antes de cerrar el juego (el cierre forzado del autotest la perderia); `python tools/analiza-jfr.py run/perf/<etiqueta>.jfr main GameRenderer.render [funcion]`
+resume el hilo del juego (**se llama `main`**, no "Render thread"): tiempo propio, tiempo "con todo lo de dentro" de las funciones clave y las cadenas de llamadas que llegan a una funcion.
+Ojo: el perfilador atribuye mal algunos fotogramas (aparecian llamadas a `ServerChunkCache.getChunk` que no existen: los 4 niveles son `ClientLevel` con `ClientChunkCache`).
+
+**Hallazgo (4 jugadores, ajustes de fabrica, 1920x1080, bosque con lluvia):** `ParticleEngine.render` = **33 % del tiempo de CPU del dibujo**, y `SingleQuadParticle.getRenderBoundingBox`
+era la funcion con mas tiempo propio de todo el juego (19,9 %). El motor de particulas es uno solo y cada una de las 4 pasadas recorria **todas** las particulas de los 4 mundos; vanilla
+calcula la caja de dibujo de cada una (una `AABB` nueva) y la prueba contra el campo de vision ANTES de que nuestro filtro por mundo (`consolepad$ownWorldOnly`, sobre `Particle.render`) actuara.
+
+**Arreglo** (`ParticleEngineMixin`): dos `@Redirect` mas, sobre `Particle.getRenderBoundingBox` (las de otro mundo devuelven una caja lejana compartida, sin calcular nada) y sobre
+`Frustum.isVisible` (esa caja se descarta sin probarla). Ademas `AdaptivePerf.level()` (se llama por cada particula dibujada) ya no lee el ajuste del modo ahorro cada vez: se copia una
+vez por fotograma y al cambiarlo (`AdaptivePerf.savingChanged`).
+
+| 4 jugadores | antes | despues |
+|---|---|---|
+| FPS | 111,5 | 127,6 |
+| ms por fotograma | 8,97 | 7,84 |
+| CPU de dibujo (ms) | 7,11 | 6,20 |
+| CPU por pasada P1 / P2 / P3 / P4 (ms) | 1,44 / 1,79 / 1,81 / 1,42 | 1,20 / 1,53 / 1,49 / 1,36 (suma 6,46 -> 5,58) |
+| Tick maximo (ms) | 14,8 | 11,1 |
+
+Quedan las particulas del propio jugador (la caja de cada una cuesta lo mismo que en vanilla con un jugador). Resto del perfil (largo, sin un punto dominante): dibujo de entidades ~15 %
+(`getRenderer`, `shouldRender`), lluvia y nieve ~11 % (consultas de bioma por columna), `compileSections` ~6 %, recorte de secciones ~4 %.
+
+**Probado y descartado: repartir las particulas por mundo.** Recorrer solo la cola de cada mundo (reparto por fotograma o por tick del motor) no gana nada: el reparto cuesta lo mismo
+que lo que ahorra (suma por pasada 5,58 -> 5,69 por fotograma y 5,56 por tick, dentro del ruido). Las particulas ajenas ya son baratas tras el arreglo anterior.
+**Siguientes candidatos (cada uno unos pocos %):** `EntityRenderDispatcher.shouldRender` ~11 % (`Entity.shouldRender` y `LivingEntity.getBoundingBoxForCulling` -> `Mob.getItemBySlot`, por cada entidad
+del mundo y pasada), `renderSnowAndRain` ~10 % (`getBiome` por columna, ~3 %). El ruido entre ejecuciones (+-15 % en FPS) obliga a medir con `cpuPorPasada` y a repetir.
+
+**Entidades y lluvia: revisados, sin cambio (2026-10-23).** En la medida p4d cada mundo tiene ~350-430 entidades y se dibujan 7-46 por pasada: la comprobacion `shouldRender` es la de vanilla
+(distancia primero, caja despues) y solo se podria acortar con una cache por entidad que no cabe en el ruido de medida (+-15 %) y arriesga mobs con correa y entidades de otros mods. La lluvia ya usa
+la version rapida (radio 5, `PerfLimits.fancyWeather`) con 3-4 jugadores; lo que queda (~10 %) es la consulta de bioma por columna de vanilla, solo cuando llueve. Se dejan como estan.
