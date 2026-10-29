@@ -25,7 +25,7 @@ import java.util.function.Supplier;
  */
 public final class V1Test {
     private static int phase;
-    private static boolean dropCursorDone, wheelDone, profilesDone, lostDone, rideDone, rumbleDone, dragDone, ambientDone, kickDone, hotbarDone, sleepDone, pickDone, dotDone, kbDone;
+    private static boolean dropCursorDone, wheelDone, profilesDone, lostDone, rideDone, rumbleDone, dragDone, ambientDone, kickDone, hotbarDone, sleepDone, pickDone, dotDone, kbDone, coopDone, bigMapDone;
     private static int calls;
     static final int EXIT_PLAYERS = envInt("CONSOLEPAD_EXIT_PLAYERS", 2);
 
@@ -45,6 +45,14 @@ public final class V1Test {
         calls++;
         switch (phase) {
             case 0 -> {
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && pickDone && dotDone && kbDone && coopDone && !bigMapDone) { // mapa grande del cuarto cuadrante
+                    bigMapDone = BigMapTest.run(mc);
+                    return false;
+                }
+                if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && pickDone && dotDone && kbDone && !coopDone) { // cooperativo: gestos, marcas, dar objeto, sin dano entre jugadores
+                    coopDone = CoopTest.run(mc);
+                    return false;
+                }
                 if (dropCursorDone && wheelDone && rideDone && rumbleDone && dragDone && ambientDone && kickDone && hotbarDone && sleepDone && pickDone && dotDone && !kbDone) { // teclado con un boton
                     kbDone = KeyboardButtonTest.run(mc);
                     return false;

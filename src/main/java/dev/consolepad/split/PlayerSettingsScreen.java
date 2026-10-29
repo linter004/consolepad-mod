@@ -41,6 +41,29 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
 
     private static final String[] ICON_STYLES = {"los de mi mando", "Xbox", "PlayStation", "Nintendo"};
 
+    public static final int[] FAR_WARNINGS = {0, 64, 100, 150, 250, 500};
+
+    /**
+     * Perfil sencillo: ayudas de botones grandes, cursor que salta de casilla en casilla, teclado en pantalla al escribir, vibracion suave, un poco de ayuda
+     * al apuntar y el nombre y la distancia de los companeros. Sirve para quien quiere menos cosas que ajustar (se puede cambiar cada una despues).
+     * No toca la identidad (nombre ni color) ni la disposicion de botones.
+     */
+    public static void applyEasyProfile(PadSettings s) {
+        s.showHints = true;
+        s.bigHints = true;
+        s.snapNav = true;
+        s.autoKeyboard = true;
+        s.vibration = 0.4f;
+        s.targetSlowdown = 0.6f;
+        s.aimSensitivity = 0.75f;
+        s.showCompanions = true;
+        s.showCompanionDistance = true;
+        s.paperDoll = true;
+        s.hudOpacity = 1f;
+        s.hudMargin = 4;
+        s.guiScale = 0;
+    }
+
     private record Item(String id, Supplier<String> label, Runnable next) {}
 
     /** Categorias de los ajustes (cada una empieza en pagina nueva) y que opciones lleva cada una. */
@@ -52,15 +75,22 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         return out;
     }
 
+    /** Pruebas: la opcion esta en alguna categoria (no cae en "Otras"). */
+    public boolean hasItemForTest(String id) {
+        for (String[] cat : CATEGORIES) for (int k = 1; k < cat.length; k++) if (cat[k].equals(id)) return true;
+        return false;
+    }
+
     private static final String[][] CATEGORIES = {
             {I18n.tr("Cámara y apuntado"), "sens", "sensY", "lookCurve", "aimSens", "targetSlowdown", "invertY", "lookDead", "fov"},
             {I18n.tr("Movimiento y botones"), "moveDead", "doubleTap", "layout", "sneakMode", "sprintMode", "attackMode", "toggleHolds", "autoJump", "dropRate"},
             {I18n.tr("Menús y cursor"), "cursorSpeed", "snapNav", "autoKeyboard", "hints", "bigHints", "iconStyle"},
-            {I18n.tr("Pantalla y rendimiento"), "guiScale", "viewDist", "fovComp", "brightness", "language", "savingMode", "reduceEffects", "showFps"},
-            {I18n.tr("Interfaz del jugador"), "showHud", "hudMargin", "hudOpacity", "showHand", "showCoords", "showDirection", "paperDoll", "showCompanions", "companionDistance", "bedMarker"},
+            {I18n.tr("Pantalla y rendimiento"), "guiScale", "viewDist", "fovComp", "brightness", "language", "savingMode", "reduceEffects", "showFps", "mapQuadrant"},
+            {I18n.tr("Interfaz del jugador"), "showHud", "hudMargin", "hudOpacity", "showHand", "showCoords", "showMinimap", "showDirection", "paperDoll"},
             {I18n.tr("Colores y avisos"), "playerColors", "lowHealthFlash", "separators", "sleepNotice"},
-            {I18n.tr("Jugador y mandos"), "name", "labelColor", "profile", "assignPads", "vibration", "vibDamage", "vibActions", "vibWorld", "wheel"},
-            {I18n.tr("Copiar y restablecer"), "copySource", "copyDo", "reset"},
+            {I18n.tr("Cooperativo"), "friendlyFire", "deathNotice", "farWarning", "showCompanions", "companionDistance", "bedMarker"},
+            {I18n.tr("Jugador y mandos"), "name", "labelColor", "profile", "assignPads", "p1Keyboard", "vibration", "vibDamage", "vibActions", "vibWorld", "wheel"},
+            {I18n.tr("Copiar y restablecer"), "easyProfile", "copySource", "copyDo", "reset"},
     };
 
     private record Page(String category, int part, int parts, List<Item> items) {}
@@ -254,6 +284,17 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
         items.add(new Item("sneakMode", () -> modeLabel(I18n.tr("Agacharse"), s.sneakToggle, s), () -> s.sneakToggle = !s.sneakToggle));
         items.add(new Item("sprintMode", () -> modeLabel(I18n.tr("Correr"), s.sprintToggle, s), () -> s.sprintToggle = !s.sprintToggle));
         items.add(new Item("attackMode", () -> modeLabel(I18n.tr("Atacar"), s.attackToggle, s), () -> s.attackToggle = !s.attackToggle));
+        items.add(new Item("p1Keyboard", () -> I18n.tr("Jugador 1 juega con (todos): ") + (SplitSettings.p1Keyboard() ? I18n.tr("teclado y ratón") : I18n.tr("mando")), () -> SplitSettings.setP1Keyboard(!SplitSettings.p1Keyboard())));
+        items.add(new Item("mapQuadrant", () -> I18n.tr("Mapa grande con 3 jugadores (todos): ") + yesNo(SplitSettings.mapQuadrant()), () -> SplitSettings.setMapQuadrant(!SplitSettings.mapQuadrant())));
+        items.add(new Item("friendlyFire", () -> I18n.tr("Daño entre jugadores (todos): ") + yesNo(SplitSettings.friendlyFire()), () -> SplitSettings.setFriendlyFire(!SplitSettings.friendlyFire())));
+        items.add(new Item("deathNotice", () -> I18n.tr("Aviso cuando muere alguien (todos): ") + yesNo(SplitSettings.deathNotice()), () -> SplitSettings.setDeathNotice(!SplitSettings.deathNotice())));
+        items.add(new Item("farWarning", () -> I18n.tr("Aviso de compañero lejos (todos): ") + (SplitSettings.farWarning() == 0 ? I18n.tr("nunca") : SplitSettings.farWarning() + " " + I18n.tr("bloques")),
+                () -> SplitSettings.setFarWarning(nextInt(FAR_WARNINGS, SplitSettings.farWarning()))));
+        items.add(new Item("easyProfile", () -> I18n.tr("Aplicar perfil sencillo a este jugador"), () -> {
+            applyEasyProfile(s);
+            ConsolePad.PADS.saveSettings();
+            this.rebuildWidgets();
+        }));
         items.add(new Item("copySource", () -> I18n.tr("Copiar ajustes de: ") + PlayerLabels.labelOf(copySource), () -> copySource = nextOther(copySource)));
         items.add(new Item("copyDo", () -> I18n.tr("Copiar ahora a este jugador"), () -> {
             s.copyFrom(ConsolePad.PADS.slot(copySource).settings);
@@ -271,6 +312,7 @@ public final class PlayerSettingsScreen extends PlayerMenuScreen {
             resetArmed = false;
             this.rebuildWidgets();
         }));
+        items.add(new Item("showMinimap", () -> I18n.tr("Minimapa: ") + yesNo(s.showMinimap), () -> s.showMinimap = !s.showMinimap));
         items.add(new Item("showCoords", () -> I18n.tr("Mostrar coordenadas: ") + yesNo(s.showCoords), () -> s.showCoords = !s.showCoords));
         items.add(new Item("paperDoll", () -> I18n.tr("Muñeco del jugador: ") + yesNo(s.paperDoll), () -> s.paperDoll = !s.paperDoll));
         items.add(new Item("bedMarker", () -> I18n.tr("Marcar mi cama: ") + yesNo(s.showBedMarker), () -> s.showBedMarker = !s.showBedMarker));

@@ -38,6 +38,10 @@ public final class QuickWheel {
     private static final boolean[] OPEN = new boolean[4];
     private static final int[] SELECTED = {-1, -1, -1, -1};
     private static final float[] HELD = new float[4];
+    /** Pagina de la rueda abierta de cada jugador (0 = sus entradas, 1 = gestos, marca y dar objeto). */
+    private static final int[] PAGE = new int[4];
+    /** Pruebas: false = la rueda solo tiene sus entradas (una pagina), como antes de existir la de gestos. */
+    private static volatile boolean builtinPage = true;
     /** Cuantos comandos ha ejecutado la rueda de cada jugador y el ultimo (diagnostico y pruebas). */
     public static final int[] executed = new int[4];
     public static final String[] lastCommand = {"", "", "", ""};
@@ -117,6 +121,28 @@ public final class QuickWheel {
     /** Pruebas: sustituye las entradas sin tocar el archivo (null = volver a leerlas). */
     public static void setEntriesForTest(List<Entry> list) {
         entries = list;
+        builtinPage = list == null;
+    }
+
+    /** Cuantas paginas tiene la rueda (2 con la de gestos). */
+    public static int pageCount() {
+        return builtinPage ? 2 : 1;
+    }
+
+    public static int page(int slot) {
+        return slot >= 0 && slot < 4 ? PAGE[slot] : 0;
+    }
+
+    /** Las entradas que se ven ahora en la rueda del jugador (segun su pagina). */
+    public static List<Entry> shown(int slot, PadSettings cfg) {
+        return builtinPage && PAGE[slot] == 1 ? Coop.wheelEntries() : listFor(cfg);
+    }
+
+    /** Pruebas y LB/RB: cambia de pagina de la rueda abierta. */
+    public static void turnPage(int slot, int dir) {
+        if (!OPEN[slot] || pageCount() < 2) return;
+        PAGE[slot] = Math.floorMod(PAGE[slot] + dir, pageCount());
+        SELECTED[slot] = -1;
     }
 
     public static boolean isOpen(int slot) {
@@ -139,6 +165,7 @@ public final class QuickWheel {
 
     private static void close(int slot) {
         OPEN[slot] = false;
+        PAGE[slot] = 0;
         SELECTED[slot] = -1;
         HELD[slot] = 0f;
     }
@@ -150,9 +177,10 @@ public final class QuickWheel {
             close(slot);
             return;
         }
-        List<Entry> list = listFor(cfg);
+        List<Entry> list = shown(slot, cfg);
         if (!OPEN[slot]) {
-            if (s.pressed(code) && !list.isEmpty()) {
+            if (s.pressed(code) && !listFor(cfg).isEmpty()) {
+                PAGE[slot] = 0;
                 OPEN[slot] = true;
                 SELECTED[slot] = -1;
                 HELD[slot] = 0f;
@@ -160,6 +188,9 @@ public final class QuickWheel {
             return;
         }
         HELD[slot] += dt;
+        if (s.pressed(PadState.RB)) turnPage(slot, 1); // LB y RB cambian de pagina mientras la rueda esta abierta
+        if (s.pressed(PadState.LB)) turnPage(slot, -1);
+        list = shown(slot, cfg);
         if (!s.isDown(code)) { // soltar: ejecuta lo elegido
             int sel = SELECTED[slot];
             boolean run = sel >= 0 && sel < list.size() && HELD[slot] >= 0.08f;
@@ -169,7 +200,8 @@ public final class QuickWheel {
                 if (cmd.startsWith("/")) cmd = cmd.substring(1);
                 executed[slot]++;
                 lastCommand[slot] = cmd;
-                send.accept(cmd);
+                if (!Coop.run(slot, cmd)) send.accept(cmd); // los gestos, la marca y dar objeto son internos
+
             }
             return;
         }
@@ -199,7 +231,7 @@ public final class QuickWheel {
     public static void render(Minecraft mc, GuiGraphics g, int slot, int w, int h) {
         if (!OPEN[slot]) return;
         Font font = mc.font;
-        List<Entry> list = listFor(ConsolePad.PADS.slot(slot).settings);
+        List<Entry> list = shown(slot, ConsolePad.PADS.slot(slot).settings);
         int n = list.size();
         int cx = w / 2, cy = h / 2, r = radius(w, h);
         int minX = cx, minY = cy, maxX = cx, maxY = cy;
@@ -230,9 +262,13 @@ public final class QuickWheel {
                 int x = cx + (p[0] - cx) * k / steps, y = cy + (p[1] - cy) * k / steps;
                 if (k % 2 == 0) g.fill(x - 1, y - 1, x + 1, y + 1, 0xFFFFD84A);
             }
-            String cmd = "/" + list.get(sel).command();
-            String shown = font.plainSubstrByWidth(cmd, Math.max(40, w - 10));
-            g.drawCenteredString(font, shown, cx, cy + r + 18, 0xFFA0A0A0);
+            String cmd = list.get(sel).command();
+            String shownText = font.plainSubstrByWidth(cmd.startsWith(Coop.PREFIX) ? list.get(sel).label() : "/" + cmd, Math.max(40, w - 10));
+            g.drawCenteredString(font, shownText, cx, cy + r + 18, 0xFFA0A0A0);
+        }
+        if (pageCount() > 1) { // pagina actual y como cambiarla
+            String pg = "< LB   " + (PAGE[slot] + 1) + "/" + pageCount() + "   RB >";
+            g.drawCenteredString(font, pg, cx, cy + r + 30, 0xFFFFD84A);
         }
         g.pose().popPose();
         lastBounds[slot] = new int[] {minX, minY, maxX - minX, maxY - minY};

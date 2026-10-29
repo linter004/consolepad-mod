@@ -44,7 +44,12 @@ public final class Companions {
     /** Un marcador: un companero (slot 0 a 3, con su vida) o la cama propia (slot -1, vida -1). */
     public record Mark(int slot, String name, int rgb, double distance, float relAngle, float health) {
         public boolean bed() {
-            return slot < 0;
+            return slot == -1;
+        }
+
+        /** Una marca de lugar puesta por un jugador (rueda de acciones). */
+        public boolean waypoint() {
+            return slot == -2;
         }
     }
 
@@ -102,6 +107,14 @@ public final class Companions {
                     relativeAngle(mc.player.getYRot(), mc.player.getX(), mc.player.getZ(), sp.getX(), sp.getZ()), sp.getHealth()));
         }
         out.sort((a, b) -> Integer.compare(a.slot(), b.slot()));
+        for (Coop.Waypoint w : Coop.waypoints()) { // marcas de lugar de todos (tambien las propias)
+            if (w.dimension() != mc.level.dimension()) continue;
+            double wdx = w.x() - mc.player.getX(), wdy = w.y() - mc.player.getY(), wdz = w.z() - mc.player.getZ();
+            double wdist = Math.sqrt(wdx * wdx + wdy * wdy + wdz * wdz);
+            if (wdist < 4.0) continue;
+            out.add(new Mark(-2, I18n.tr("Marca") + " " + PlayerLabels.labelOf(w.slot()), PlayerLabels.themeRgb(w.slot()), wdist,
+                    relativeAngle(mc.player.getYRot(), mc.player.getX(), mc.player.getZ(), w.x(), w.z()), -1f));
+        }
         if (viewer != null && ConsolePad.PADS.slot(viewerSlot).settings.showBedMarker) { // segundo marcador: la cama o el punto de reaparicion de este jugador
             var bed = viewer.getRespawnPosition();
             if (bed != null && viewer.getRespawnDimension() == mc.level.dimension()) {
@@ -142,8 +155,12 @@ public final class Companions {
                 if ((System.nanoTime() / 350_000_000L) % 2 == 0) color = 0xFFFF3030;
             }
             // Un cuadrado de 5x5 (la barra de experiencia mide 5 de alto) dentro de la barra, con un borde oscuro de 1 pixel para que se distinga del relleno verde.
+            if (m.waypoint()) {
+                PixelArt.draw(g, PixelArt.PIN, x - 3, y - 2, 1, m.rgb()); // la marca de lugar es una chincheta, no un cuadrado
+            } else {
             g.fill(x - 3, y - 1, x + 4, y + 6, 0xFF000000);
             g.fill(x - 2, y, x + 3, y + 5, color);
+            }
             if (m.bed()) g.fill(x - 1, y + 1, x + 2, y + 4, 0xFF303030); // la cama es un anillo: el hueco la distingue de un companero
             if (Math.abs(m.relAngle()) > 90f) { // detras o muy de lado: una marca de 2x3 junto al cuadrado, hacia ese lado
                 int side = m.relAngle() > 0 ? 1 : -1;

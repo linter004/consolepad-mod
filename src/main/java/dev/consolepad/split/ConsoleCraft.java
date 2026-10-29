@@ -209,6 +209,7 @@ public final class ConsoleCraft {
 
     /** True si el filtro "solo fabricables" del libro esta activado. */
     public static boolean filtering(Screen screen) {
+        if (!applies(screen)) return false; // otra pantalla encima (por ejemplo la de mando perdido): sin libro no hay filtro
         var f = ((RecipeBookComponentAccessor) book(screen)).consolepad$filter();
         return f != null && f.isStateTriggered();
     }

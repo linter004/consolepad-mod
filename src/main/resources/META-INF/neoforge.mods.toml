@@ -4,7 +4,7 @@ license = "All Rights Reserved"
 
 [[mods]]
 modId = "consolepad"
-version = "0.15.0-beta"
+version = "0.16.0-beta"
 displayName = "ConsolePad"
 description = '''Soporte de mandos estilo consola (Xbox / PlayStation / Nintendo) con base para pantalla dividida de 2 a 4 jugadores.'''
 

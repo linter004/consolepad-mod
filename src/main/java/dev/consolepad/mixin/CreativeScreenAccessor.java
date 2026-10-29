@@ -29,6 +29,9 @@ public interface CreativeScreenAccessor {
     @Accessor("currentPage")
     CreativeTabsScreenPage consolepad$currentPage();
 
+    @Accessor("pages")
+    java.util.List<CreativeTabsScreenPage> consolepad$pages();
+
     @Accessor("scrollOffs")
     float consolepad$scrollOffs();
 

@@ -183,8 +183,8 @@ public final class PadHints {
         if (screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen) {
             out.add(new Hint(PadState.LB, I18n.tr("Categoría")));
             out.add(new Hint(PadState.RB, I18n.tr("Categoría")));
-            out.add(new Hint(PadState.LT, I18n.tr("Página anterior")));
-            out.add(new Hint(PadState.RT, I18n.tr("Página siguiente")));
+            out.add(new Hint(PadState.LT, I18n.tr("Categorías anteriores")));
+            out.add(new Hint(PadState.RT, I18n.tr("Categorías siguientes")));
         }
         if (craftBook) {
             out.add(new Hint(PadState.L3, I18n.tr("Libro de recetas")));

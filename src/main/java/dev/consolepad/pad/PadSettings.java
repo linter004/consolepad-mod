@@ -42,6 +42,8 @@ public final class PadSettings {
     public boolean showHints = true;
     /** Informacion extra en la region de este jugador: coordenadas, direccion a la que mira y FPS. */
     public boolean showCoords = false;
+    /** Minimapa del terreno (arriba a la derecha de la region de este jugador); apagado por defecto. */
+    public boolean showMinimap = false;
     public boolean showDirection = false;
     public boolean showFps = false;
     /** Punto sobre la barra de experiencia que apunta hacia los demas jugadores cuando estan lejos (como la barra de localizacion de Bedrock), con su nombre y distancia. */

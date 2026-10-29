@@ -1,6 +1,7 @@
 package dev.consolepad.pad;
 
 import dev.consolepad.ConsolePad;
+import dev.consolepad.split.SplitSettings;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWGamepadState;
 
@@ -208,14 +209,46 @@ public final class PadManager {
         }
     }
 
+    /**
+     * P1 con teclado y raton: el mando que tuviera el slot 0 pasa al primer slot libre de P2 a P4 (o queda sin jugador). Al desactivarlo, el slot 0 recupera un mando
+     * que no tenga jugador (los mandos de jugadores que ya estan dentro no se mueven).
+     */
+    public void applyP1Keyboard(boolean on) {
+        Slot first = slots[0];
+        if (on) {
+            Device d = first.device;
+            if (d == null) return;
+            for (int i = 1; i < MAX_PLAYERS; i++) {
+                if (slots[i].device == null) {
+                    slots[i].device = d;
+                    slots[i].lost = false;
+                    first.device = null;
+                    first.lost = false;
+                    return;
+                }
+            }
+            first.device = null; // sin hueco: queda sin jugador
+            first.lost = false;
+        } else if (first.device == null) {
+            for (Device d : allDevices()) {
+                if (slotOf(d) == null) {
+                    first.device = d;
+                    first.lost = false;
+                    return;
+                }
+            }
+        }
+    }
+
     private void connect(int jid) {
         Device dev = new Device(jid, GLFW.glfwGetGamepadName(jid));
         devices[jid] = dev;
         // Un mando que vuelve recupera su jugador; si no, el primer jugador sin mando que lo habia perdido; si no, el primer slot libre.
         Slot target = null;
-        for (Slot s : slots) if (s.device == null && s.lost && s.lostJid == jid) target = s;
-        if (target == null) for (Slot s : slots) if (s.device == null && s.lost) { target = s; break; }
-        if (target == null) for (Slot s : slots) if (s.device == null) { target = s; break; }
+        boolean kb = SplitSettings.p1Keyboard();
+        for (Slot s : slots) if (s.device == null && s.lost && s.lostJid == jid && !(kb && s.index == 0)) target = s;
+        if (target == null) for (Slot s : slots) if (s.device == null && s.lost && !(kb && s.index == 0)) { target = s; break; }
+        if (target == null) for (Slot s : slots) if (s.device == null && !(kb && s.index == 0)) { target = s; break; }
         if (target != null) {
             target.device = dev;
             target.lost = false;

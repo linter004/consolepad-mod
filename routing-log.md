@@ -379,3 +379,39 @@ Pantalla dividida local de 2 a 4 jugadores **funcionando de principio a fin** (2
 - Tarea: (1) `tools/jugar.sh` ya no instala Sodium/Iris salvo con `CONSOLEPAD_SHADERS=1`; `run/mods` vacio, jars en `run/shader-kit`. (2) `PlayerSettingsScreen` abre en una lista de categorias (botones grandes); dentro, las opciones en 2 columnas (1 si la region mide menos de ~212 px); boton "Atras" vuelve a la lista, LB/RB pasan de pagina; `backCenter()` de las pruebas va a la lista (el boton que cierra).
 - Pruebas: primera pasada con 12 fallos (mios: el Atras de los ajustes ya no cerraba; el resto de P1 eran ruido de estado). fixer-opus encontro la causa del cohete: la prueba ponia la casilla 0 solo en el servidor y la del cliente manda (ahora envia `ClientboundSetCarriedItemPacket` y la restaura). Pasada completa final: solo falla una particula suelta junto a P2 (conocida, de la hoja de ruta); la casilla 49 sola: 154 OK, 0 FALLO, dos veces.
 - Nivel: Sonnet medio + fixer-opus una vez. Intentos: 3 pasadas completas. Sin publicar.
+
+## 0.15.0-beta publicada en GitHub (2026-10-23)
+- Peticion "lo publicamos": version 0.15.0-beta (gradle.properties, neoforge.mods.toml, README, INSTALL), notas `docs/publicar/notas-0.15.0-beta.md`, copia anonimizada al repo publico (commit b9a19c0), release `v0.15.0-beta` (prerelease) con `consolepad-0.15.0-beta.jar` (SHA-256 5b0a5b67...3be5) y `ConsolePadLite.zip` (sin cambios). Descarga verificada por SHA-256.
+- Pendiente del usuario: subir la 0.15 a Modrinth/CurseForge (textos en `docs/publicar/webs/`, falta el changelog de la 0.15).
+- Nivel: Sonnet medio. Intentos: 1.
+
+## A al enviar un comando ya no salta en P2-P4 (2026-10-24)
+- Tarea: "al enviar un comando y doy A, saltas". En `SecondaryTick` saltar/atacar/usar/barra se leen directo del boton (no de `downSet`), asi que el `closeLatch` (que solo vaciaba `downSet`) no los cubria. Ahora: con una pantalla abierta todo lo pulsado se anota en `closeLatch` y el latch tambien pone a falso jump/attack/use/lb/rb hasta soltar. P1 no cambia (sus acciones son por flanco).
+- Pruebas: `KeyboardButtonTest` nueva fase (chat de P2: A pulsado al cerrarse -> +0 ticks de salto; soltar y pulsar -> +20). Mi primera version de la prueba abria un `ChatScreen` que P2 cerraba solo (el chat no estaba abierto) y daba un falso fallo: hay que usar `ExtraChatScreen`. Pasada completa: un cierre del juego por `ClassCastException` (`PadLostScreen` -> `RecipeUpdateListener` en `ConsoleCraft.filtering`, llamado desde la prueba del horno; salio la pantalla de mando perdido de P2): `filtering` ahora comprueba `applies`. Casillas 44-49 repetidas: 293 OK, 0 FALLO; el resto de la pasada: 576 OK, 0 FALLO.
+- Nivel: Sonnet medio. Intentos: 4 ejecuciones de la 49 + 2 pasadas. Sin publicar.
+
+## Prueba de portar a 1.21.11 (2026-10-24)
+- Tarea: rama `port-1.21.11` en un worktree, compilar contra NeoForge 21.11.48 y contar. Resultado en `docs/port-1.21.11.md`: 459 errores en 80 de 154 archivos, ~20 de 44 mixins a rehacer, y riesgo de rehacer el reparto del dibujo del GUI. `master` sin tocar.
+- Nivel: Sonnet medio. Intentos: 2 compilaciones + 1 script de comprobacion de mixins.
+
+## Prueba de portar a Fabric 1.21.1 (2026-10-25)
+- Tarea: rama `port-fabric` con Loom 1.15.5, mapeos oficiales, Fabric API 0.116.17. 144 errores en 28 archivos (113 en codigo del mod, 23 archivos), 5 de 44 mixins con error de compilacion. Detalle en `docs/port-fabric-1.21.1.md`. `master` sin tocar.
+- Nivel: Sonnet medio. Intentos: 7 versiones de Loom hasta dar con una compatible.
+
+## Cooperativo, gestos, marcas, dar objeto y perfil sencillo (2026-10-26) — SIN PROBAR
+- Hecho y compilando (`./gradlew build` OK): `Coop.java` (gestos con particulas/sonido/chat, marca de lugar visible en el indicador de companeros, dar la pila de la mano al companero mas cercano, sin dano entre jugadores por defecto, aviso de muerte, aviso de companero lejos), segunda pagina de la rueda (LB/RB), categoria "Cooperativo" y "Aplicar perfil sencillo" en los ajustes, traducciones al ingles (check-i18n: 0 pendientes), `CoopTest` enganchada en la casilla 49 (via V1Test).
+- PENDIENTE: ejecutar `CONSOLEPAD_AUTOTEST_CASES=49 tools/run-autotest.sh` y la pasada completa, arreglar lo que falle; actualizar la rama `port-fabric` (eventos de dano y muerte: ServerLivingEntityEvents; tick de servidor: ServerTickEvents); notas de version. Vibracion de PlayStation/Switch y mundos de servidor quedan en la hoja de ruta (sin mandos reales para probar / grande y arriesgado).
+- Nivel: Sonnet medio. Parado por limite de uso.
+
+## Cooperativo validado + minimapa + LT/RT creativo + P1 con teclado y raton (2026-10-29)
+- Tarea: autotest casilla 49 del cooperativo (168 OK, 0 FALLO); gestos de la rueda quitados (el usuario no los quiso); marca de lugar como chincheta de pixel art; minimapa opcional por jugador (`showMinimap`, apagado por defecto, `Minimap.java`); LT/RT del creativo cambian de pagina de categorias (mods) y el stick derecho el scroll; ajuste global "Jugador 1 juega con teclado y raton" (`p1Keyboard`, el mando pasa a P2).
+- Nivel: Sonnet medio, 2 pasadas del autotest (la primera fallo por un contador del test sin poner a cero).
+- PENDIENTE: `p1Keyboard` y LT/RT del creativo sin probar con hardware real; P1 con mando y P2 con teclado y raton queda en el roadmap (hay que desactivar el teclado de P1); actualizar la rama `port-fabric` con el cooperativo.
+
+## Mapa grande en el cuarto cuadrante (2026-10-29)
+- Tarea: con 3 jugadores y el ajuste global `mapQuadrant` (apagado por defecto) el reparto es de cuadrantes y el cuarto muestra `BigMap` (escala 4 de vanilla, 2048 bloques, terreno descubierto por los jugadores, puntos con nombre y chinchetas). `BigMapTest` en la casilla 49.
+- Nivel: Sonnet medio, 2 pasadas (la primera fallo por el reparto apilado del usuario en la comprobacion del test).
+- PENDIENTE: verlo con ojos (captura) y con mandos reales; sin publicar.
+
+## Publicacion 0.16.0-beta (2026-10-29)
+- Tarea: version 0.16.0-beta (`gradle.properties` y `neoforge.mods.toml`), notas en `docs/publicar/notas-0.16.0-beta.md`, publicacion en el repositorio publico y release. Nivel: Sonnet medio.

@@ -45,6 +45,14 @@ public final class SplitSettings {
         Integer targetFps = 40;
         Integer padLostLeaveSeconds = 30;
         Boolean askPlayers = Boolean.TRUE;
+        /** Cooperativo: dano entre jugadores locales (apagado por defecto), aviso de muerte y distancia (bloques) a la que se avisa de un companero lejos (0 = nunca). */
+        Boolean friendlyFire = Boolean.FALSE;
+        /** El jugador 1 juega con teclado y raton: ningun mando se asigna al slot 0 (los mandos son de P2 a P4). */
+        Boolean p1Keyboard = Boolean.FALSE;
+        /** Con 3 jugadores: cuadrantes y un mapa grande en el cuarto ("mapQuadrant"; no por defecto). */
+        Boolean mapQuadrant = Boolean.FALSE;
+        Boolean deathNotice = Boolean.TRUE;
+        Integer farWarning = 150;
         java.util.Map<String, String> worldOrientation = new java.util.HashMap<>();
     }
 
@@ -99,6 +107,16 @@ public final class SplitSettings {
                         if (read.padLostLeaveSeconds != null) d.padLostLeaveSeconds = Math.max(0, read.padLostLeaveSeconds);
                         else complete = false;
                         if (read.askPlayers != null) d.askPlayers = read.askPlayers;
+                        else complete = false;
+                        if (read.friendlyFire != null) d.friendlyFire = read.friendlyFire;
+                        else complete = false;
+                        if (read.p1Keyboard != null) d.p1Keyboard = read.p1Keyboard;
+                        else complete = false;
+                        if (read.mapQuadrant != null) d.mapQuadrant = read.mapQuadrant;
+                        else complete = false;
+                        if (read.deathNotice != null) d.deathNotice = read.deathNotice;
+                        else complete = false;
+                        if (read.farWarning != null) d.farWarning = Math.max(0, Math.min(1000, read.farWarning));
                         else complete = false;
                         if (read.worldOrientation != null) d.worldOrientation = read.worldOrientation;
                         else complete = false;
@@ -204,6 +222,56 @@ public final class SplitSettings {
     public static void setSavingMode(boolean on) {
         data().savingMode = on;
         AdaptivePerf.savingChanged(on);
+        save();
+    }
+
+    /** Cooperativo: si los jugadores locales se hacen dano entre si ("friendlyFire" de split.json; no por defecto). */
+    public static boolean friendlyFire() {
+        return data().friendlyFire;
+    }
+
+    public static void setFriendlyFire(boolean on) {
+        data().friendlyFire = on;
+        save();
+    }
+
+    /** El jugador 1 usa teclado y raton y los mandos pasan a P2 a P4 ("p1Keyboard"; no por defecto). */
+    public static boolean mapQuadrant() {
+        return data().mapQuadrant;
+    }
+
+    public static void setMapQuadrant(boolean on) {
+        data().mapQuadrant = on;
+        save();
+    }
+
+    public static boolean p1Keyboard() {
+        return data().p1Keyboard;
+    }
+
+    public static void setP1Keyboard(boolean on) {
+        data().p1Keyboard = on;
+        save();
+        dev.consolepad.ConsolePad.PADS.applyP1Keyboard(on);
+    }
+
+    /** Aviso para todos cuando muere un jugador local ("deathNotice"; si por defecto). */
+    public static boolean deathNotice() {
+        return data().deathNotice;
+    }
+
+    public static void setDeathNotice(boolean on) {
+        data().deathNotice = on;
+        save();
+    }
+
+    /** Distancia (bloques) a la que un companero lejos genera un aviso; 0 = nunca ("farWarning"; 150 por defecto). */
+    public static int farWarning() {
+        return data().farWarning;
+    }
+
+    public static void setFarWarning(int blocks) {
+        data().farWarning = Math.max(0, Math.min(1000, blocks));
         save();
     }
 

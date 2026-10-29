@@ -32,6 +32,7 @@ public final class SplitLayout {
         int left = w / 2, right = w - left;
         int top = h / 2, bottom = h - top;
         boolean stacked = orientation == SplitSettings.Orientation.STACKED;
+        if (BigMap.active(n)) return new int[][] {{0, 0, left, top}, {left, 0, right, top}, {0, top, left, bottom}}; // cuadrantes: el cuarto es del mapa
         return switch (n) {
             case 1 -> new int[][] {{0, 0, w, h}};
             case 2 -> stacked
@@ -54,6 +55,11 @@ public final class SplitLayout {
         int s = 1;
         while (pxW / (s + 1) >= AUTO_MIN_W && pxH / (s + 1) >= AUTO_MIN_H) s++;
         return s;
+    }
+
+    /** El cuarto cuadrante {x, y, ancho, alto} en unidades de GUI de la ventana (donde va el mapa grande con 3 jugadores). */
+    public static int[] mapRect(int w, int h) {
+        return rects(4, w, h, SplitSettings.Orientation.SIDE_BY_SIDE)[3];
     }
 
     /** Calcula y guarda las regiones de P1 (en SplitView) y de cada contexto extra, para la ventana actual. */

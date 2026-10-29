@@ -20,6 +20,8 @@ public final class KeyboardButtonTest {
         Settings2Test.check(name, ok);
     }
 
+    private static int jump0;
+
     private static void pad(int slot, int bits) {
         var d = ConsolePad.PADS.slot(slot).device;
         if (d != null) d.state.simDown = bits;
@@ -72,6 +74,26 @@ public final class KeyboardButtonTest {
             s0.autoKeyboard = prev0;
             s1.autoKeyboard = prev1;
             SecondaryTick.scriptActive = false;
+        }
+        // ---- P2: A pulsado cuando el chat se cierra solo (enviar un comando) no hace saltar; soltar y volver a pulsar si salta
+        if (t == 140) ContextSwitcher.run(c, () -> mc.setScreen(new ExtraChatScreen()));
+        if (t == 150) pad(1, 1 << PadState.A);
+        if (t == 160) {
+            jump0 = SecondaryTick.dbgJumpTicks;
+            ContextSwitcher.run(c, () -> { if (c.screen != null) c.screen.onClose(); });
+        }
+        if (t == 185) {
+            check("chat de P2: con A pulsado al cerrarse el chat no salta (ticks de salto +" + (SecondaryTick.dbgJumpTicks - jump0) + ", pantalla " + c.screen + ")",
+                    c.screen == null && SecondaryTick.dbgJumpTicks - jump0 == 0);
+            pad(1, 0);
+        }
+        if (t == 195) {
+            jump0 = SecondaryTick.dbgJumpTicks;
+            pad(1, 1 << PadState.A);
+        }
+        if (t == 215) {
+            check("chat de P2: tras soltar, A vuelve a saltar (ticks de salto +" + (SecondaryTick.dbgJumpTicks - jump0) + ")", SecondaryTick.dbgJumpTicks - jump0 >= 3);
+            pad(1, 0);
             t = 0;
             return true;
         }

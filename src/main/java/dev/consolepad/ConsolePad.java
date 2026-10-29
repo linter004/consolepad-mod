@@ -43,6 +43,14 @@ public class ConsolePad {
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onExplosion);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.RumbleEvents::onServerTick);
         NeoForge.EVENT_BUS.addListener(dev.consolepad.split.PlayerLabels::onTabName);
+        // Cooperativo: sin dano entre jugadores locales (si se apaga en los ajustes), aviso de muerte y de companero lejos, marcas de lugar.
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent e) -> {
+            if (dev.consolepad.split.Coop.blocksDamage(e.getSource().getEntity(), e.getEntity())) e.setCanceled(true);
+        });
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) -> {
+            if (e.getEntity() instanceof net.minecraft.server.level.ServerPlayer dead) dev.consolepad.split.Coop.onDeath(dead);
+        });
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) -> dev.consolepad.split.Coop.serverTick(e.getServer()));
 
         // Fase 3, paso 1: jugador local extra. Atajo de mando (Start+Back en el slot 1) en PadDriver; comando para probar con un solo mando.
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> {

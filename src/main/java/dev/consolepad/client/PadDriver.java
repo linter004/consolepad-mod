@@ -465,7 +465,7 @@ public final class PadDriver {
             case PERSPECTIVE -> tap(o.keyTogglePerspective);
             case PICK_BLOCK -> tap(o.keyPickItem);
             case CHAT -> tap(o.keyChat);
-            case HOTBAR_PREV, HOTBAR_NEXT -> hotbarStep(player, action, cfg);
+            case HOTBAR_PREV, HOTBAR_NEXT -> { if (!dev.consolepad.split.QuickWheel.isOpen(0)) hotbarStep(player, action, cfg); } // con la rueda abierta, LB y RB cambian su pagina
             case SPRINT_TOGGLE -> {
                 sprintLatch = HoldToggle.next(cfg.isToggle(action), sprintLatch, true, true);
                 o.keySprint.setDown(sprintLatch);

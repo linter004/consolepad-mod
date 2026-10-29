@@ -153,13 +153,24 @@ public final class SecondaryTick {
             // la pantalla se cierra en el fotograma y este tick veria ese boton como una pulsacion nueva (soltar un objeto, reabrir el menu).
             if (st.closeLatch != 0) {
                 for (Map.Entry<Integer, PadAction> e : cfg.bindings.entrySet()) {
-                    if ((st.closeLatch & (1 << e.getKey())) != 0 && cs.isDown(e.getKey())) downSet.remove(e.getValue());
+                    if ((st.closeLatch & (1 << e.getKey())) != 0 && cs.isDown(e.getKey())) {
+                        downSet.remove(e.getValue());
+                        switch (e.getValue()) { // saltar, atacar, usar y la barra se leen de forma directa, no de downSet
+                            case JUMP -> jump = false;
+                            case ATTACK -> attack = false;
+                            case USE -> use = false;
+                            case HOTBAR_PREV -> lb = false;
+                            case HOTBAR_NEXT -> rb = false;
+                            default -> { }
+                        }
+                    }
                 }
                 for (int code = 0; code < 32; code++) {
                     if ((st.closeLatch & (1 << code)) != 0 && !cs.isDown(code)) st.closeLatch &= ~(1 << code);
                 }
             }
         }
+        if (QuickWheel.isOpen(ctx.slotIndex)) lb = rb = false; // con la rueda abierta, LB y RB cambian su pagina, no la barra de objetos
         // Con un menu abierto el jugador no se mueve ni actua en el mundo (su mando maneja el cursor), pero lo que tiene pulsado se
         // recuerda: al cerrar el menu no cuenta como pulsacion nueva.
         java.util.EnumSet<PadAction> rawDown = java.util.EnumSet.copyOf(downSet);
@@ -168,6 +179,12 @@ public final class SecondaryTick {
             forward = left = lookX = lookY = 0f;
             jump = attack = use = lb = rb = false;
             downSet.clear();
+            // Lo que el jugador tiene pulsado con una pantalla abierta (A para enviar un comando del chat, por ejemplo) no dispara su accion de
+            // juego cuando la pantalla se cierra sola: hasta soltarlo queda en el cierre (saltaba al enviar un comando).
+            if (slot.device != null && !scripted) {
+                PadState hs = slot.device.state;
+                for (int code = 0; code < 32; code++) if (hs.isDown(code)) st.closeLatch |= 1 << code;
+            }
         }
         java.util.EnumSet<PadAction> pressed = java.util.EnumSet.copyOf(downSet);
         pressed.removeAll(st.prevDown);

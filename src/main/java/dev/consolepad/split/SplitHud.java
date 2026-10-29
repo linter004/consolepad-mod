@@ -111,6 +111,7 @@ public final class SplitHud {
                                 PlayerInfo.render(mc, graphics, p.slotIndex);
                                 PaperDoll.render(mc, graphics, p.slotIndex, fw, fh);
                                 Companions.render(mc, graphics, p.slotIndex, fw, fh);
+                                Minimap.render(mc, graphics, p.slotIndex, fw, fh);
                                 SleepNotice.render(mc, graphics, p.slotIndex, fw, fh);
                             } finally {
                                 endAlpha(graphics);
@@ -135,6 +136,7 @@ public final class SplitHud {
                 rects.add(new int[] {p.gx, p.gy, p.gw, p.gh});
                 owners.add(p.slotIndex);
             }
+            if (BigMap.active(rects.size())) BigMap.render(mc, graphics, SplitLayout.mapRect(graphics.guiWidth(), graphics.guiHeight())); // el cuarto cuadrante
             SplitSeparators.render(mc, graphics, rects, owners); // linea de color entre las regiones
         } finally {
             SplitView.guiWidth = 0;
@@ -170,6 +172,7 @@ public final class SplitHud {
             PlayerInfo.render(mc, graphics, 0);
             PaperDoll.render(mc, graphics, 0, fw, fh);
             Companions.render(mc, graphics, 0, fw, fh);
+            Minimap.render(mc, graphics, 0, fw, fh);
             SleepNotice.render(mc, graphics, 0, fw, fh);
         } finally {
             mc.options.hideGui = oldHide;
