@@ -60,6 +60,7 @@ public class ConsolePad {
         });
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e) -> {
             SecondaryPlayers.shutdown();
+            dev.consolepad.split.Coop.clearWaypoints();
             dev.consolepad.pad.Rumble.stopAll();
         });
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> {

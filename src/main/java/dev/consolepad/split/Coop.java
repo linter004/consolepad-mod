@@ -111,7 +111,7 @@ public final class Coop {
         double bestD = 64.0; // 8 bloques al cuadrado
         List<ServerPlayer> all = new ArrayList<>(server.getPlayerList().getPlayers());
         for (ServerPlayer sp : all) {
-            if (sp == null || sp == from || sp.level() != from.level()) continue;
+            if (sp == null || sp == from || sp.level() != from.level() || !sp.isAlive() || sp.isSpectator()) continue; // un muerto no recibe
             if (PlayerLabels.slotOf(mc, sp.getGameProfile().getName()) < 0) continue;
             double d = sp.distanceToSqr(from);
             if (d < bestD) {
@@ -121,6 +121,11 @@ public final class Coop {
         }
         if (best == null) {
             from.sendSystemMessage(Component.literal(I18n.tr("No hay nadie cerca (hasta 8 bloques).")), true);
+            return;
+        }
+        Component itemName = held.getHoverName(); // antes de entregar: la mano puede quedar vacia
+        if (best.getAbilities().instabuild && !hasRoom(best, held)) { // en creativo Inventory.add da la pila por entregada aunque no quepa
+            from.sendSystemMessage(Component.literal(I18n.fmt("A {0} no le caben más objetos.", PlayerLabels.labelOf(PlayerLabels.slotOf(mc, best.getGameProfile().getName())))), true);
             return;
         }
         ItemStack giving = held.copy();
@@ -134,10 +139,19 @@ public final class Coop {
         held.shrink(given);
         gives[slot]++;
         int toSlot = PlayerLabels.slotOf(mc, best.getGameProfile().getName());
-        Component what = Component.literal(given + " ").append(held.getItem().getName(held.isEmpty() ? new ItemStack(giving.getItem()) : held));
+        Component what = Component.literal(given + " ").append(itemName);
         from.sendSystemMessage(Component.literal(I18n.fmt("Le diste a {0}: ", PlayerLabels.labelOf(toSlot))).append(what), true);
         best.sendSystemMessage(Component.literal(I18n.fmt("{0} te dio: ", PlayerLabels.labelOf(slot))).append(what), true);
         ((ServerLevel) best.level()).playSound(null, best.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.4f, 1.1f);
+    }
+
+    /** Si el inventario del jugador tiene un hueco libre o una pila del mismo objeto con sitio. */
+    private static boolean hasRoom(ServerPlayer p, ItemStack stack) {
+        for (int i = 0; i < p.getInventory().items.size(); i++) {
+            ItemStack s = p.getInventory().items.get(i);
+            if (s.isEmpty() || (ItemStack.isSameItemSameComponents(s, stack) && s.getCount() < s.getMaxStackSize())) return true;
+        }
+        return false;
     }
 
     // ---- Marcas de lugar

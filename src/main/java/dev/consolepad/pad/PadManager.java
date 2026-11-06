@@ -216,10 +216,11 @@ public final class PadManager {
     public void applyP1Keyboard(boolean on) {
         Slot first = slots[0];
         if (on) {
+            first.lost = false; // P1 ya no espera mando: el aviso de mando perdido no tiene sentido
             Device d = first.device;
             if (d == null) return;
             for (int i = 1; i < MAX_PLAYERS; i++) {
-                if (slots[i].device == null) {
+                if (slots[i].device == null && !slots[i].lost && !dev.consolepad.split.SecondaryPlayers.isActive(i)) { // un slot sin jugador ni mando esperado
                     slots[i].device = d;
                     slots[i].lost = false;
                     first.device = null;
@@ -234,6 +235,15 @@ public final class PadManager {
                 if (slotOf(d) == null) {
                     first.device = d;
                     first.lost = false;
+                    return;
+                }
+            }
+            for (int i = 1; i < MAX_PLAYERS; i++) { // el mando de un slot sin jugador dentro vuelve a P1
+                if (slots[i].device != null && !dev.consolepad.split.SecondaryPlayers.isActive(i)) {
+                    first.device = slots[i].device;
+                    first.lost = false;
+                    slots[i].device = null;
+                    slots[i].lost = false;
                     return;
                 }
             }

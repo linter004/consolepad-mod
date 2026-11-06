@@ -183,8 +183,9 @@ public final class PadHints {
         if (screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen) {
             out.add(new Hint(PadState.LB, I18n.tr("Categoría")));
             out.add(new Hint(PadState.RB, I18n.tr("Categoría")));
-            out.add(new Hint(PadState.LT, I18n.tr("Categorías anteriores")));
-            out.add(new Hint(PadState.RT, I18n.tr("Categorías siguientes")));
+            boolean pages = TabNav.creativePageCount(screen) > 1; // con una sola pagina de categorias, LT/RT mueven la lista
+            out.add(new Hint(PadState.LT, I18n.tr(pages ? "Categorías anteriores" : "Página anterior")));
+            out.add(new Hint(PadState.RT, I18n.tr(pages ? "Categorías siguientes" : "Página siguiente")));
         }
         if (craftBook) {
             out.add(new Hint(PadState.L3, I18n.tr("Libro de recetas")));

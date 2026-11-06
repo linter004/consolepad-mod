@@ -170,7 +170,9 @@ public final class SecondaryTick {
                 }
             }
         }
-        if (QuickWheel.isOpen(ctx.slotIndex)) lb = rb = false; // con la rueda abierta, LB y RB cambian su pagina, no la barra de objetos
+        final boolean lbRaw = lb, rbRaw = rb; // lo que de verdad esta pulsado: al soltar la rueda con RB aun pulsado no cuenta como pulsacion nueva
+        final boolean wheelOpenNow = QuickWheel.isOpen(ctx.slotIndex);
+        if (wheelOpenNow) lb = rb = false; // con la rueda abierta, LB y RB cambian su pagina, no la barra de objetos
         // Con un menu abierto el jugador no se mueve ni actua en el mundo (su mando maneja el cursor), pero lo que tiene pulsado se
         // recuerda: al cerrar el menu no cuenta como pulsacion nueva.
         java.util.EnumSet<PadAction> rawDown = java.util.EnumSet.copyOf(downSet);
@@ -224,6 +226,10 @@ public final class SecondaryTick {
             ContextSwitcher.run(ctx, () -> secondaryTick(ctx, f, l, lx, ly, j, a, u, bl, br, cfg));
         } catch (RuntimeException e) {
             if (errors++ < MAX_LOGGED_ERRORS) ConsolePad.LOGGER.error("[split] error en el tick de " + ctx.label() + " (suprimido)", e);
+        }
+        if (wheelOpenNow) { // con la rueda abierta lb/rb valian false: se recuerda lo pulsado de verdad para que soltar la rueda no cuente como pulsacion nueva
+            st.prevLb = lbRaw;
+            st.prevRb = rbRaw;
         }
     }
 

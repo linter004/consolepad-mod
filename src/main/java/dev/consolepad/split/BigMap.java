@@ -31,6 +31,7 @@ public final class BigMap {
     private static final int[] PIXELS = new int[CELLS * CELLS];
     private static int tileX = Integer.MIN_VALUE, tileZ = Integer.MIN_VALUE, frame;
     private static ResourceKey<Level> tileDim;
+    private static ClientLevel tileLevel;
     private static boolean dirty;
     /** Pruebas: fotogramas dibujados, casillas descubiertas y jugadores dentro del mapa en el ultimo dibujado. */
     public static volatile int drawn, lastExplored, lastPlayers;
@@ -62,7 +63,8 @@ public final class BigMap {
         // la casilla del mapa sale de la posicion de P1, con la misma cuadricula que los mapas de vanilla
         int cx = (int) Math.floor((first.player().getX() + 64.0) / COVER) * COVER + COVER / 2 - 64;
         int cz = (int) Math.floor((first.player().getZ() + 64.0) / COVER) * COVER + COVER / 2 - 64;
-        if (cx != tileX || cz != tileZ || dim != tileDim || texture == null) {
+        if (cx != tileX || cz != tileZ || dim != tileDim || first.level() != tileLevel || texture == null) {
+            tileLevel = first.level();
             tileX = cx;
             tileZ = cz;
             tileDim = dim;

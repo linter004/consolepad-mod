@@ -41,6 +41,11 @@ public final class TabNav {
     }
 
     /** LT/RT: pasa a la pagina anterior (-1) o siguiente (+1) de categorias (donde estan las de otros mods), dando la vuelta, y elige la primera de esa pagina. */
+    /** Paginas de categorias del creativo (mas de una cuando hay pestanas de otros mods). */
+    public static int creativePageCount(Screen screen) {
+        return screen instanceof CreativeModeInventoryScreen c ? ((CreativeScreenAccessor) c).consolepad$pages().size() : 0;
+    }
+
     public static void changeCreativePage(Screen screen, int dir) {
         var a = (CreativeScreenAccessor) screen;
         var pages = a.consolepad$pages();
@@ -61,8 +66,13 @@ public final class TabNav {
                 lastPadTabNanos = System.nanoTime();
             }
             // LT/RT: pagina de categorias anterior/siguiente (las de otros mods); la lista de objetos la mueve el stick derecho
-            if (s.pressed(PadState.LT)) changeCreativePage(screen, -1);
-            if (s.pressed(PadState.RT)) changeCreativePage(screen, 1);
+            if (creativePageCount(screen) > 1) {
+                if (s.pressed(PadState.LT)) changeCreativePage(screen, -1);
+                if (s.pressed(PadState.RT)) changeCreativePage(screen, 1);
+            } else { // una sola pagina de categorias: LT/RT pasan 5 filas de la lista, como antes
+                if (s.pressed(PadState.LT)) screen.mouseScrolled(0, 0, 0, 5.0);
+                if (s.pressed(PadState.RT)) screen.mouseScrolled(0, 0, 0, -5.0);
+            }
             return true;
         }
         if (screen instanceof PlayerScreen ps && ps.hintTabs()) {

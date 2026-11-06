@@ -415,3 +415,10 @@ Pantalla dividida local de 2 a 4 jugadores **funcionando de principio a fin** (2
 
 ## Publicacion 0.16.0-beta (2026-10-29)
 - Tarea: version 0.16.0-beta (`gradle.properties` y `neoforge.mods.toml`), notas en `docs/publicar/notas-0.16.0-beta.md`, publicacion en el repositorio publico y release. Nivel: Sonnet medio.
+
+## Revision Opus max de la 0.16.0 y arreglos (2026-11-06)
+- Tarea: revision de solo lectura (agente Opus, esfuerzo max) de lo nuevo desde la 0.15.0: 13 hallazgos. Arreglados 9 (dar objeto a un muerto/en creativo/mensaje "Aire", marcas y mapa grande al cambiar de mundo, P1 con teclado al desactivar y `lost`, LB/RB al cerrar la rueda de P2-P4, LT/RT del creativo con una sola pagina, traducciones). Autotest casilla 49: 171 OK, 0 FALLO.
+- PENDIENTE (menores): pregunta de cuantos jugadores y PadSetupScreen con `p1Keyboard`, minimapa sobre los efectos, aviso en la rueda en servidor remoto. Sin publicar (la 0.16.0-beta publicada no lleva estos arreglos).
+
+## Publicacion 0.16.1-beta (2026-11-06)
+- Tarea: version 0.16.1-beta con los arreglos de la revision Opus; notas en `docs/publicar/notas-0.16.1-beta.md`; release en el repositorio publico. Nivel: Sonnet medio.
